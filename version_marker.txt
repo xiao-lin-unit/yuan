@@ -1,0 +1,14 @@
+Version: 1.0
+Date: 2026-03-29
+Description: Current project state before any further modifications
+
+This file marks the current state of the project. When requested, the project can be restored to this state.
+
+Files included in this version:
+- src/components/mobile/account/AccountManagement.vue
+- src/components/mobile/account/AccountForm.vue
+- src/components/mobile/account/BalanceAdjustForm.vue
+- src/components/mobile/account/TransferForm.vue
+- src/App.vue
+- src/stores/account.ts
+- and all other project files
