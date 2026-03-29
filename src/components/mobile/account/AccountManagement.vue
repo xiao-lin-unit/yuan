@@ -100,39 +100,7 @@
       </div>
     </div>
 
-    <!-- 新增账户对话框 -->
-    <el-dialog v-model="dialogVisible.add" title="新增账户" width="500px">
-      <el-form :model="accountForm" label-width="80px">
-        <el-form-item label="账户名称">
-          <el-input v-model="accountForm.name" placeholder="请输入账户名称" />
-        </el-form-item>
-        <el-form-item label="账户类型">
-          <el-select v-model="accountForm.type" placeholder="请选择账户类型">
-            <el-option label="现金" value="现金" />
-            <el-option label="微信" value="微信" />
-            <el-option label="支付宝" value="支付宝" />
-            <el-option label="储蓄卡" value="储蓄卡" />
-            <el-option label="社保卡" value="社保卡" />
-            <el-option label="信用卡" value="信用卡" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="初始余额">
-          <el-input v-model.number="accountForm.balance" placeholder="请输入初始余额" type="number" step="0.01" />
-        </el-form-item>
-        <el-form-item label="可用额度" v-if="accountForm.type === '信用卡'">
-          <el-input v-model.number="accountForm.available" placeholder="请输入可用额度" type="number" step="0.01" />
-        </el-form-item>
-        <el-form-item label="备注">
-          <el-input v-model="accountForm.remark" placeholder="请输入备注" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <span class="dialog-footer">
-          <el-button @click="dialogVisible.add = false">取消</el-button>
-          <el-button type="primary" @click="addAccount">确定</el-button>
-        </span>
-      </template>
-    </el-dialog>
+
     
     <!-- 编辑账户对话框 -->
     <el-dialog v-model="dialogVisible.edit" title="编辑账户" width="500px">
@@ -150,11 +118,17 @@
             <el-option label="信用卡" value="信用卡" />
           </el-select>
         </el-form-item>
-        <el-form-item label="初始余额">
-          <el-input v-model.number="accountForm.balance" placeholder="请输入初始余额" type="number" step="0.01" />
+        <el-form-item label="余额" v-if="accountForm.type !== '信用卡'">
+          <el-input v-model.number="accountForm.balance" placeholder="请输入余额" type="number" step="0.01" />
         </el-form-item>
-        <el-form-item label="可用额度" v-if="accountForm.type === '信用卡'">
-          <el-input v-model.number="accountForm.available" placeholder="请输入可用额度" type="number" step="0.01" />
+        <el-form-item label="已用额度" v-if="accountForm.type === '信用卡'">
+          <el-input v-model.number="accountForm.usedLimit" placeholder="请输入已用额度" type="number" step="0.01" />
+        </el-form-item>
+        <el-form-item label="总额度" v-if="accountForm.type === '信用卡'">
+          <el-input v-model.number="accountForm.totalLimit" placeholder="请输入总额度" type="number" step="0.01" />
+        </el-form-item>
+        <el-form-item label="流动资金" v-if="accountForm.type !== '信用卡' && accountForm.type !== '社保卡'">
+          <el-switch v-model="accountForm.isLiquid" />
         </el-form-item>
         <el-form-item label="备注">
           <el-input v-model="accountForm.remark" placeholder="请输入备注" />
@@ -218,7 +192,9 @@ const accountForm = ref({
   name: '',
   type: '',
   balance: 0,
-  available: 0,
+  usedLimit: 0,
+  totalLimit: 0,
+  isLiquid: true,
   remark: ''
 })
 
@@ -360,7 +336,9 @@ onMounted(() => {
 const openEditAccountDialog = (account: any) => {
   accountForm.value = { 
     ...account,
-    available: account.available || 0
+    usedLimit: account.used_limit || 0,
+    totalLimit: account.total_limit || 0,
+    isLiquid: account.is_liquid !== false
   }
   dialogVisible.value.edit = true
 }
@@ -375,11 +353,7 @@ const openBalanceAdjustDialog = (account: any) => {
   dialogVisible.value.adjust = true
 }
 
-const addAccount = () => {
-  accountStore.addAccount(accountForm.value)
-  dialogVisible.value.add = false
-  accounts.value = accountStore.accounts
-}
+
 
 const updateAccount = () => {
   accountStore.updateAccount(accountForm.value)
