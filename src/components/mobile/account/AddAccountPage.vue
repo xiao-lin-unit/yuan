@@ -1,11 +1,11 @@
 <template>
-  <div class="add-account-page">
-    <div class="page-header">
-      <el-icon @click="goBack"><ArrowLeft /></el-icon>
-      <h1>新增账户</h1>
-      <div class="placeholder"></div>
-    </div>
-
+  <PageTemplate 
+    title="新增账户"
+    show-confirm-button
+    confirm-text="确认添加"
+    @back="goBack"
+    @confirm="addAccount"
+  >
     <div class="form-container">
       <el-form :model="accountForm" label-width="80px">
         <el-form-item label="账户名称" required>
@@ -38,19 +38,13 @@
         </el-form-item>
       </el-form>
     </div>
-
-    <div class="button-container">
-      <el-button type="primary" class="submit-button" @click="addAccount">
-        确认添加
-      </el-button>
-    </div>
-  </div>
+  </PageTemplate>
 </template>
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import PageTemplate from '../../common/PageTemplate.vue'
 import { useAccountStore } from '../../../stores/account'
-import { ArrowLeft } from '@element-plus/icons-vue'
 
 const emit = defineEmits(['navigate'])
 const accountStore = useAccountStore()
@@ -90,62 +84,22 @@ const addAccount = async () => {
   }
   
   try {
+    console.log('Submitting account form:', accountForm.value)
     await accountStore.addAccount(accountForm.value)
+    console.log('Account added successfully, navigating back...')
     emit('navigate', 'account')
-  } catch (error) {
+  } catch (error: any) {
     console.error('添加账户失败:', error)
+    const errorMessage = error?.message || error?.toString() || '未知错误'
+    alert('添加账户失败：' + errorMessage)
   }
 }
 </script>
 
 <style scoped>
-.add-account-page {
-  padding: 0;
-  min-height: 100%;
-  background-color: #f5f5f5;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
-}
-
-.page-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px;
-  background-color: white;
-  border-bottom: 1px solid #e0e0e0;
-  position: sticky;
-  top: 0;
-  z-index: 100;
-}
-
-.page-header h1 {
-  font-size: 16px;
-  font-weight: bold;
-  color: #333333;
-  margin: 0;
-}
-
-.page-header .placeholder {
-  width: 24px;
-}
-
-.page-header el-icon {
-  font-size: 20px;
-  color: #333333;
-  cursor: pointer;
-  transition: color 0.2s ease;
-}
-
-.page-header el-icon:hover {
-  color: #409eff;
-}
-
 .form-container {
   background-color: white;
   padding: 0;
-  flex: 1;
   box-sizing: border-box;
 }
 
@@ -216,49 +170,8 @@ const addAccount = async () => {
   border-color: transparent;
 }
 
-.button-container {
-  padding: 16px;
-  box-sizing: border-box;
-  margin-top: auto;
-  background-color: white;
-  border-top: 1px solid #f0f0f0;
-}
-
-.submit-button {
-  width: 90%;
-  margin: 0 auto;
-  padding: 14px 0;
-  font-size: 16px;
-  font-weight: 500;
-  border-radius: 8px;
-  background-color: #1677ff;
-  border: none;
-  color: white;
-  transition: all 0.3s ease;
-  cursor: pointer;
-  display: block;
-  text-align: center;
-  line-height: 1.2;
-  height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.submit-button:hover {
-  background-color: #409eff;
-}
-
-.submit-button:active {
-  background-color: #096dd9;
-}
-
 /* 响应式设计 */
 @media (max-width: 375px) {
-  .page-header {
-    padding: 14px;
-  }
-  
   .el-form {
     padding: 14px;
   }
@@ -270,17 +183,6 @@ const addAccount = async () => {
   .el-form-item__label {
     width: 70px;
     font-size: 13px;
-  }
-  
-  .button-container {
-    padding: 14px;
-  }
-  
-  .submit-button {
-    width: 95%;
-    padding: 12px 0;
-    font-size: 15px;
-    height: 40px;
   }
 }
 </style>

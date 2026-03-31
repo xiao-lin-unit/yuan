@@ -1,7 +1,7 @@
 <template>
   <div class="fund-item">
     <div class="fund-icon" :class="'fund-icon' + fund.name">
-      {{ fund.name === '招商银行' ? '招' : '中' }}
+      {{ fund.name.charAt(0) }}
     </div>
     <div class="fund-name">{{ fund.name }}</div>
     <div class="fund-balance">{{ formatCurrency(fund.balance) }}</div>
@@ -40,6 +40,7 @@ const formatCurrency = (value: number) => {
   border-radius: 50%;
   display: flex;
   align-items: center;
+  background-color: #409eff;
   justify-content: center;
   margin-right: 12px;
   font-size: 12px;
@@ -47,7 +48,7 @@ const formatCurrency = (value: number) => {
   color: white;
 }
 
-.fund-icon招商银行 {
+/* .fund-icon招商银行 {
   width: 40px;
   height: 40px;
   border-radius: 50%;
@@ -73,7 +74,7 @@ const formatCurrency = (value: number) => {
   color: white;
   font-weight: bold;
   font-size: 12px;
-}
+} */
 
 .fund-name {
   flex: 1;

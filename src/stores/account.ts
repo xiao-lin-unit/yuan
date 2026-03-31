@@ -42,6 +42,7 @@ export const useAccountStore = defineStore('account', {
         await db.connect()
         // 查询所有账户
         const accounts = await db.query('SELECT * FROM accounts')
+        console.log('Loaded accounts:', JSON.stringify(accounts))
         this.accounts = accounts
       } catch (error) {
         this.error = '加载账户失败'
@@ -57,20 +58,44 @@ export const useAccountStore = defineStore('account', {
      */
     async addAccount(account: any) {
       try {
+        console.log('Starting addAccount process...')
         // 连接数据库
         await db.connect()
+        console.log('Database connected')
+        
         // 生成账户ID
         const id = Date.now().toString()
+        console.log('Generated account ID:', id)
+        
+        // 准备账户数据
+        const accountData = {
+          id: id,
+          name: account.name,
+          type: account.type,
+          balance: account.balance || 0,
+          usedLimit: account.usedLimit || 0,
+          totalLimit: account.totalLimit || 0,
+          isLiquid: account.isLiquid !== undefined ? account.isLiquid : true,
+          remark: account.remark || ''
+        }
+        console.log('Prepared account data:', accountData)
+        
         // 插入账户记录
-        await db.run(
+        const result = await db.run(
           'INSERT INTO accounts (id, name, type, balance, used_limit, total_limit, is_liquid, remark) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-          [id, account.name, account.type, account.balance || 0, account.usedLimit || 0, account.totalLimit || 0, account.isLiquid || true, account.remark]
+          [accountData.id, accountData.name, accountData.type, accountData.balance, accountData.usedLimit, accountData.totalLimit, accountData.isLiquid, accountData.remark]
         )
+        console.log('Add account result:', result)
+        
         // 重新加载账户列表
+        console.log('Reloading accounts...')
         await this.loadAccounts()
-      } catch (error) {
-        this.error = '添加账户失败'
-        console.error(error)
+        console.log('Accounts after reload:', this.accounts)
+        console.log('Add account process completed successfully')
+      } catch (error: any) {
+        this.error = '添加账户失败: ' + (error?.message || error?.toString() || '未知错误')
+        console.error('Error adding account:', error)
+        throw new Error(this.error)
       }
     },
 
@@ -177,10 +202,14 @@ export const useAccountStore = defineStore('account', {
           throw new Error('转出账户余额不足')
         }
 
-        // 开始事务
-        await db.run('BEGIN TRANSACTION')
-
+        // 事务状态
+        let transactionStarted = false
+        
         try {
+          // 开始事务
+          await db.run('BEGIN TRANSACTION')
+          transactionStarted = true
+          
           // 更新转出账户余额
           const newFromBalance = fromAccount.balance - data.amount
           await db.run('UPDATE accounts SET balance = ? WHERE id = ?', [newFromBalance, data.fromAccountId])
@@ -203,14 +232,27 @@ export const useAccountStore = defineStore('account', {
             [transactionId2, '转账收入', data.amount, data.toAccountId, newToBalance, data.remark]
           )
 
-          // 提交事务
-          await db.run('COMMIT')
+          try {
+            // 提交事务
+            await db.run('COMMIT')
+            transactionStarted = false
+          } catch (commitError) {
+            // 提交失败时，事务已经结束，不需要回滚
+            transactionStarted = false
+            throw commitError
+          }
 
           // 重新加载账户列表
           await this.loadAccounts()
         } catch (error) {
-          // 回滚事务
-          await db.run('ROLLBACK')
+          // 回滚事务（只有在事务真正开始后才执行）
+          if (transactionStarted) {
+            try {
+              await db.run('ROLLBACK')
+            } catch (rollbackErr) {
+              console.error('回滚错误:', rollbackErr)
+            }
+          }
           throw error
         }
       } catch (error) {

@@ -3,17 +3,20 @@
   "appName": "财务APP",
   "webDir": "dist",
   "bundledWebRuntime": false,
-  "server": {
-    "url": "http://localhost:5174",
-    "cleartext": true
-  },
   "plugins": {
     "SplashScreen": {
       "launchShowDuration": 0
+    },
+    "Keyboard": {
+      "resize": "none"
     }
   },
   "android": {
     "packageName": "com.finance.app",
-    "allowMixedContent": true
+    "allowMixedContent": true,
+    "buildOptions": {
+      "sourceCompatibility": "17",
+      "targetCompatibility": "17"
+    }
   }
 }

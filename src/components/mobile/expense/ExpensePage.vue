@@ -16,7 +16,7 @@
     <ExpenseRecords />
     
     <!-- 浮动添加按钮 -->
-    <div class="floating-add-button">
+    <div class="floating-add-button" @click="navigateToAddExpense">
       <el-icon><Plus /></el-icon>
     </div>
   </div>
@@ -31,6 +31,8 @@ import BudgetComponent from './BudgetComponent.vue';
 import WeeklyFinance from './WeeklyFinance.vue';
 import ExpenseRecords from './ExpenseRecords.vue';
 
+const emit = defineEmits(['navigate']);
+
 // 可以添加支出数据和相关方法
 const expenses = ref([]);
 const budget = ref({});
@@ -40,9 +42,9 @@ const loadExpenses = () => {
   // 这里可以从API或本地存储获取支出数据
 };
 
-// 可以添加添加支出的方法
-const addExpense = () => {
-  // 这里可以打开添加支出的对话框
+// 导航到新增支出页面
+const navigateToAddExpense = () => {
+  emit('navigate', 'addExpense');
 };
 </script>
 

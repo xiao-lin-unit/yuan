@@ -22,6 +22,7 @@ defineEmits<{
   padding: 15px;
   width: 100%;
   box-sizing: border-box;
+  position: relative;
 }
 
 /* 响应式调整 */

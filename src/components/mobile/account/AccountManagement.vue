@@ -97,6 +97,10 @@
           <el-icon style="color: white;"><RefreshLeft /></el-icon>
           <span>内部转账</span>
         </div>
+        <div class="floating-menu-item" @click="openDatabaseViewer">
+          <el-icon style="color: white;"><DataLine /></el-icon>
+          <span>数据库查看</span>
+        </div>
       </div>
     </div>
 
@@ -170,16 +174,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onActivated, computed } from 'vue'
 import { useAccountStore } from '../../../stores/account'
 import CreditCardItem from './CreditCardItem.vue'
 import FundItem from './FundItem.vue'
-import { ArrowDown, View, More, Plus, RefreshLeft } from '@element-plus/icons-vue'
+import { ArrowDown, View, More, Plus, RefreshLeft, DataLine } from '@element-plus/icons-vue'
 
 const emit = defineEmits(['navigate'])
 
 const accountStore = useAccountStore()
-const accounts = ref([])
 
 const dialogVisible = ref({
   add: false,
@@ -207,14 +210,14 @@ const adjustForm = ref({
 
 // 计算数据
 const totalAssets = computed(() => {
-  return accounts.value.reduce((total, account) => {
-    if (account.balance > 0 && account.is_liquid !== false) return total + account.balance
+  return accountStore.accounts.reduce((total, account) => {
+    if (account.balance > 0 && account.is_liquid !== 0 && account.is_liquid !== false) return total + account.balance
     return total
   }, 0)
 })
 
 const totalLiabilities = computed(() => {
-  return accounts.value.reduce((total, account) => {
+  return accountStore.accounts.reduce((total, account) => {
     if (account.type === '信用卡') {
       return total + (account.used_limit || 0)
     } else if (account.balance < 0) {
@@ -229,11 +232,11 @@ const netWorth = computed(() => {
 })
 
 const assetsCount = computed(() => {
-  return accounts.value.filter(account => account.balance > 0).length
+  return accountStore.accounts.filter(account => account.balance > 0).length
 })
 
 const liabilitiesCount = computed(() => {
-  return accounts.value.filter(account => account.type === '信用卡' || account.balance < 0).length
+  return accountStore.accounts.filter(account => account.type === '信用卡' || account.balance < 0).length
 })
 
 const debtRatio = computed(() => {
@@ -251,7 +254,7 @@ const totalLent = ref(40000)
 
 // 从accounts中计算信用卡和资金数据
 const creditCards = computed(() => {
-  return accounts.value
+  return accountStore.accounts
     .filter(account => account.type === '信用卡')
     .map(account => ({
       id: account.id,
@@ -262,8 +265,8 @@ const creditCards = computed(() => {
 })
 
 const funds = computed(() => {
-  return accounts.value
-    .filter(account => account.type !== '信用卡' && (account.is_liquid === true || account.is_liquid === undefined))
+  return accountStore.accounts
+    .filter(account => account.type !== '信用卡' && (account.is_liquid === 1 || account.is_liquid === true || account.is_liquid === undefined || account.is_liquid === null))
     .map(account => ({
       id: account.id,
       name: account.name,
@@ -272,8 +275,8 @@ const funds = computed(() => {
 })
 
 const otherFunds = computed(() => {
-  return accounts.value
-    .filter(account => account.type !== '信用卡' && account.is_liquid === false)
+  return accountStore.accounts
+    .filter(account => account.type !== '信用卡' && (account.is_liquid === 0 || account.is_liquid === false))
     .map(account => ({
       id: account.id,
       name: account.name,
@@ -323,14 +326,22 @@ const openTransferDialog = () => {
   isMoreMenuExpanded.value = false
 }
 
+const openDatabaseViewer = () => {
+  emit('navigate', 'databaseViewer')
+  isMoreMenuExpanded.value = false
+}
+
 // 格式化货币
-const formatCurrency = (value: number) => {
+const formatCurrency = (value: number = 0) => {
   return '¥' + value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
 onMounted(() => {
   accountStore.loadAccounts()
-  accounts.value = accountStore.accounts
+})
+
+onActivated(() => {
+  accountStore.loadAccounts()
 })
 
 const openEditAccountDialog = (account: any) => {
@@ -338,7 +349,7 @@ const openEditAccountDialog = (account: any) => {
     ...account,
     usedLimit: account.used_limit || 0,
     totalLimit: account.total_limit || 0,
-    isLiquid: account.is_liquid !== false
+    isLiquid: account.is_liquid === 1 || account.is_liquid === true
   }
   dialogVisible.value.edit = true
 }
@@ -358,18 +369,15 @@ const openBalanceAdjustDialog = (account: any) => {
 const updateAccount = () => {
   accountStore.updateAccount(accountForm.value)
   dialogVisible.value.edit = false
-  accounts.value = accountStore.accounts
 }
 
 const deleteAccount = (id: string) => {
   accountStore.deleteAccount(id)
-  accounts.value = accountStore.accounts
 }
 
 const adjustBalance = () => {
   accountStore.adjustBalance(adjustForm.value)
   dialogVisible.value.adjust = false
-  accounts.value = accountStore.accounts
 }
 </script>
 

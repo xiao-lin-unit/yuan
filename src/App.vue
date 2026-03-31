@@ -15,7 +15,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { Capacitor } from '@capacitor/core'
+import { Keyboard } from '@capacitor/keyboard'
 
 // 导入组件
 import AppHeader from './components/common/AppHeader.vue'
@@ -34,6 +36,8 @@ import FinancialKnowledge from './components/mobile/financial/FinancialKnowledge
 import MoreFeatures from './components/mobile/more/MoreFeatures.vue'
 import ExpensePage from './components/mobile/expense/ExpensePage.vue'
 import AddAccountPage from './components/mobile/account/AddAccountPage.vue'
+import AddExpensePage from './components/mobile/expense/AddExpensePage.vue'
+import DatabaseViewer from './components/mobile/DatabaseViewer.vue'
 
 const activeMenu = ref('account')
 const menuVisible = ref<boolean>(false)
@@ -44,6 +48,7 @@ const menuVisible = ref<boolean>(false)
       account: MobileAccountManagement,
       addAccount: AddAccountPage,
       expense: ExpensePage, // 映射到支出页面组件
+      addExpense: AddExpensePage, // 映射到新增支出页面组件
       income: MobileAccountManagement, // 暂时映射到账户管理组件，后续可创建专门的收入组件
       asset: AssetManagement,
       liability: LiabilityManagement,
@@ -51,7 +56,8 @@ const menuVisible = ref<boolean>(false)
       goal: FinancialGoal,
       sandbox: FinancialSandbox,
       knowledge: FinancialKnowledge,
-      more: MoreFeatures // 映射到更多功能组件
+      more: MoreFeatures, // 映射到更多功能组件
+      databaseViewer: DatabaseViewer // 数据库查看页面
     }
     return componentMap[activeMenu.value] || MobileAccountManagement
   })
@@ -69,6 +75,25 @@ const toggleMenu = () => {
 const closeMenu = () => {
   menuVisible.value = false
 }
+
+// 初始化Keyboard插件
+onMounted(() => {
+  if (Capacitor.isNativePlatform()) {
+    // 设置键盘配置
+    Keyboard.setResizeMode({
+      mode: 'none'
+    })
+    
+    // 监听键盘事件
+    Keyboard.addListener('keyboardWillShow', (info) => {
+      console.log('键盘将显示，高度:', info.keyboardHeight)
+    })
+    
+    Keyboard.addListener('keyboardWillHide', () => {
+      console.log('键盘将隐藏')
+    })
+  }
+})
 </script>
 
 <style scoped>
@@ -89,5 +114,6 @@ const closeMenu = () => {
   flex-direction: column;
   background-color: #f5f7fa;
   overflow: hidden;
+  box-sizing: border-box;
 }
 </style>
