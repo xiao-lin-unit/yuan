@@ -1,16 +1,23 @@
 <template>
   <div class="content-area">
-    <component :is="currentComponent" @navigate="$emit('navigate', $event)" />
+    <component 
+      :is="currentComponent" 
+      @navigate="$emit('navigate', $event)" 
+      @dateChange="$emit('dateChange', $event)"
+      v-bind="componentProps"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 defineProps<{
-  currentComponent: any
+  currentComponent: any,
+  componentProps?: Record<string, any>
 }>();
 
 defineEmits<{
-  (e: 'navigate', key: string): void
+  (e: 'navigate', key: string): void,
+  (e: 'dateChange', date: { year: number; month: number }): void
 }>();
 </script>
 

@@ -1,5 +1,5 @@
 import db from '../database'
-import { Category, defaultCategories } from '../data/categories'
+import { Category, expenseCategories, incomeCategories } from '../data/categories'
 
 /**
  * 分类管理服务
@@ -39,7 +39,10 @@ export class CategoryService {
       const categoryMap = new Map<string, Category>()
       
       // 先添加默认分类
-      defaultCategories.forEach(cat => {
+      expenseCategories.forEach(cat => {
+        categoryMap.set(cat.id, cat)
+      })
+      incomeCategories.forEach(cat => {
         categoryMap.set(cat.id, cat)
       })
       
@@ -59,9 +62,9 @@ export class CategoryService {
       console.error('Error getting categories:', error)
       // 出错时返回默认分类
       if (type) {
-        return defaultCategories.filter(cat => cat.type === type)
+        return [...expenseCategories, ...incomeCategories].filter(cat => cat.type === type)
       }
-      return defaultCategories
+      return [...expenseCategories, ...incomeCategories]
     }
   }
 

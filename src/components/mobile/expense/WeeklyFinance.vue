@@ -3,57 +3,15 @@
     <div class="section-header">
       <h3>本周支出</h3>
     </div>
-    <div class="weekly-total">总计: ¥6,629.50</div>
+    <div class="weekly-total">总计: ¥{{ totalExpense.toFixed(2) }}</div>
     <div class="finance-chart">
       <div class="chart-container">
-        <div class="chart-bar">
-          <div class="bar-value">15</div>
+        <div v-for="(day, index) in weeklyData" :key="index" class="chart-bar">
+          <div class="bar-value">{{ formatAmount(day.amount) }}</div>
           <div class="bar-container">
-            <div class="bar" style="height: 2%;"></div>
+            <div class="bar" :style="{ height: getBarHeight(day.amount) }"></div>
           </div>
-          <div class="bar-label">周日</div>
-        </div>
-        <div class="chart-bar">
-          <div class="bar-value">11</div>
-          <div class="bar-container">
-            <div class="bar" style="height: 1%;"></div>
-          </div>
-          <div class="bar-label">周一</div>
-        </div>
-        <div class="chart-bar">
-          <div class="bar-value">0</div>
-          <div class="bar-container">
-            <div class="bar" style="height: 0%;"></div>
-          </div>
-          <div class="bar-label">周二</div>
-        </div>
-        <div class="chart-bar">
-          <div class="bar-value">6.14K</div>
-          <div class="bar-container">
-            <div class="bar" style="height: 90%;"></div>
-          </div>
-          <div class="bar-label">周三</div>
-        </div>
-        <div class="chart-bar">
-          <div class="bar-value">25</div>
-          <div class="bar-container">
-            <div class="bar" style="height: 3%;"></div>
-          </div>
-          <div class="bar-label">周四</div>
-        </div>
-        <div class="chart-bar">
-          <div class="bar-value">362</div>
-          <div class="bar-container">
-            <div class="bar" style="height: 6%;"></div>
-          </div>
-          <div class="bar-label">周五</div>
-        </div>
-        <div class="chart-bar">
-          <div class="bar-value">76.5</div>
-          <div class="bar-container">
-            <div class="bar" style="height: 1%;"></div>
-          </div>
-          <div class="bar-label">周六</div>
+          <div class="bar-label">{{ day.label }}</div>
         </div>
       </div>
     </div>
@@ -61,7 +19,143 @@
 </template>
 
 <script setup lang="ts">
-// 可以添加本周收支相关的逻辑
+import { ref, computed, onMounted } from 'vue';
+import db from '../../../database';
+
+interface DayData {
+  date: Date;
+  label: string;
+  amount: number;
+}
+
+const weeklyData = ref<DayData[]>([]);
+
+// 计算本周总支出
+const totalExpense = computed(() => {
+  return weeklyData.value.reduce((total, day) => total + day.amount, 0);
+});
+
+// 计算本周最大支出（用于图表高度）
+const maxExpense = computed(() => {
+  return Math.max(...weeklyData.value.map(day => day.amount), 1); // 确保至少为1，避免除以0
+});
+
+// 格式化金额
+const formatAmount = (amount: number): string => {
+  if (amount >= 1000) {
+    return (amount / 1000).toFixed(2) + 'K';
+  }
+  return amount.toFixed(1);
+};
+
+// 计算柱状图高度
+const getBarHeight = (amount: number): string => {
+  const height = (amount / maxExpense.value) * 90; // 最大高度为90%
+  return `${height}%`;
+};
+
+// 获取本周的开始和结束日期
+const getWeekRange = (): { start: Date; end: Date } => {
+  const now = new Date();
+  console.log('当前日期:', now.toISOString());
+  const dayOfWeek = now.getDay(); // 0-6，0表示周日
+  console.log('当前星期:', dayOfWeek);
+  
+  // 计算本周一的日期（如果今天是周日，则上周日为一周的开始）
+  const start = new Date(now);
+  start.setDate(now.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1)); // 调整为周一作为开始
+  start.setHours(0, 0, 0, 0);
+  console.log('本周开始日期:', start.toISOString());
+  
+  // 计算本周日的日期
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+  end.setHours(23, 59, 59, 999);
+  console.log('本周结束日期:', end.toISOString());
+  
+  return { start, end };
+};
+
+// 从流水记录中获取本周支出数据
+const loadWeeklyExpenses = async () => {
+  try {
+    console.log('开始加载本周支出数据');
+    
+    // 连接数据库
+    console.log('正在连接数据库...');
+    await db.connect();
+    console.log('数据库连接成功');
+    
+    // 获取本周的开始和结束日期
+    const { start, end } = getWeekRange();
+    console.log('本周日期范围:', start.toISOString(), '至', end.toISOString());
+    
+    // 从流水表中查询类型为账户支出的记录
+    console.log('正在查询流水记录...');
+    const transactions = await db.query(
+      'SELECT t.* FROM transactions t WHERE t.type = ? AND t.created_at BETWEEN ? AND ?',
+      ['账户支出', start.toISOString(), end.toISOString()]
+    );
+    
+    console.log('查询到的流水记录数量:', transactions.length);
+    console.log('查询到的流水记录:', transactions);
+    
+    // 按日期分组统计支出
+    const dailyExpenses = new Map<string, number>();
+    
+    transactions.forEach(transaction => {
+      console.log('处理流水记录:', transaction);
+      if (transaction.createdAt) {
+        const date = new Date(transaction.createdAt);
+        const dateStr = date.toISOString().split('T')[0]; // YYYY-MM-DD格式
+        
+        if (dailyExpenses.has(dateStr)) {
+          dailyExpenses.set(dateStr, dailyExpenses.get(dateStr)! + (transaction.amount || 0));
+        } else {
+          dailyExpenses.set(dateStr, transaction.amount || 0);
+        }
+      }
+    });
+    
+    console.log('按日期分组的支出:', Object.fromEntries(dailyExpenses));
+    
+    // 生成本周的日期数据
+    const days: DayData[] = [];
+    const dayLabels = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+    
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(start);
+      date.setDate(start.getDate() + i);
+      const dateStr = date.toISOString().split('T')[0];
+      
+      days.push({
+        date,
+        label: dayLabels[i],
+        amount: dailyExpenses.get(dateStr) || 0
+      });
+    }
+    
+    console.log('生成的周数据:', days);
+    weeklyData.value = days;
+  } catch (error) {
+    console.error('加载本周支出数据失败:', error);
+    // 出错时使用默认数据
+    weeklyData.value = [
+      { date: new Date(), label: '周一', amount: 0 },
+      { date: new Date(), label: '周二', amount: 0 },
+      { date: new Date(), label: '周三', amount: 0 },
+      { date: new Date(), label: '周四', amount: 0 },
+      { date: new Date(), label: '周五', amount: 0 },
+      { date: new Date(), label: '周六', amount: 0 },
+      { date: new Date(), label: '周日', amount: 0 }
+    ];
+  }
+};
+
+// 组件挂载时加载数据
+onMounted(() => {
+  loadWeeklyExpenses();
+});
 </script>
 
 <style scoped>

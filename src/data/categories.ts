@@ -6,9 +6,9 @@ export interface Category {
   type: string
 }
 
-// 默认分类数据，仅用于初始化
+// 支出分类数据，仅用于初始化
 // 实际使用时应从数据库获取
-export const defaultCategories: Category[] = [
+export const expenseCategories: Category[] = [
   { id: 'cat_1', name: '三餐', icon: 'food-icon', iconText: '🍽', type: 'expense' },
   { id: 'cat_2', name: '零食', icon: 'snack-icon', iconText: '🍪', type: 'expense' },
   { id: 'cat_3', name: '衣服', icon: 'clothes-icon', iconText: '👔', type: 'expense' },
@@ -30,7 +30,12 @@ export const defaultCategories: Category[] = [
   { id: 'cat_19', name: '电器数码', icon: 'digital-icon', iconText: '📱', type: 'expense' },
   { id: 'cat_20', name: '运动', icon: 'sport-icon', iconText: '🏃', type: 'expense' },
   { id: 'cat_21', name: '其它', icon: 'other-icon', iconText: '📦', type: 'expense' },
-  { id: 'cat_22', name: '水电煤', icon: 'utility-icon', iconText: '💧', type: 'expense' },
+  { id: 'cat_22', name: '水电煤', icon: 'utility-icon', iconText: '💧', type: 'expense' }
+]
+
+// 收入分类数据，仅用于初始化
+// 实际使用时应从数据库获取
+export const incomeCategories: Category[] = [
   { id: 'cat_23', name: '工资', icon: 'salary-icon', iconText: '💰', type: 'income' },
   { id: 'cat_24', name: '奖金', icon: 'bonus-icon', iconText: '🎊', type: 'income' },
   { id: 'cat_25', name: '投资收益', icon: 'investment-icon', iconText: '📈', type: 'income' },

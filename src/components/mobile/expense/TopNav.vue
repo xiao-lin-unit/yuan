@@ -5,20 +5,19 @@
       <el-icon class="dropdown-icon"><ArrowDown /></el-icon>
     </div>
     <div class="top-icons">
-      <el-icon class="nav-icon"><Calendar /></el-icon>
-      <el-icon class="nav-icon"><DataAnalysis /></el-icon>
+      <el-icon class="nav-icon" @click="navigateToStats"><DataAnalysis /></el-icon>
     </div>
     
     <!-- 日期选择器 -->
     <div v-if="showDatePicker" class="date-picker-dropdown">
-      <div class="picker-header">
+      <!-- <div class="picker-header">
         <div class="picker-title">显示方式</div>
         <div class="picker-option">按月</div>
       </div>
       <div class="picker-header">
         <div class="picker-title">月份起始日</div>
         <div class="picker-option">01</div>
-      </div>
+      </div> -->
       <div class="picker-content">
         <div class="year-list">
           <div 
@@ -56,6 +55,9 @@ const showDatePicker = ref(false);
 const selectedYear = ref(2026);
 const selectedMonth = ref(3);
 
+// 定义事件
+const emit = defineEmits(['dateChange', 'navigate']);
+
 // 生成年份列表
 const years = ref([]);
 for (let i = 2023; i <= 2029; i++) {
@@ -70,12 +72,19 @@ const selectedDate = computed(() => {
 // 选择年份
 const selectYear = (year: number) => {
   selectedYear.value = year;
+  emit('dateChange', { year, month: selectedMonth.value });
 };
 
 // 选择月份
 const selectMonth = (month: number) => {
   selectedMonth.value = month;
   showDatePicker.value = false;
+  emit('dateChange', { year: selectedYear.value, month });
+};
+
+// 导航到统计页面
+const navigateToStats = () => {
+  emit('navigate', 'expenseStats');
 };
 </script>
 

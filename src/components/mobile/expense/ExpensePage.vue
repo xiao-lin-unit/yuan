@@ -1,19 +1,19 @@
 <template>
   <div class="expense-page">
     <!-- 顶部导航栏 -->
-    <TopNav />
+    <TopNav @dateChange="handleDateChange" @navigate="handleNavigate" />
     
     <!-- 月统计 -->
-    <MonthlyStats />
+    <MonthlyStats :year="selectedYear" :month="selectedMonth" />
     
     <!-- 预算 -->
-    <BudgetComponent />
+    <!-- <BudgetComponent :year="selectedYear" :month="selectedMonth" /> -->
     
     <!-- 本周收支 -->
-    <WeeklyFinance />
+    <WeeklyFinance v-if="isCurrentMonth" />
     
     <!-- 支出记录 -->
-    <ExpenseRecords />
+    <ExpenseRecords :year="selectedYear" :month="selectedMonth" />
     
     <!-- 浮动添加按钮 -->
     <div class="floating-add-button" @click="navigateToAddExpense">
@@ -23,7 +23,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { Plus } from '@element-plus/icons-vue';
 import TopNav from './TopNav.vue';
 import MonthlyStats from './MonthlyStats.vue';
@@ -32,6 +32,22 @@ import WeeklyFinance from './WeeklyFinance.vue';
 import ExpenseRecords from './ExpenseRecords.vue';
 
 const emit = defineEmits(['navigate']);
+
+// 日期选择状态
+const selectedYear = ref(2026);
+const selectedMonth = ref(3);
+
+// 计算是否是当前月份
+const isCurrentMonth = computed(() => {
+  const now = new Date();
+  return selectedYear.value === now.getFullYear() && selectedMonth.value === now.getMonth() + 1;
+});
+
+// 处理日期变化
+const handleDateChange = (date: { year: number; month: number }) => {
+  selectedYear.value = date.year;
+  selectedMonth.value = date.month;
+};
 
 // 可以添加支出数据和相关方法
 const expenses = ref([]);
@@ -45,6 +61,11 @@ const loadExpenses = () => {
 // 导航到新增支出页面
 const navigateToAddExpense = () => {
   emit('navigate', 'addExpense');
+};
+
+// 处理导航事件
+const handleNavigate = (key: string) => {
+  emit('navigate', key);
 };
 </script>
 

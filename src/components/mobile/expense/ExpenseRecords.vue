@@ -4,192 +4,97 @@
       v-for="day in days" 
       :key="day.date"
       :date="day.date"
-      :total-expense="day.totalExpense"
-      :expenses="day.expenses"
+      :date-str="day.dateStr"
+      :year="year"
+      :month="month"
     />
   </div>
 </template>
 
 <script setup lang="ts">
+import { ref, onMounted, watch } from 'vue';
 import DailyExpense from './DailyExpense.vue';
 
-// 模拟本月的日期数据（倒序）
-const days = [
-  {
-    date: '03.28 今天',
-    totalExpense: 76.50,
-    expenses: [
-      { category: '交通', amount: 62.00, method: '花呗' },
-      { category: '交通', amount: 10.00, method: '微信零钱通' },
-      { category: '三餐', amount: 4.50, method: '花呗' }
-    ]
-  },
-  {
-    date: '03.27 昨天',
-    totalExpense: 362.00,
-    expenses: [
-      { category: '发红包', amount: 300.00, method: '中国银行', note: '随份子' },
-      { category: '购物', amount: 62.00, method: '支付宝' }
-    ]
-  },
-  {
-    date: '03.26 前天',
-    totalExpense: 0,
-    expenses: []
-  },
-  {
-    date: '03.25',
-    totalExpense: 128.50,
-    expenses: [
-      { category: '餐饮', amount: 88.50, method: '微信' },
-      { category: '交通', amount: 40.00, method: '支付宝' }
-    ]
-  },
-  {
-    date: '03.24',
-    totalExpense: 0,
-    expenses: []
-  },
-  {
-    date: '03.23',
-    totalExpense: 95.00,
-    expenses: [
-      { category: '购物', amount: 95.00, method: '信用卡' }
-    ]
-  },
-  {
-    date: '03.22',
-    totalExpense: 0,
-    expenses: []
-  },
-  {
-    date: '03.21',
-    totalExpense: 210.00,
-    expenses: [
-      { category: '娱乐', amount: 210.00, method: '微信' }
-    ]
-  },
-  {
-    date: '03.20',
-    totalExpense: 0,
-    expenses: []
-  },
-  {
-    date: '03.19',
-    totalExpense: 150.00,
-    expenses: [
-      { category: '餐饮', amount: 150.00, method: '支付宝' }
-    ]
-  },
-  {
-    date: '03.18',
-    totalExpense: 0,
-    expenses: []
-  },
-  {
-    date: '03.17',
-    totalExpense: 85.00,
-    expenses: [
-      { category: '交通', amount: 85.00, method: '微信' }
-    ]
-  },
-  {
-    date: '03.16',
-    totalExpense: 0,
-    expenses: []
-  },
-  {
-    date: '03.15',
-    totalExpense: 320.00,
-    expenses: [
-      { category: '购物', amount: 320.00, method: '信用卡' }
-    ]
-  },
-  {
-    date: '03.14',
-    totalExpense: 0,
-    expenses: []
-  },
-  {
-    date: '03.13',
-    totalExpense: 180.00,
-    expenses: [
-      { category: '餐饮', amount: 180.00, method: '支付宝' }
-    ]
-  },
-  {
-    date: '03.12',
-    totalExpense: 0,
-    expenses: []
-  },
-  {
-    date: '03.11',
-    totalExpense: 120.00,
-    expenses: [
-      { category: '交通', amount: 120.00, method: '微信' }
-    ]
-  },
-  {
-    date: '03.10',
-    totalExpense: 0,
-    expenses: []
-  },
-  {
-    date: '03.09',
-    totalExpense: 250.00,
-    expenses: [
-      { category: '娱乐', amount: 250.00, method: '支付宝' }
-    ]
-  },
-  {
-    date: '03.08',
-    totalExpense: 0,
-    expenses: []
-  },
-  {
-    date: '03.07',
-    totalExpense: 160.00,
-    expenses: [
-      { category: '购物', amount: 160.00, method: '信用卡' }
-    ]
-  },
-  {
-    date: '03.06',
-    totalExpense: 0,
-    expenses: []
-  },
-  {
-    date: '03.05',
-    totalExpense: 90.00,
-    expenses: [
-      { category: '餐饮', amount: 90.00, method: '微信' }
-    ]
-  },
-  {
-    date: '03.04',
-    totalExpense: 0,
-    expenses: []
-  },
-  {
-    date: '03.03',
-    totalExpense: 130.00,
-    expenses: [
-      { category: '交通', amount: 130.00, method: '支付宝' }
-    ]
-  },
-  {
-    date: '03.02',
-    totalExpense: 0,
-    expenses: []
-  },
-  {
-    date: '03.01',
-    totalExpense: 200.00,
-    expenses: [
-      { category: '购物', amount: 200.00, method: '信用卡' }
-    ]
+// 接收年月参数
+const props = defineProps<{
+  year: number;
+  month: number;
+}>();
+
+const days = ref([]);
+const year = ref(props.year);
+const month = ref(props.month);
+
+// 生成当月的每一天日期
+const generateDays = () => {
+  const yearVal = year.value;
+  const monthVal = month.value - 1; // 转换为0-11的月份格式
+  
+  // 获取当月第一天
+  const firstDay = new Date(yearVal, monthVal, 1);
+  // 获取当月最后一天
+  const lastDay = new Date(yearVal, monthVal + 1, 0);
+  // 获取当月天数
+  const daysInMonth = lastDay.getDate();
+  
+  const daysArray = [];
+  
+  // 生成当月的每一天
+  for (let day = 1; day <= daysInMonth; day++) {
+    const date = new Date(yearVal, monthVal, day);
+    const dateStr = `${String(monthVal + 1).padStart(2, '0')}.${String(day).padStart(2, '0')}`;
+    
+    // 标记今天、昨天、前天
+    let displayDate = dateStr;
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const dayBeforeYesterday = new Date(today);
+    dayBeforeYesterday.setDate(dayBeforeYesterday.getDate() - 2);
+    
+    const formatDate = (d) => {
+      return `${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
+    };
+    
+    const todayStr = formatDate(today);
+    const yesterdayStr = formatDate(yesterday);
+    const dayBeforeYesterdayStr = formatDate(dayBeforeYesterday);
+    
+    if (dateStr === todayStr) {
+      displayDate += ' 今天';
+    } else if (dateStr === yesterdayStr) {
+      displayDate += ' 昨天';
+    } else if (dateStr === dayBeforeYesterdayStr) {
+      displayDate += ' 前天';
+    }
+    
+    daysArray.push({
+      date: displayDate,
+      dateStr: dateStr
+    });
   }
-];
+  
+  // 按日期倒序排序
+  daysArray.sort((a, b) => {
+    const dateA = new Date(`${year.value}-${a.dateStr.replace('.', '-')}`);
+    const dateB = new Date(`${year.value}-${b.dateStr.replace('.', '-')}`);
+    return dateB.getTime() - dateA.getTime();
+  });
+  
+  days.value = daysArray;
+};
+
+// 组件挂载时生成日期数据
+onMounted(() => {
+  generateDays();
+});
+
+// 监听年月变化，重新生成日期数据
+watch(() => [props.year, props.month], (newValues) => {
+  year.value = newValues[0];
+  month.value = newValues[1];
+  generateDays();
+}, { deep: true });
 </script>
 
 <style scoped>

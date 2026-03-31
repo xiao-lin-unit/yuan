@@ -8,11 +8,11 @@
       <div v-for="(expense, index) in expenses" :key="index" class="expense-item">
         <div class="expense-info">
           <div class="expense-category">{{ expense.category }}</div>
-          <div v-if="expense.note" class="expense-note">{{ expense.note }}</div>
+          <div v-if="expense.remark" class="expense-note">{{ expense.remark }}</div>
         </div>
         <div class="expense-details">
           <span class="expense-amount">-¥{{ expense.amount.toFixed(2) }}</span>
-          <span class="expense-method">{{ expense.method }}</span>
+          <span class="expense-method">{{ expense.account_name }}</span>
         </div>
       </div>
     </div>
@@ -23,20 +23,87 @@
 </template>
 
 <script setup lang="ts">
-defineProps({
+import { ref, onMounted, defineProps, watch } from 'vue';
+import db from '../../../database';
+import { expenseCategories } from '../../../data/categories';
+
+const props = defineProps({
   date: {
     type: String,
     required: true
   },
-  totalExpense: {
-    type: Number,
-    default: 0
+  dateStr: {
+    type: String,
+    required: true
   },
-  expenses: {
-    type: Array,
-    default: () => []
+  year: {
+    type: Number,
+    required: true
+  },
+  month: {
+    type: Number,
+    required: true
   }
 });
+
+const expenses = ref([]);
+const totalExpense = ref(0);
+
+// 查询当天的支出记录
+const loadDailyExpenses = async () => {
+  try {
+    // 连接数据库
+    await db.connect();
+    
+    // 解析日期字符串
+    const [month, day] = props.dateStr.split('.').map(Number);
+    const year = props.year;
+    
+    // 构建当天的开始和结束时间
+    const startDate = new Date(year, month - 1, day, 0, 0, 0).toISOString();
+    const endDate = new Date(year, month - 1, day, 23, 59, 59).toISOString();
+    
+    // 从流水表中查询当天的账户支出记录
+    const transactions = await db.query(
+      'SELECT t.*, a.name as account_name, a.type as account_type FROM transactions t LEFT JOIN accounts a ON t.account_id = a.id WHERE t.type = ? AND t.created_at BETWEEN ? AND ? ORDER BY t.created_at DESC',
+      ['账户支出', startDate, endDate]
+    );
+    
+    // 处理支出记录
+    const expenseList = [];
+    let total = 0;
+    
+    transactions.forEach(transaction => {
+      console.log("流水信息", JSON.stringify(transaction))
+      // 根据subType查找对应的分类名称
+      const category = expenseCategories.find(cat => cat.id === transaction.subType);
+      const categoryName = category ? category.name : transaction.subType;
+      
+      expenseList.push({
+        category: categoryName,
+        amount: transaction.amount,
+        account_name: transaction.accountName,
+        remark: transaction.remark
+      });
+      total += transaction.amount;
+    });
+    console.log("支出记录", JSON.stringify(expenseList))
+    expenses.value = expenseList;
+    totalExpense.value = total;
+  } catch (error) {
+    console.error('加载当日支出记录失败:', error);
+  }
+};
+
+// 组件挂载时加载数据
+onMounted(() => {
+  loadDailyExpenses();
+});
+
+// 监听年月变化，重新加载数据
+watch(() => [props.year, props.month], () => {
+  loadDailyExpenses();
+}, { deep: true });
 </script>
 
 <style scoped>

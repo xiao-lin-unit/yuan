@@ -4,7 +4,12 @@
     <AppHeader @toggle-menu="toggleMenu" />
     
     <!-- 中间内容区域 -->
-    <AppContent :currentComponent="currentComponent" @navigate="navigateTo" />
+    <AppContent 
+      :currentComponent="currentComponent" 
+      @navigate="navigateTo"
+      @dateChange="handleDateChange"
+      :componentProps="componentProps"
+    />
     
     <!-- 底部功能导航 -->
     <AppFooter @navigate="navigateTo" />
@@ -37,10 +42,15 @@ import MoreFeatures from './components/mobile/more/MoreFeatures.vue'
 import ExpensePage from './components/mobile/expense/ExpensePage.vue'
 import AddAccountPage from './components/mobile/account/AddAccountPage.vue'
 import AddExpensePage from './components/mobile/expense/AddExpensePage.vue'
+import ExpenseStats from './components/mobile/expense/ExpenseStats.vue'
 import DatabaseViewer from './components/mobile/DatabaseViewer.vue'
 
-const activeMenu = ref('account')
+const activeMenu = ref('expense')
 const menuVisible = ref<boolean>(false)
+
+// 日期选择状态
+const selectedYear = ref(2026);
+const selectedMonth = ref(3);
 
 // 组件映射
   const currentComponent = computed(() => {
@@ -49,6 +59,7 @@ const menuVisible = ref<boolean>(false)
       addAccount: AddAccountPage,
       expense: ExpensePage, // 映射到支出页面组件
       addExpense: AddExpensePage, // 映射到新增支出页面组件
+      expenseStats: ExpenseStats, // 映射到支出统计页面组件
       income: MobileAccountManagement, // 暂时映射到账户管理组件，后续可创建专门的收入组件
       asset: AssetManagement,
       liability: LiabilityManagement,
@@ -62,9 +73,28 @@ const menuVisible = ref<boolean>(false)
     return componentMap[activeMenu.value] || MobileAccountManagement
   })
 
+// 组件属性
+const componentProps = computed(() => {
+  const props: Record<string, any> = {};
+  
+  // 为支出相关组件传递年月参数
+  if (activeMenu.value === 'expense' || activeMenu.value === 'expenseStats') {
+    props.year = selectedYear.value;
+    props.month = selectedMonth.value;
+  }
+  
+  return props;
+});
+
 const navigateTo = (key: string) => {
   activeMenu.value = key
 }
+
+// 处理日期变化
+const handleDateChange = (date: { year: number; month: number }) => {
+  selectedYear.value = date.year;
+  selectedMonth.value = date.month;
+};
 
 // 切换菜单显示/隐藏
 const toggleMenu = () => {

@@ -23,11 +23,85 @@
 </template>
 
 <script setup lang="ts">
+import { ref, computed, onMounted, watch } from 'vue';
+import db from '../../../database';
+
+// 接收年月参数
+const props = defineProps<{
+  year: number;
+  month: number;
+}>();
+
 // 定义收支数据
-const expense = 6910.90;
-const income = 1042.11;
+const expense = ref(0);
+const income = ref(0);
+
 // 计算本月结余
-const balance = income - expense;
+const balance = computed(() => {
+  return income.value - expense.value;
+});
+
+// 获取指定月份的开始和结束日期
+const getMonthRange = (year: number, month: number) => {
+  const start = new Date(year, month - 1, 1);
+  start.setHours(0, 0, 0, 0);
+  
+  const end = new Date(year, month, 0);
+  end.setHours(23, 59, 59, 999);
+  
+  return { start, end };
+};
+
+// 从流水表中获取月度收支数据
+const loadMonthlyStats = async () => {
+  try {
+    console.log('开始加载月度收支数据:', props.year, props.month);
+    
+    // 连接数据库
+    await db.connect();
+    
+    // 获取本月的开始和结束日期
+    const { start, end } = getMonthRange(props.year, props.month);
+    console.log('月度日期范围:', start.toISOString(), '至', end.toISOString());
+    
+    // 从流水表中查询类型为账户支出的记录
+    const expenseTransactions = await db.query(
+      'SELECT SUM(amount) as total FROM transactions WHERE type = ? AND created_at BETWEEN ? AND ?',
+      ['账户支出', start.toISOString(), end.toISOString()]
+    );
+    
+    // 从流水表中查询类型为账户收入的记录
+    const incomeTransactions = await db.query(
+      'SELECT SUM(amount) as total FROM transactions WHERE type = ? AND created_at BETWEEN ? AND ?',
+      ['账户收入', start.toISOString(), end.toISOString()]
+    );
+    
+    console.log('支出查询结果:', expenseTransactions);
+    console.log('收入查询结果:', incomeTransactions);
+    
+    // 更新收支数据
+    expense.value = expenseTransactions[0]?.total || 0;
+    income.value = incomeTransactions[0]?.total || 0;
+    
+    console.log('更新后的支出:', expense.value);
+    console.log('更新后的收入:', income.value);
+  } catch (error) {
+    console.error('加载月度收支数据失败:', error);
+    // 出错时使用默认数据
+    expense.value = 0;
+    income.value = 0;
+  }
+};
+
+// 组件挂载时加载数据
+onMounted(() => {
+  loadMonthlyStats();
+});
+
+// 监听年月变化，重新加载数据
+watch(() => [props.year, props.month], () => {
+  loadMonthlyStats();
+}, { deep: true });
 </script>
 
 <style scoped>
