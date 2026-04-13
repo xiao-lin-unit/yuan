@@ -127,7 +127,7 @@ const addStock = async () => {
     const stockId = Date.now().toString()
     await db.run(
       'INSERT INTO stocks (id, name, code, quantity, current_price, cost_price, first_buy_date, account_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [stockId, stockForm.value.name, stockForm.value.code, 0, stockForm.value.price, 0, stockForm.value.transaction_time, stockForm.value.account_id]
+      [stockId, stockForm.value.name, stockForm.value.code, stockForm.value.quantity, stockForm.value.price, 0, stockForm.value.transaction_time, stockForm.value.account_id]
     )
     
     // 创建股票交易记录
@@ -137,6 +137,7 @@ const addStock = async () => {
       [transactionId, stockId, stockForm.value.type, stockForm.value.price, stockForm.value.quantity, stockForm.value.fee, stockForm.value.transaction_time, stockForm.value.account_id]
     )
     
+    console.log("新增股票", stockForm.value)
     // 新增股票时，更新股票表的持有股数和成本价
     // 成本价格计算公式为：（当前价格*购买股数+费用）/ 购买股数
     if (stockForm.value.type === '买入') {

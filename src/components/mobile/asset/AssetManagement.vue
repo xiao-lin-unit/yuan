@@ -24,8 +24,8 @@
           v-for="stock in stocks" 
           :key="stock.id"
           :title="stock.name"
-          :amount="stock.price * stock.quantity"
-          :secondary-amount="stock.price"
+          :amount="stock.costPrice * stock.quantity"
+          :secondary-amount="stock.costPrice"
           :icon="stock.icon"
           :color="stock.color"
           :assetId="stock.id"
@@ -37,8 +37,8 @@
           v-for="fund in funds" 
           :key="fund.id"
           :title="fund.name"
-          :amount="fund.current_nav * fund.shares"
-          :secondary-amount="fund.current_nav"
+          :amount="fund.costNav * fund.shares"
+          :secondary-amount="fund.costNav"
           :icon="fund.icon"
           :color="fund.color"
           :assetId="fund.id"
@@ -184,8 +184,55 @@ const loadAssetData = async () => {
 
 const loadMockData = () => {
   // 模拟数据
-  generalAssets.value = [
-    
+  stocks.value = [
+    {
+      id: '1',
+      name: '股票',
+      type: '股票',
+      amount: 0,
+      monthlyIncome: 0,
+      account_id: '1'
+    },
+    {
+      id: '2',
+      name: '基金',
+      type: '基金',
+      amount: 0,
+      monthlyIncome: 0,
+      account_id: '1'
+    },
+    {
+      id: '1',
+      name: '股票',
+      type: '股票',
+      amount: 0,
+      monthlyIncome: 0,
+      account_id: '1'
+    },
+    {
+      id: '2',
+      name: '基金',
+      type: '基金',
+      amount: 0,
+      monthlyIncome: 0,
+      account_id: '1'
+    },
+    {
+      id: '1',
+      name: '股票',
+      type: '股票',
+      amount: 0,
+      monthlyIncome: 0,
+      account_id: '1'
+    },
+    {
+      id: '2',
+      name: '基金',
+      type: '基金',
+      amount: 0,
+      monthlyIncome: 0,
+      account_id: '1'
+    }
   ];
   
   // 模拟账户数据（包括公积金账户）
@@ -225,21 +272,30 @@ const navigateToAddFund = () => {
 <style scoped>
 .asset-page {
   padding: 0;
+  background-color: #f5f7fa;
+  overflow-y: auto;
+  overflow-x: hidden;
   height: 100%;
   min-height: 100%;
-  background-color: #f5f7fa;
-  overflow: hidden;
+}
+
+/* 隐藏滚动条但保留滚动功能 */
+.asset-page::-webkit-scrollbar {
+  display: none;
+}
+
+.asset-page {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 
 
 .asset-cards-container {
-  padding: 0 15px 10px 15px;
+  padding: 0 0 10px 0;
   display: grid;
   grid-template-columns: 1fr;
-  gap: 15px;
-  height: 100%;
-  min-height: 100%;
+  gap: 10px;
 }
 
 .no-assets {
@@ -247,8 +303,7 @@ const navigateToAddFund = () => {
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 100%;
-  min-height: 100%;
+  min-height: 77vh;
   background-color: #ffffff;
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
