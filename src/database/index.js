@@ -493,6 +493,7 @@ class DatabaseManager {
               name TEXT NOT NULL,
               amount REAL DEFAULT 0,
               account_id TEXT,
+              period TEXT,
               created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
               updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
               FOREIGN KEY (account_id) REFERENCES accounts(id)
@@ -506,13 +507,31 @@ class DatabaseManager {
               id TEXT PRIMARY KEY,
               name TEXT NOT NULL,
               code TEXT,
+              quantity INTEGER DEFAULT 0,
+              current_price REAL DEFAULT 0,
+              cost_price REAL DEFAULT 0,
+              first_buy_date TIMESTAMP,
+              account_id TEXT,
+              created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+              updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+              FOREIGN KEY (account_id) REFERENCES accounts(id)
+            )
+          `
+        },
+        // 创建股票交易记录表
+        {
+          sql: `
+            CREATE TABLE IF NOT EXISTS stock_transactions (
+              id TEXT PRIMARY KEY,
+              stock_id TEXT NOT NULL,
+              type TEXT NOT NULL,
               price REAL NOT NULL,
               quantity INTEGER NOT NULL,
               fee REAL DEFAULT 0,
               transaction_time TIMESTAMP NOT NULL,
-              type TEXT NOT NULL,
               account_id TEXT,
               created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+              FOREIGN KEY (stock_id) REFERENCES stocks(id),
               FOREIGN KEY (account_id) REFERENCES accounts(id)
             )
           `
@@ -524,14 +543,36 @@ class DatabaseManager {
               id TEXT PRIMARY KEY,
               name TEXT NOT NULL,
               code TEXT,
-              nav REAL NOT NULL,
+              shares REAL DEFAULT 0,
+              current_nav REAL DEFAULT 0,
+              cost_nav REAL DEFAULT 0,
+              first_buy_date TIMESTAMP,
+              has_lock BOOLEAN DEFAULT 0,
+              lock_period INTEGER DEFAULT 0,
+              account_id TEXT,
+              created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+              updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+              FOREIGN KEY (account_id) REFERENCES accounts(id)
+            )
+          `
+        },
+        // 创建基金交易记录表
+        {
+          sql: `
+            CREATE TABLE IF NOT EXISTS fund_transactions (
+              id TEXT PRIMARY KEY,
+              fund_id TEXT NOT NULL,
+              type TEXT NOT NULL,
+              transaction_nav REAL NOT NULL,
               shares REAL NOT NULL,
               fee REAL DEFAULT 0,
               has_lock BOOLEAN DEFAULT 0,
+              lock_period INTEGER DEFAULT 0,
+              lock_end_date TIMESTAMP,
               transaction_time TIMESTAMP NOT NULL,
-              type TEXT NOT NULL,
               account_id TEXT,
               created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+              FOREIGN KEY (fund_id) REFERENCES funds(id),
               FOREIGN KEY (account_id) REFERENCES accounts(id)
             )
           `
@@ -626,6 +667,9 @@ class DatabaseManager {
       // 批量执行
       await this.batch(createStatements)
 
+      // 更新表结构，添加缺失的字段
+      await this.updateTables()
+
       this.initialized = true
       if (PERFORMANCE_CONFIG.DEBUG) {
         console.log('Database tables initialized successfully')
@@ -634,6 +678,61 @@ class DatabaseManager {
       console.error('Error initializing database tables:', err)
       throw new Error('数据库表初始化失败: ' + (err.message || err.toString()))
     }
+  }
+
+  /**
+   * 更新表结构，添加缺失的字段
+   */
+  async updateTables() {
+    try {
+      // 检查并添加股票表的current_price字段
+      const stockColumns = await this.getColumns('stocks')
+      if (!stockColumns.includes('current_price')) {
+        await this.run('ALTER TABLE stocks ADD COLUMN current_price REAL DEFAULT 0')
+        console.log('已添加stocks表的current_price字段')
+      }
+      
+      // 检查并添加基金表的current_nav字段
+      const fundColumns = await this.getColumns('funds')
+      if (!fundColumns.includes('current_nav')) {
+        await this.run('ALTER TABLE funds ADD COLUMN current_nav REAL DEFAULT 0')
+        console.log('已添加funds表的current_nav字段')
+      }
+      
+      // 检查并添加基金表的lock_period字段
+      if (!fundColumns.includes('lock_period')) {
+        await this.run('ALTER TABLE funds ADD COLUMN lock_period INTEGER DEFAULT 0')
+        console.log('已添加funds表的lock_period字段')
+      }
+      
+      // 检查并添加基金交易记录表的transaction_nav、lock_period和lock_end_date字段
+      const fundTransactionColumns = await this.getColumns('fund_transactions')
+      if (!fundTransactionColumns.includes('transaction_nav')) {
+        await this.run('ALTER TABLE fund_transactions ADD COLUMN transaction_nav REAL DEFAULT 0')
+        console.log('已添加fund_transactions表的transaction_nav字段')
+      }
+      if (!fundTransactionColumns.includes('lock_period')) {
+        await this.run('ALTER TABLE fund_transactions ADD COLUMN lock_period INTEGER DEFAULT 0')
+        console.log('已添加fund_transactions表的lock_period字段')
+      }
+      if (!fundTransactionColumns.includes('lock_end_date')) {
+        await this.run('ALTER TABLE fund_transactions ADD COLUMN lock_end_date TIMESTAMP')
+        console.log('已添加fund_transactions表的lock_end_date字段')
+      }
+    } catch (e) {
+      console.error('更新表结构失败:', e)
+      // 忽略错误，继续执行
+    }
+  }
+
+  /**
+   * 获取表的列名
+   * @param {string} tableName - 表名
+   * @returns {Array} 列名数组
+   */
+  async getColumns(tableName) {
+    const result = await this.query(`PRAGMA table_info(${tableName})`)
+    return result.map(row => row.name)
   }
 
   /**

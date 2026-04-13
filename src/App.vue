@@ -44,6 +44,9 @@ import AddAccountPage from './components/mobile/account/AddAccountPage.vue'
 import AddExpensePage from './components/mobile/expense/AddExpensePage.vue'
 import ExpenseStats from './components/mobile/expense/ExpenseStats.vue'
 import DatabaseViewer from './components/mobile/DatabaseViewer.vue'
+import AddAssetPage from './components/mobile/asset/AddAssetPage.vue'
+import AddStockPage from './components/mobile/asset/AddStockPage.vue'
+import AddFundPage from './components/mobile/asset/AddFundPage.vue'
 
 const activeMenu = ref('expense')
 const menuVisible = ref<boolean>(false)
@@ -61,7 +64,10 @@ const selectedMonth = ref(3);
       addExpense: AddExpensePage, // 映射到新增支出页面组件
       expenseStats: ExpenseStats, // 映射到支出统计页面组件
       income: MobileAccountManagement, // 暂时映射到账户管理组件，后续可创建专门的收入组件
-      asset: AssetManagement,
+      asset: AssetManagement, // 映射到资产页面组件
+      addAsset: AddAssetPage, // 映射到新增通用资产页面组件
+      addStock: AddStockPage, // 映射到新增股票交易页面组件
+      addFund: AddFundPage, // 映射到新增基金交易页面组件
       liability: LiabilityManagement,
       dashboard: FinancialDashboard,
       goal: FinancialGoal,
