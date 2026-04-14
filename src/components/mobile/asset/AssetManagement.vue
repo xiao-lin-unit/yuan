@@ -37,12 +37,12 @@
           v-for="fund in funds" 
           :key="fund.id"
           :title="fund.name"
-          :amount="fund.costNav * fund.shares"
-          :secondary-amount="fund.costNav"
+          :amount="fund.cost_nav * fund.shares"
+          :secondary-amount="fund.cost_nav"
           :icon="fund.icon"
           :color="fund.color"
           :assetId="fund.id"
-          @click="viewAssetDetail"
+          @click="viewFundDetail(fund.id)"
         />
       </template>
     </div>
@@ -185,54 +185,7 @@ const loadAssetData = async () => {
 const loadMockData = () => {
   // 模拟数据
   stocks.value = [
-    {
-      id: '1',
-      name: '股票',
-      type: '股票',
-      amount: 0,
-      monthlyIncome: 0,
-      account_id: '1'
-    },
-    {
-      id: '2',
-      name: '基金',
-      type: '基金',
-      amount: 0,
-      monthlyIncome: 0,
-      account_id: '1'
-    },
-    {
-      id: '1',
-      name: '股票',
-      type: '股票',
-      amount: 0,
-      monthlyIncome: 0,
-      account_id: '1'
-    },
-    {
-      id: '2',
-      name: '基金',
-      type: '基金',
-      amount: 0,
-      monthlyIncome: 0,
-      account_id: '1'
-    },
-    {
-      id: '1',
-      name: '股票',
-      type: '股票',
-      amount: 0,
-      monthlyIncome: 0,
-      account_id: '1'
-    },
-    {
-      id: '2',
-      name: '基金',
-      type: '基金',
-      amount: 0,
-      monthlyIncome: 0,
-      account_id: '1'
-    }
+   
   ];
   
   // 模拟账户数据（包括公积金账户）
@@ -246,25 +199,30 @@ const loadMockData = () => {
 
 
 const viewAssetDetail = (assetId) => {
-  console.log('查看资产详情:', assetId);
-  // 实现资产详情查看功能
-};
+    console.log('查看资产详情:', assetId);
+    // 这里可以跳转到资产详情页面
+  };
+  
+  const viewFundDetail = (fundId) => {
+    console.log('查看基金详情:', fundId);
+    emit('navigate', { key: 'fundDetail', params: { fundId } });
+  };
 
 // 导航到新增通用资产页面
 const navigateToAddAsset = () => {
-  emit('navigate', 'addAsset');
+  emit('navigate', { key: 'addAsset' });
   isMoreMenuExpanded.value = false;
 };
 
 // 导航到新增股票交易页面
 const navigateToAddStock = () => {
-  emit('navigate', 'addStock');
+  emit('navigate', { key: 'addStock' });
   isMoreMenuExpanded.value = false;
 };
 
 // 导航到新增基金交易页面
 const navigateToAddFund = () => {
-  emit('navigate', 'addFund');
+  emit('navigate', { key: 'addFund' });
   isMoreMenuExpanded.value = false;
 };
 </script>

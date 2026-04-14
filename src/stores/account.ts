@@ -13,9 +13,9 @@ export interface Account {
   name: string       // 账户名称
   type: string       // 账户类型
   balance: number    // 账户余额
-  usedLimit?: number // 已用额度（信用卡）
-  totalLimit?: number // 总额度（信用卡）
-  isLiquid?: boolean // 是否为流动资金
+  used_limit?: number // 已用额度（信用卡）
+  total_limit?: number // 总额度（信用卡）
+  is_liquid?: boolean // 是否为流动资金
   remark: string     // 备注
   created_at?: string // 创建时间
   updated_at?: string // 更新时间
@@ -73,9 +73,9 @@ export const useAccountStore = defineStore('account', {
           name: account.name,
           type: account.type,
           balance: account.balance || 0,
-          usedLimit: account.usedLimit || 0,
-          totalLimit: account.totalLimit || 0,
-          isLiquid: account.isLiquid !== undefined ? account.isLiquid : true,
+          used_limit: account.used_limit || 0,
+          total_limit: account.total_limit || 0,
+          is_liquid: account.is_liquid !== undefined ? account.is_liquid : true,
           remark: account.remark || ''
         }
         console.log('Prepared account data:', accountData)
@@ -83,7 +83,7 @@ export const useAccountStore = defineStore('account', {
         // 插入账户记录
         const result = await db.run(
           'INSERT INTO accounts (id, name, type, balance, used_limit, total_limit, is_liquid, remark) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-          [accountData.id, accountData.name, accountData.type, accountData.balance, accountData.usedLimit, accountData.totalLimit, accountData.isLiquid, accountData.remark]
+          [accountData.id, accountData.name, accountData.type, accountData.balance, accountData.used_limit, accountData.total_limit, accountData.is_liquid, accountData.remark]
         )
         console.log('Add account result:', result)
         
@@ -110,7 +110,7 @@ export const useAccountStore = defineStore('account', {
         // 更新账户记录
         await db.run(
           'UPDATE accounts SET name = ?, type = ?, balance = ?, used_limit = ?, total_limit = ?, is_liquid = ?, remark = ? WHERE id = ?',
-          [account.name, account.type, account.balance || 0, account.usedLimit || 0, account.totalLimit || 0, account.isLiquid || true, account.remark, account.id]
+          [account.name, account.type, account.balance || 0, account.used_limit || 0, account.total_limit || 0, account.is_liquid || true, account.remark, account.id]
         )
         // 重新加载账户列表
         await this.loadAccounts()

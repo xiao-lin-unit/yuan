@@ -84,25 +84,7 @@
     </div>
 
     <!-- 浮动操作按钮 -->
-    <div class="floating-action-menu">
-      <div class="floating-action-button" @click="toggleMoreMenu">
-        <el-icon style="color: white;"><More /></el-icon>
-      </div>
-      <div class="floating-menu" v-if="isMoreMenuExpanded">
-        <div class="floating-menu-item" @click="openAddAccountDialog">
-          <el-icon style="color: white;"><Plus /></el-icon>
-          <span>新增账户</span>
-        </div>
-        <div class="floating-menu-item" @click="openTransferDialog">
-          <el-icon style="color: white;"><RefreshLeft /></el-icon>
-          <span>内部转账</span>
-        </div>
-        <div class="floating-menu-item" @click="openDatabaseViewer">
-          <el-icon style="color: white;"><DataLine /></el-icon>
-          <span>数据库查看</span>
-        </div>
-      </div>
-    </div>
+    <FloatingActionMenu :buttons="actionButtons" />
 
 
     
@@ -178,6 +160,7 @@ import { ref, onMounted, onActivated, computed } from 'vue'
 import { useAccountStore } from '../../../stores/account'
 import CreditCardItem from './CreditCardItem.vue'
 import FundItem from './FundItem.vue'
+import FloatingActionMenu from '../../common/FloatingActionMenu.vue'
 import { ArrowDown, View, More, Plus, RefreshLeft, DataLine } from '@element-plus/icons-vue'
 
 const emit = defineEmits(['navigate'])
@@ -297,7 +280,6 @@ const totalOtherFunds = computed(() => {
 const isCreditCardExpanded = ref(true)
 const isFundExpanded = ref(true)
 const isOtherFundExpanded = ref(true)
-const isMoreMenuExpanded = ref(false)
 
 // 切换展开/收起状态
 const toggleCreditCard = () => {
@@ -312,24 +294,37 @@ const toggleOtherFund = () => {
   isOtherFundExpanded.value = !isOtherFundExpanded.value
 }
 
-const toggleMoreMenu = () => {
-  isMoreMenuExpanded.value = !isMoreMenuExpanded.value
-}
-
 const openAddAccountDialog = () => {
   emit('navigate', 'addAccount')
-  isMoreMenuExpanded.value = false
 }
 
 const openTransferDialog = () => {
   // 这里可以添加打开内部转账对话框的逻辑
-  isMoreMenuExpanded.value = false
+  console.log('打开内部转账对话框')
 }
 
 const openDatabaseViewer = () => {
   emit('navigate', 'databaseViewer')
-  isMoreMenuExpanded.value = false
 }
+
+// 定义按钮列表
+const actionButtons = [
+  {
+    text: '新增账户',
+    icon: Plus,
+    action: openAddAccountDialog
+  },
+  {
+    text: '内部转账',
+    icon: RefreshLeft,
+    action: openTransferDialog
+  },
+  {
+    text: '数据库查看',
+    icon: DataLine,
+    action: openDatabaseViewer
+  }
+];
 
 // 格式化货币
 const formatCurrency = (value: number = 0) => {
@@ -589,102 +584,7 @@ const adjustBalance = () => {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
-/* 浮动操作菜单 */
-.floating-action-menu {
-  position: fixed;
-  bottom: 80px;
-  right: 20px;
-  z-index: 1000;
-}
 
-.floating-action-button {
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background-color: #409eff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.5);
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.floating-action-button:hover {
-  transform: scale(1.1);
-  box-shadow: 0 6px 16px rgba(64, 158, 255, 0.5);
-}
-
-.floating-action-button :deep(el-icon) {
-  font-size: 24px;
-  color: white;
-}
-
-.floating-menu {
-  position: absolute;
-  bottom: 66px;
-  right: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 10px;
-  animation: fadeIn 0.3s ease;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.floating-menu-item {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  background-color: #409eff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.5);
-  cursor: pointer;
-  transition: all 0.3s ease;
-  position: relative;
-}
-
-.floating-menu-item:hover {
-  transform: scale(1.1);
-  box-shadow: 0 6px 16px rgba(64, 158, 255, 0.5);
-}
-
-.floating-menu-item :deep(el-icon) {
-  font-size: 20px;
-  color: white;
-}
-
-.floating-menu-item span {
-  position: absolute;
-  right: 56px;
-  background-color: rgba(0, 0, 0, 0.7);
-  color: white;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 12px;
-  white-space: nowrap;
-  opacity: 0;
-  transform: translateX(10px);
-  transition: all 0.2s ease;
-  pointer-events: none;
-}
-
-.floating-menu-item:hover span {
-  opacity: 1;
-  transform: translateX(0);
-}
 
 /* 对话框样式 */
 .dialog-footer {

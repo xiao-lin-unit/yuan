@@ -105,8 +105,8 @@ const loadWeeklyExpenses = async () => {
     
     transactions.forEach(transaction => {
       console.log('处理流水记录:', transaction);
-      if (transaction.createdAt) {
-        const date = new Date(transaction.createdAt);
+      if (transaction.created_at) {
+        const date = new Date(transaction.created_at);
         const dateStr = date.toISOString().split('T')[0]; // YYYY-MM-DD格式
         
         if (dailyExpenses.has(dateStr)) {

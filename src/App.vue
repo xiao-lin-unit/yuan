@@ -47,9 +47,14 @@ import DatabaseViewer from './components/mobile/DatabaseViewer.vue'
 import AddAssetPage from './components/mobile/asset/AddAssetPage.vue'
 import AddStockPage from './components/mobile/asset/AddStockPage.vue'
 import AddFundPage from './components/mobile/asset/AddFundPage.vue'
+import FundDetailPage from './components/mobile/asset/FundDetailPage.vue'
+import BuyFundPage from './components/mobile/asset/BuyFundPage.vue'
 
 const activeMenu = ref('expense')
 const menuVisible = ref<boolean>(false)
+
+// 导航参数
+const navParams = ref<any>({});
 
 // 日期选择状态
 const selectedYear = ref(2026);
@@ -68,6 +73,8 @@ const selectedMonth = ref(3);
       addAsset: AddAssetPage, // 映射到新增通用资产页面组件
       addStock: AddStockPage, // 映射到新增股票交易页面组件
       addFund: AddFundPage, // 映射到新增基金交易页面组件
+      fundDetail: FundDetailPage, // 映射到基金详情页面组件
+      buyFund: BuyFundPage, // 映射到基金二次买入页面组件
       liability: LiabilityManagement,
       dashboard: FinancialDashboard,
       goal: FinancialGoal,
@@ -89,11 +96,37 @@ const componentProps = computed(() => {
     props.month = selectedMonth.value;
   }
   
+  // 为基金详情页面传递fundId参数
+  if (activeMenu.value === 'fundDetail' && navParams.value.fundId) {
+    props.fundId = navParams.value.fundId;
+  }
+  
+  // 为基金二次买入页面传递fundId参数
+  if (activeMenu.value === 'buyFund' && navParams.value.fundId) {
+    props.fundId = navParams.value.fundId;
+  }
+  
   return props;
 });
 
-const navigateTo = (key: string) => {
-  activeMenu.value = key
+const navigateTo = (key: string | { key: string, params?: any }, params?: any) => {
+  let navKey: string;
+  let navParamsObj: any = {};
+  
+  if (typeof key === 'object' && key.key) {
+    // 新格式：{ key: 'fundDetail', params: { fundId } }
+    navKey = key.key;
+    navParamsObj = key.params || {};
+  } else {
+    // 旧格式：'addAsset', params
+    navKey = key as string;
+    navParamsObj = params || {};
+  }
+  
+  activeMenu.value = navKey;
+  // 存储导航参数
+  navParams.value = navParamsObj;
+  console.log('Navigate to:', navKey, 'with params:', navParamsObj);
 }
 
 // 处理日期变化

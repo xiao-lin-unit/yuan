@@ -14,12 +14,12 @@
         <el-form-item label="基金代码" required>
           <el-input v-model="fundForm.code" placeholder="请输入基金代码" />
         </el-form-item>
-        <el-form-item label="交易类型" required>
+        <!-- <el-form-item label="交易类型" required>
           <el-select v-model="fundForm.type" placeholder="请选择交易类型">
             <el-option label="买入" value="买入" />
             <el-option label="卖出" value="卖出" />
           </el-select>
-        </el-form-item>
+        </el-form-item> -->
         <el-form-item label="确认净值" required>
           <el-input v-model.number="fundForm.cost_nav" placeholder="请输入确认净值" type="number" min="0" step="0.0001" />
         </el-form-item>
@@ -138,8 +138,8 @@ const addFund = async () => {
     // 不存在，创建新基金记录
     const fundId = Date.now().toString()
     await db.run(
-      'INSERT INTO funds (id, name, code, shares, current_nav, cost_nav, first_buy_date, has_lock, lock_period, account_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [fundId, fundForm.value.name, fundForm.value.code, fundForm.value.shares, fundForm.value.cost_nav, fundForm.value.cost_nav, fundForm.value.transaction_time, fundForm.value.has_lock, fundForm.value.lock_period, fundForm.value.account_id]
+      'INSERT INTO funds (id, name, code, shares, current_nav, cost_nav, total_fee, first_buy_date, has_lock, lock_period, account_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [fundId, fundForm.value.name, fundForm.value.code, fundForm.value.shares, fundForm.value.cost_nav, fundForm.value.cost_nav, fundForm.value.fee, fundForm.value.transaction_time, fundForm.value.has_lock, fundForm.value.lock_period, fundForm.value.account_id]
     )
     
     // 计算锁定期限的最后一日
@@ -149,12 +149,28 @@ const addFund = async () => {
       lockEndDate.setMonth(lockEndDate.getMonth() + fundForm.value.lock_period)
     }
     
-    // 创建基金交易记录
-    const transactionId = Date.now().toString()
-    await db.run(
-      'INSERT INTO fund_transactions (id, fund_id, type, transaction_nav, shares, fee, has_lock, lock_period, lock_end_date, transaction_time, account_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [transactionId, fundId, fundForm.value.type, fundForm.value.cost_nav, fundForm.value.shares, fundForm.value.fee, fundForm.value.has_lock, fundForm.value.lock_period, lockEndDate, fundForm.value.transaction_time, fundForm.value.account_id]
-    )
+    if (fundForm.value.type === '买入') {
+      // 创建基金持有记录
+      const holdingId = Date.now().toString() + '_hold'
+      await db.run(
+        'INSERT INTO fund_holdings (id, fund_id, nav, shares, remaining_shares, fee, lock_period, lock_end_date, transaction_time, account_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [holdingId, fundId, fundForm.value.cost_nav, fundForm.value.shares, fundForm.value.shares, fundForm.value.fee, fundForm.value.lock_period, lockEndDate, fundForm.value.transaction_time, fundForm.value.account_id]
+      )
+      
+      // 创建基金交易记录（买入）
+      const transactionId = Date.now().toString()
+      await db.run(
+        'INSERT INTO fund_transactions (id, fund_id, transaction_nav, shares, type, hold_ids, fee, transaction_time, account_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [transactionId, fundId, fundForm.value.cost_nav, fundForm.value.shares, '买入', holdingId, fundForm.value.fee, fundForm.value.transaction_time, fundForm.value.account_id]
+      )
+    } else if (fundForm.value.type === '卖出') {
+      // 创建基金交易记录（卖出）
+      const transactionId = Date.now().toString()
+      await db.run(
+        'INSERT INTO fund_transactions (id, fund_id, transaction_nav, shares, type, fee, transaction_time, account_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [transactionId, fundId, fundForm.value.cost_nav, fundForm.value.shares, '卖出', fundForm.value.fee, fundForm.value.transaction_time, fundForm.value.account_id]
+      )
+    }
     
     // 新增基金时，基金表成本净值和当前净值为本次新增的基金的成本净值
     // if (fundForm.value.type === '买入') {
@@ -174,18 +190,18 @@ const addFund = async () => {
     const fundData = await db.query('SELECT * FROM funds WHERE id = ?', [fundId])
     if (fundData.length > 0) {
       const currentFund = fundData[0]
-      let newShares = currentFund.shares
-      let newCostNav = currentFund.cost_nav
+      let new_shares = currentFund.shares
+      let new_cost_nav = currentFund.cost_nav
       
       if (fundForm.value.type === '买入') {
         // 买入：更新份额和成本净值
-        const totalCost = (currentFund.shares * currentFund.cost_nav) + (fundForm.value.current_nav * fundForm.value.shares) + fundForm.value.fee
-        newShares = currentFund.shares + fundForm.value.shares
-        newCostNav = totalCost / newShares
+        const total_cost = (currentFund.shares * currentFund.cost_nav) + (fundForm.value.current_nav * fundForm.value.shares) + fundForm.value.fee
+        new_shares = currentFund.shares + fundForm.value.shares
+        new_cost_nav = total_cost / new_shares
       } else if (fundForm.value.type === '卖出') {
         // 卖出：只更新份额，成本净值不变
-        newShares = currentFund.shares - fundForm.value.shares
-        if (newShares < 0) {
+        new_shares = currentFund.shares - fundForm.value.shares
+        if (new_shares < 0) {
           alert('卖出份额不能超过当前持有份额')
           return
         }
@@ -194,7 +210,7 @@ const addFund = async () => {
       // 更新基金记录
       await db.run(
         'UPDATE funds SET shares = ?, cost_nav = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-        [newShares, newCostNav, fundId]
+        [new_shares, new_cost_nav, fundId]
       )
     }
     */

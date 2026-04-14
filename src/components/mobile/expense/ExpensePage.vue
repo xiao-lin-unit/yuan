@@ -16,9 +16,7 @@
     <ExpenseRecords :year="selectedYear" :month="selectedMonth" />
     
     <!-- 浮动添加按钮 -->
-    <div class="floating-add-button" @click="navigateToAddExpense">
-      <el-icon><Plus /></el-icon>
-    </div>
+    <FloatingActionMenu :buttons="actionButtons" />
   </div>
 </template>
 
@@ -30,6 +28,7 @@ import MonthlyStats from './MonthlyStats.vue';
 import BudgetComponent from './BudgetComponent.vue';
 import WeeklyFinance from './WeeklyFinance.vue';
 import ExpenseRecords from './ExpenseRecords.vue';
+import FloatingActionMenu from '../../common/FloatingActionMenu.vue';
 
 const emit = defineEmits(['navigate']);
 
@@ -63,6 +62,15 @@ const navigateToAddExpense = () => {
   emit('navigate', 'addExpense');
 };
 
+// 定义按钮列表
+const actionButtons = [
+  {
+    text: '新增支出',
+    icon: Plus,
+    action: navigateToAddExpense
+  }
+];
+
 // 处理导航事件
 const handleNavigate = (key: string) => {
   emit('navigate', key);
@@ -76,45 +84,5 @@ const handleNavigate = (key: string) => {
   position: relative;
 }
 
-/* 浮动添加按钮 */
-.floating-add-button {
-  position: fixed;
-  bottom: 80px;
-  right: 20px;
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background-color: #409eff;
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.5);
-  cursor: pointer;
-  z-index: 100;
-  transition: all 0.3s ease;
-}
 
-.floating-add-button:hover {
-  transform: scale(1.1);
-  box-shadow: 0 6px 16px rgba(64, 158, 255, 0.6);
-}
-
-.floating-add-button :deep(el-icon) {
-  font-size: 24px;
-}
-
-/* 响应式调整 */
-@media (max-width: 375px) {
-  .floating-add-button {
-    bottom: 70px;
-    right: 15px;
-    width: 50px;
-    height: 50px;
-  }
-  
-  .floating-add-button :deep(el-icon) {
-    font-size: 20px;
-  }
-}
 </style>

@@ -130,17 +130,24 @@ const addStock = async () => {
       [stockId, stockForm.value.name, stockForm.value.code, stockForm.value.quantity, stockForm.value.price, 0, stockForm.value.transaction_time, stockForm.value.account_id]
     )
     
-    // 创建股票交易记录
-    const transactionId = Date.now().toString()
-    await db.run(
-      'INSERT INTO stock_transactions (id, stock_id, type, price, quantity, fee, transaction_time, account_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [transactionId, stockId, stockForm.value.type, stockForm.value.price, stockForm.value.quantity, stockForm.value.fee, stockForm.value.transaction_time, stockForm.value.account_id]
-    )
-    
-    console.log("新增股票", stockForm.value)
-    // 新增股票时，更新股票表的持有股数和成本价
-    // 成本价格计算公式为：（当前价格*购买股数+费用）/ 购买股数
     if (stockForm.value.type === '买入') {
+      // 创建股票持有记录
+      const holdingId = Date.now().toString() + '_hold'
+      await db.run(
+        'INSERT INTO stock_holdings (id, stock_id, price, quantity, remaining_quantity, fee, transaction_time, account_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [holdingId, stockId, stockForm.value.price, stockForm.value.quantity, stockForm.value.quantity, stockForm.value.fee, stockForm.value.transaction_time, stockForm.value.account_id]
+      )
+      
+      // 创建股票交易记录（买入）
+      const transactionId = Date.now().toString()
+      await db.run(
+        'INSERT INTO stock_transactions (id, stock_id, price, quantity, type, hold_ids, fee, transaction_time, account_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [transactionId, stockId, stockForm.value.price, stockForm.value.quantity, '买入', holdingId, stockForm.value.fee, stockForm.value.transaction_time, stockForm.value.account_id]
+      )
+      
+      console.log("新增股票", stockForm.value)
+      // 新增股票时，更新股票表的持有股数和成本价
+      // 成本价格计算公式为：（当前价格*购买股数+费用）/ 购买股数
       const newQuantity = stockForm.value.quantity
       const newCostPrice = (stockForm.value.price * stockForm.value.quantity + stockForm.value.fee) / stockForm.value.quantity
       
@@ -148,6 +155,13 @@ const addStock = async () => {
       await db.run(
         'UPDATE stocks SET quantity = ?, current_price = ?, cost_price = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
         [newQuantity, stockForm.value.price, newCostPrice, stockId]
+      )
+    } else if (stockForm.value.type === '卖出') {
+      // 创建股票交易记录（卖出）
+      const transactionId = Date.now().toString()
+      await db.run(
+        'INSERT INTO stock_transactions (id, stock_id, price, quantity, type, fee, transaction_time, account_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [transactionId, stockId, stockForm.value.price, stockForm.value.quantity, '卖出', stockForm.value.fee, stockForm.value.transaction_time, stockForm.value.account_id]
       )
     }
     
