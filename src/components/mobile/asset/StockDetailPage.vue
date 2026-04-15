@@ -1,7 +1,7 @@
 <template>
-  <div class="fund-detail-page">
+  <div class="stock-detail-page">
     <!-- 顶部导航栏 -->
-    <div class="fund-detail-header">
+    <div class="stock-detail-header">
       <div class="header-left" @click="goBack">
         <el-icon><ArrowLeft /></el-icon>
       </div>
@@ -9,55 +9,48 @@
       <div class="header-right"></div>
     </div>
     
-    <!-- 基金基本信息 -->
-    <div class="fund-basic-info">
-      <h2 class="fund-name">{{ fundInfo.name }}</h2>
-      <div class="fund-code-risk">
-        <span class="fund-code">{{ fundInfo.code }}</span>
-        <!-- <span class="fund-risk">中高风险</span> -->
+    <!-- 股票基本信息 -->
+    <div class="stock-basic-info">
+      <h2 class="stock-name">{{ stockInfo.name }}</h2>
+      <div class="stock-code-risk">
+        <span class="stock-code">{{ stockInfo.code }}</span>
       </div>
-      <div class="fund-amount">
+      <div class="stock-amount">
         <div class="amount-label">成本金额(元)</div>
-        <div class="amount-value">¥{{ fundInfo.costAmount.toFixed(2) }}</div>
+        <div class="amount-value">¥{{ stockInfo.costAmount.toFixed(2) }}</div>
       </div>
-      <div class="fund-amount">
-        <div class="amount-label">成本费用(元)</div>
-        <div class="amount-value">¥{{ fundInfo.costFee.toFixed(2) }}</div>
-      </div>
-      <div class="fund-returns">
+      <div class="stock-returns">
         <div class="return-item">
           <div class="return-label">持有成本</div>
-          <div class="return-value">¥{{ fundInfo.costNav.toFixed(4) }}</div>
+          <div class="return-value">¥{{ stockInfo.costPrice.toFixed(2) }}</div>
         </div>
         <div class="return-item">
-          <div class="return-label">当前净值</div>
-          <div class="return-value">¥{{ fundInfo.currentNav.toFixed(4) }}</div>
+          <div class="return-label">当前价格</div>
+          <div class="return-value">¥{{ stockInfo.currentPrice.toFixed(2) }}</div>
         </div>
         <div class="return-item">
-          <div class="return-label">持有份额</div>
-          <div class="return-value">{{ fundInfo.shares.toFixed(2) }}</div>
+          <div class="return-label">持有数量</div>
+          <div class="return-value">{{ stockInfo.quantity }}</div>
         </div>
       </div>
-      <div class="fund-returns">
+      <div class="stock-returns">
         <div class="return-item">
           <div class="return-label">确认收益</div>
-          <div class="return-value positive">¥{{ fundInfo.confirmedReturn.toFixed(2) }}</div>
+          <div class="return-value positive">¥{{ stockInfo.confirmedReturn.toFixed(2) }}</div>
         </div>
         <div class="return-item">
           <div class="return-label">持有收益</div>
-          <div class="return-value positive">¥{{ fundInfo.holdReturn.toFixed(2) }}</div>
+          <div class="return-value positive">¥{{ stockInfo.holdReturn.toFixed(2) }}</div>
         </div>
         <div class="return-item">
           <div class="return-label">总收益</div>
-          <div class="return-value positive">¥{{ fundInfo.totalReturn.toFixed(2) }}</div>
+          <div class="return-value positive">¥{{ stockInfo.totalReturn.toFixed(2) }}</div>
         </div>
       </div>
     </div>
     
-    <!-- 基金交易记录明细 -->
-    <div class="fund-transactions">
-      <!-- <h3 class="section-title">交易记录明细</h3> -->
-      
+    <!-- 股票交易记录明细 -->
+    <div class="stock-transactions">
       <!-- Tab切换 -->
       <el-tabs v-model="activeTag" class="transaction-tabs" type="card">
         <!-- 持有记录 -->
@@ -74,16 +67,16 @@
                 </div>
                 <div class="transaction-content">
                   <div class="transaction-item">
-                    <span class="item-label">净值</span>
-                    <span class="item-value">¥{{ (holding.nav || 0).toFixed(4) }}</span>
+                    <span class="item-label">价格</span>
+                    <span class="item-value">¥{{ (holding.price || 0).toFixed(2) }}</span>
                   </div>
                   <div class="transaction-item">
-                    <span class="item-label">份额</span>
-                    <span class="item-value">{{ (holding.shares || 0).toFixed(4) }}</span>
+                    <span class="item-label">数量</span>
+                    <span class="item-value">{{ holding.quantity || 0 }}</span>
                   </div>
                   <div class="transaction-item">
-                    <span class="item-label">剩余份额</span>
-                    <span class="item-value">{{ (holding.remaining_shares || 0).toFixed(4) }}</span>
+                    <span class="item-label">剩余数量</span>
+                    <span class="item-value">{{ holding.remaining_quantity || 0 }}</span>
                   </div>
                   <div class="transaction-item">
                     <span class="item-label">手续费</span>
@@ -92,14 +85,6 @@
                   <div class="transaction-item">
                     <span class="item-label">状态</span>
                     <span class="item-value">{{ holding.sell_status || '未卖出' }}</span>
-                  </div>
-                  <div v-if="holding.lock_period" class="transaction-item">
-                    <span class="item-label">锁定期限</span>
-                    <span class="item-value">{{ holding.lock_period }}个月</span>
-                  </div>
-                  <div v-if="holding.lock_end_date" class="transaction-item">
-                    <span class="item-label">锁定结束日期</span>
-                    <span class="item-value">{{ formatDate(holding.lock_end_date) }}</span>
                   </div>
                 </div>
               </div>
@@ -121,16 +106,16 @@
                 </div>
                 <div class="transaction-content">
                   <div class="transaction-item">
-                    <span class="item-label">交易净值</span>
-                    <span class="item-value">¥{{ (transaction.transaction_nav || 0).toFixed(4) }}</span>
+                    <span class="item-label">交易价格</span>
+                    <span class="item-value">¥{{ (transaction.price || 0).toFixed(2) }}</span>
                   </div>
                   <div class="transaction-item">
-                    <span class="item-label">交易份额</span>
-                    <span class="item-value">{{ (transaction.shares || 0).toFixed(4) }}</span>
+                    <span class="item-label">交易数量</span>
+                    <span class="item-value">{{ transaction.quantity || 0 }}</span>
                   </div>
                   <div class="transaction-item">
                     <span class="item-label">交易金额</span>
-                    <span class="item-value">¥{{ ((transaction.transaction_nav || 0) * (transaction.shares || 0)).toFixed(2) }}</span>
+                    <span class="item-value">¥{{ ((transaction.price || 0) * (transaction.quantity || 0)).toFixed(2) }}</span>
                   </div>
                   <div class="transaction-item">
                     <span class="item-label">手续费</span>
@@ -156,16 +141,16 @@
                 </div>
                 <div class="transaction-content">
                   <div class="transaction-item">
-                    <span class="item-label">交易净值</span>
-                    <span class="item-value">¥{{ (transaction.transaction_nav || 0).toFixed(4) }}</span>
+                    <span class="item-label">交易价格</span>
+                    <span class="item-value">¥{{ (transaction.price || 0).toFixed(2) }}</span>
                   </div>
                   <div class="transaction-item">
-                    <span class="item-label">交易份额</span>
-                    <span class="item-value">{{ (transaction.shares || 0).toFixed(4) }}</span>
+                    <span class="item-label">交易数量</span>
+                    <span class="item-value">{{ transaction.quantity || 0 }}</span>
                   </div>
                   <div class="transaction-item">
                     <span class="item-label">交易金额</span>
-                    <span class="item-value">¥{{ ((transaction.transaction_nav || 0) * (transaction.shares || 0)).toFixed(2) }}</span>
+                    <span class="item-value">¥{{ ((transaction.price || 0) * (transaction.quantity || 0)).toFixed(2) }}</span>
                   </div>
                   <div class="transaction-item">
                     <span class="item-label">手续费</span>
@@ -186,72 +171,66 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import { ArrowLeft, Plus, Minus, More, Switch, Edit } from '@element-plus/icons-vue';
+import { ArrowLeft, Plus, Minus, Edit } from '@element-plus/icons-vue';
 import { ElMessageBox, ElMessage } from 'element-plus';
 import FloatingActionMenu from '../../../components/common/FloatingActionMenu.vue';
 import db from '../../../database/index.js';
 
 const props = defineProps({
-  fundId: {
+  stockId: {
     type: String,
     required: true
   }
 });
 
-// 跳转到基金二次买入页面
-const navigateToBuyFund = () => {
-  emit('navigate', { key: 'buyFund', params: { fundId: props.fundId } });
+// 跳转到股票买入页面
+const navigateToBuyStock = () => {
+  emit('navigate', { key: 'buyStock', params: { stockId: props.stockId } });
 };
 
-// 跳转到基金转换页面
-const navigateToConvertFund = () => {
-  // 这里可以实现基金转换的逻辑
-  console.log('转换基金');
+// 跳转到股票卖出页面
+const navigateToSellStock = () => {
+  emit('navigate', { key: 'sellStock', params: { stockId: props.stockId } });
 };
 
-// 跳转到基金卖出页面
-const navigateToSellFund = () => {
-  emit('navigate', { key: 'sellFund', params: { fundId: props.fundId } });
-};
-
-// 修改基金净值
-const editFundNav = async () => {
+// 修改股票价格
+const editStockPrice = async () => {
   try {
     const { value } = await ElMessageBox.prompt(
-      '请输入新的基金净值',
-      '修改净值',
+      '请输入新的股票价格',
+      '修改价格',
       {
         confirmButtonText: '确认',
         cancelButtonText: '取消',
-        inputPattern: /^\d+(\.\d{1,4})?$/,
-        inputErrorMessage: '请输入有效的净值（最多4位小数）',
-        inputValue: fundInfo.value.currentNav.toFixed(4)
+        inputPattern: /^\d+(\.\d{1,2})?$/,
+        inputErrorMessage: '请输入有效的价格（最多2位小数）',
+        inputValue: stockInfo.value.currentPrice.toFixed(2)
       }
     );
     
-    const newNav = parseFloat(value);
-    if (isNaN(newNav) || newNav <= 0) {
-      ElMessage.error('请输入有效的净值');
+    const newPrice = parseFloat(value);
+    if (isNaN(newPrice) || newPrice <= 0) {
+      ElMessage.error('请输入有效的价格');
       return;
     }
     
     // 更新数据库
     await db.run(
-      'UPDATE funds SET current_nav = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-      [newNav, props.fundId]
+      'UPDATE stocks SET current_price = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      [newPrice, props.stockId]
     );
     
     // 更新本地显示
-    fundInfo.value.currentNav = newNav;
+    stockInfo.value.currentPrice = newPrice;
     
     // 重新计算收益
-    await loadFundDetail();
+    await loadStockDetail();
     
-    ElMessage.success('净值更新成功');
+    ElMessage.success('价格更新成功');
   } catch (error) {
     if (error !== 'cancel') {
-      console.error('修改净值失败:', error);
-      ElMessage.error('修改净值失败');
+      console.error('修改价格失败:', error);
+      ElMessage.error('修改价格失败');
     }
   }
 };
@@ -261,38 +240,32 @@ const actionButtons = [
   {
     text: '买入',
     icon: Plus,
-    action: navigateToBuyFund
+    action: navigateToBuyStock
   },
   {
-    text: '修改净值',
+    text: '修改价格',
     icon: Edit,
-    action: editFundNav
+    action: editStockPrice
   },
-  // {
-  //   text: '转换',
-  //   icon: Switch,
-  //   action: navigateToConvertFund
-  // },
   {
     text: '卖出',
     icon: Minus,
-    action: navigateToSellFund
+    action: navigateToSellStock
   }
 ];
 
 const emit = defineEmits(['navigate']);
 
-const fundInfo = ref({
-  name: '兴全趋势投资混合(LOF)',
-  code: '163402',
-  costAmount: 36.13,
-  costFee: 0.00,
-  costNav: 1.54,
-  currentNav: 1.68,
-  shares: 21.98,
-  confirmedReturn: 10.50,
-  holdReturn: 3.23,
-  totalReturn: 13.73
+const stockInfo = ref({
+  name: '',
+  code: '',
+  costAmount: 0,
+  costPrice: 0,
+  currentPrice: 0,
+  quantity: 0,
+  confirmedReturn: 0,
+  holdReturn: 0,
+  totalReturn: 0
 });
 
 // 当前激活的标签
@@ -323,47 +296,45 @@ const formatDate = (dateString) => {
   });
 };
 
-// 加载基金详情数据
-const loadFundDetail = async () => {
-  console.log('Loading fund detail for:', props.fundId);
+// 加载股票详情数据
+const loadStockDetail = async () => {
+  console.log('Loading stock detail for:', props.stockId);
   
   try {
     // 连接数据库
     await db.connect();
     
-    // 查询基金基本信息
-    const fundData = await db.query('SELECT * FROM funds WHERE id = ?', [props.fundId]);
-    console.log('Fund data:', JSON.stringify(fundData));
-    if (fundData.length > 0) {
-      const fund = fundData[0];
+    // 查询股票基本信息
+    const stockData = await db.query('SELECT * FROM stocks WHERE id = ?', [props.stockId]);
+    console.log('Stock data:', JSON.stringify(stockData));
+    if (stockData.length > 0) {
+      const stock = stockData[0];
       
       // 防御性检查，确保所有必要字段都存在
-      const shares = fund.shares;
-      const current_nav = fund.current_nav;
-      const cost_nav = fund.cost_nav;
-      const total_fee = fund.total_fee || 0;
+      const quantity = stock.quantity || 0;
+      const current_price = stock.current_price || 0;
+      const cost_price = stock.cost_price || 0;
       
       // 计算持有金额
-      const costAmount = shares * cost_nav;
-      const holdReturn = (current_nav - cost_nav) * shares; // 持有收益 = （当前净值-持有成本净值）* 持有份额
-      const confirmedReturn = fund.confirmed_profit || 0; // 确认收益默认为0，只有卖出时才计算
-      const totalReturn = holdReturn + confirmedReturn; // 总收益 = 持有收益 + 确认收益
+      const costAmount = quantity * cost_price;
+      const holdReturn = (current_price - cost_price) * quantity;
+      const confirmedReturn = stock.confirmed_profit || 0;
+      const totalReturn = holdReturn + confirmedReturn;
       
-      // 更新基金信息
-      fundInfo.value = {
-        name: fund.name || '未知基金',
-        code: fund.code || '',
+      // 更新股票信息
+      stockInfo.value = {
+        name: stock.name || '未知股票',
+        code: stock.code || '',
         costAmount: costAmount,
-        costFee: total_fee,
-        costNav: cost_nav,
-        currentNav: current_nav,
-        shares: shares,
-        confirmedReturn: confirmedReturn, // 确认收益默认为0，只有卖出时才计算
-        holdReturn: holdReturn, // 持有收益 = （当前净值-持有成本净值）* 持有份额
-        totalReturn: totalReturn // 总收益 = 持有收益 + 确认收益
+        costPrice: cost_price,
+        currentPrice: current_price,
+        quantity: quantity,
+        confirmedReturn: confirmedReturn,
+        holdReturn: holdReturn,
+        totalReturn: totalReturn
       };
       
-      console.log('Fund detail loaded:', fundInfo.value);
+      console.log('Stock detail loaded:', stockInfo.value);
       
       // 加载持有记录
       await loadHoldings();
@@ -371,23 +342,22 @@ const loadFundDetail = async () => {
       // 加载交易记录
       await loadTransactions();
     } else {
-      console.error('Fund not found:', props.fundId);
+      console.error('Stock not found:', props.stockId);
       // 设置默认值，避免模板渲染错误
-      fundInfo.value = {
-        name: '未知基金',
+      stockInfo.value = {
+        name: '未知股票',
         code: '',
         costAmount: 0,
-        costFee: 0,
-        costNav: 0,
-        currentNav: 0,
-        shares: 0,
+        costPrice: 0,
+        currentPrice: 0,
+        quantity: 0,
         confirmedReturn: 0,
         holdReturn: 0,
         totalReturn: 0
       };
     }
   } catch (error) {
-    console.error('Error loading fund detail:', error);
+    console.error('Error loading stock detail:', error);
   }
 };
 
@@ -396,15 +366,15 @@ const loadHoldings = async () => {
   try {
     // 查询持有记录，按时间倒序
     const holdingData = await db.query(
-      'SELECT * FROM fund_holdings WHERE fund_id = ? ORDER BY transaction_time DESC', 
-      [props.fundId]
+      'SELECT * FROM stock_holdings WHERE stock_id = ? ORDER BY transaction_time DESC', 
+      [props.stockId]
     );
     
     holdings.value = holdingData.map(holding => ({
       ...holding,
-      nav: holding.nav || 0,
-      shares: holding.shares || 0,
-      remaining_shares: holding.remaining_shares || 0,
+      price: holding.price || 0,
+      quantity: holding.quantity || 0,
+      remaining_quantity: holding.remaining_quantity || 0,
       fee: holding.fee || 0,
       sell_status: holding.sell_status || '未卖出',
       transaction_time: holding.transaction_time || new Date()
@@ -421,8 +391,8 @@ const loadTransactions = async () => {
   try {
     // 查询交易记录，按时间倒序
     const transactionData = await db.query(
-      'SELECT * FROM fund_transactions WHERE fund_id = ? ORDER BY transaction_time DESC', 
-      [props.fundId]
+      'SELECT * FROM stock_transactions WHERE stock_id = ? ORDER BY transaction_time DESC', 
+      [props.stockId]
     );
     
     // 分离买入和卖出记录
@@ -430,8 +400,8 @@ const loadTransactions = async () => {
       .filter(transaction => transaction.type === '买入')
       .map(transaction => ({
         ...transaction,
-        transaction_nav: transaction.transaction_nav || 0,
-        shares: transaction.shares || 0,
+        price: transaction.price || 0,
+        quantity: transaction.quantity || 0,
         fee: transaction.fee || 0,
         transaction_time: transaction.transaction_time || new Date()
       }));
@@ -440,8 +410,8 @@ const loadTransactions = async () => {
       .filter(transaction => transaction.type === '卖出')
       .map(transaction => ({
         ...transaction,
-        transaction_nav: transaction.transaction_nav || 0,
-        shares: transaction.shares || 0,
+        price: transaction.price || 0,
+        quantity: transaction.quantity || 0,
         fee: transaction.fee || 0,
         transaction_time: transaction.transaction_time || new Date()
       }));
@@ -454,12 +424,12 @@ const loadTransactions = async () => {
 };
 
 onMounted(() => {
-  loadFundDetail();
+  loadStockDetail();
 });
 </script>
 
 <style scoped>
-.fund-detail-page {
+.stock-detail-page {
   height: 100%;
   background-color: #f5f7fa;
   display: flex;
@@ -467,7 +437,7 @@ onMounted(() => {
 }
 
 /* 顶部导航栏 */
-.fund-detail-header {
+.stock-detail-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -492,41 +462,33 @@ onMounted(() => {
   margin: 0;
 }
 
-/* 基金基本信息 */
-.fund-basic-info {
+/* 股票基本信息 */
+.stock-basic-info {
   padding: 13px 30px;
   background-color: #ffffff;
   margin-bottom: 10px;
 }
 
-.fund-name {
+.stock-name {
   font-size: 18px;
   font-weight: 600;
   color: #333333;
   margin: 0 0 10px 0;
 }
 
-.fund-code-risk {
+.stock-code-risk {
   display: flex;
   align-items: center;
   margin-bottom: 20px;
 }
 
-.fund-code {
+.stock-code {
   font-size: 14px;
   color: #666666;
   margin-right: 10px;
 }
 
-.fund-risk {
-  font-size: 12px;
-  color: #ff6b6b;
-  background-color: #fff5f5;
-  padding: 2px 8px;
-  border-radius: 10px;
-}
-
-.fund-amount {
+.stock-amount {
   text-align: center;
   margin-bottom: 20px;
 }
@@ -543,7 +505,7 @@ onMounted(() => {
   color: #333333;
 }
 
-.fund-returns {
+.stock-returns {
   display: flex;
   justify-content: space-around;
   border-top: 1px solid #f0f0f0;
@@ -574,216 +536,11 @@ onMounted(() => {
   color: #ff6b6b;
 }
 
-/* 功能按钮 */
-.fund-functions {
-  display: flex;
-  justify-content: space-around;
-  padding: 15px;
-  background-color: #ffffff;
-  margin-bottom: 10px;
-}
-
-.function-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  cursor: pointer;
-}
-
-.function-item :deep(el-icon) {
-  font-size: 20px;
-  color: #409eff;
-  margin-bottom: 5px;
-}
-
-.function-item span {
-  font-size: 12px;
-  color: #666666;
-}
-
-/* 累计盈亏和业绩走势 */
-.fund-trend {
-  background-color: #ffffff;
-  margin-bottom: 10px;
-  padding: 15px;
-}
-
-.trend-tabs {
-  display: flex;
-  border-bottom: 1px solid #f0f0f0;
-  margin-bottom: 15px;
-}
-
-.tab-item {
-  flex: 1;
-  text-align: center;
-  padding: 10px 0;
-  font-size: 14px;
-  color: #666666;
-  cursor: pointer;
-}
-
-.tab-item.active {
-  color: #409eff;
-  border-bottom: 2px solid #409eff;
-}
-
-.trend-content {
-  padding: 10px 0;
-}
-
-.total-return {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-}
-
-.total-return-label {
-  font-size: 14px;
-  color: #666666;
-}
-
-.total-return-value {
-  font-size: 16px;
-  font-weight: 600;
-  color: #67c23a;
-}
-
-.trend-chart {
-  height: 200px;
-  position: relative;
-}
-
-.chart-placeholder {
-  width: 100%;
-  height: 100%;
-  position: relative;
-}
-
-.chart-line {
-  position: absolute;
-  bottom: 30px;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: linear-gradient(to right, #333 0%, #333 20%, #333 40%, #333 60%, #333 80%, #333 100%);
-  transform: scaleY(0.5);
-  transform-origin: bottom;
-}
-
-.chart-dot {
-  position: absolute;
-  bottom: 29px;
-  right: 20px;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background-color: #333;
-}
-
-.chart-value {
-  position: absolute;
-  bottom: 40px;
-  right: 10px;
-  font-size: 12px;
-  color: #333;
-  background-color: rgba(255, 255, 255, 0.8);
-  padding: 2px 6px;
-  border-radius: 4px;
-}
-
-.chart-labels {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  display: flex;
-  justify-content: space-between;
-  font-size: 10px;
-  color: #999;
-}
-
-/* 投资计划 */
-.investment-plan {
-  background-color: #ffffff;
-  margin-bottom: 80px;
-  padding: 15px;
-}
-
-.plan-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 15px;
-}
-
-.plan-header h3 {
-  font-size: 16px;
-  font-weight: 600;
-  color: #333333;
-  margin: 0;
-}
-
-.plan-setting {
-  font-size: 14px;
-  color: #409eff;
-  display: flex;
-  align-items: center;
-  cursor: pointer;
-}
-
-.plan-setting :deep(el-icon) {
-  font-size: 14px;
-  margin-left: 5px;
-}
-
-.plan-content {
-  padding: 20px 0;
-  text-align: center;
-  background-color: #f9f9f9;
-  border-radius: 8px;
-}
-
-.plan-placeholder {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  color: #999999;
-}
-
-.plan-icon {
-  font-size: 40px;
-  margin-bottom: 10px;
-  opacity: 0.5;
-}
-
-
-
-.action-btn.primary {
-  background-color: #409eff;
-  border-color: #409eff;
-  color: #ffffff;
-}
-
-.action-btn.secondary {
-  background-color: #f0f0f0;
-  border-color: #f0f0f0;
-  color: #333333;
-}
-
 /* 交易记录明细 */
-.fund-transactions {
+.stock-transactions {
   padding: 15px;
   background-color: #ffffff;
   margin-bottom: 80px;
-}
-
-.section-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: #333333;
-  margin: 0 0 15px 0;
 }
 
 /* Tab样式 */

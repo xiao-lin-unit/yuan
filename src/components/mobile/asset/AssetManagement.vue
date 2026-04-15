@@ -29,12 +29,12 @@
           v-for="stock in displayStocks" 
           :key="stock.id"
           :title="stock.name"
-          :amount="stock.costPrice * stock.quantity"
-          :secondary-amount="stock.costPrice"
+          :amount="stock.cost_price * stock.quantity"
+          :secondary-amount="stock.cost_price"
           :icon="stock.icon"
           :color="stock.color"
           :assetId="stock.id"
-          @click="viewAssetDetail"
+          @click="viewStockDetail(stock.id)"
         />
         
         <!-- 基金资产 -->
@@ -242,6 +242,11 @@ const loadMockData = () => {
 const viewAssetDetail = (assetId) => {
     console.log('查看资产详情:', assetId);
     // 这里可以跳转到资产详情页面
+  };
+  
+  const viewStockDetail = (stockId) => {
+    console.log('查看股票详情:', stockId);
+    emit('navigate', { key: 'stockDetail', params: { stockId } });
   };
   
   const viewFundDetail = (fundId) => {

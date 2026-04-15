@@ -19,6 +19,7 @@
             <el-option label="版权" value="版权" />
             <el-option label="副业" value="副业" />
             <el-option label="被动收入" value="被动收入" />
+            <el-option label="社保" value="社保" />
             <el-option label="公积金" value="公积金" />
             <el-option label="其他" value="其他" />
           </el-select>
@@ -36,10 +37,10 @@
             />
           </el-select>
         </el-form-item>
-        <el-form-item label="周期">
+        <el-form-item label="收益周期">
           <el-select v-model="assetForm.period" placeholder="请选择周期（可选）">
-            <el-option label="年" value="年" />
-            <el-option label="月" value="月" />
+            <el-option label="每年" value="年" />
+            <el-option label="每月" value="月" />
           </el-select>
         </el-form-item>
       </el-form>
@@ -71,6 +72,8 @@ const assetForm = ref({
 const filteredAccounts = computed(() => {
   if (assetForm.value.type === '公积金') {
     return accounts.value.filter(acc => acc.type === '公积金')
+  } else if (assetForm.value.type === '社保') {
+    return accounts.value.filter(acc => acc.type === '社保')
   } else {
     return accounts.value.filter(acc => acc.type !== '信用卡')
   }

@@ -50,6 +50,9 @@ import AddFundPage from './components/mobile/asset/AddFundPage.vue'
 import FundDetailPage from './components/mobile/asset/FundDetailPage.vue'
 import BuyFundPage from './components/mobile/asset/BuyFundPage.vue'
 import SellFundPage from './components/mobile/asset/SellFundPage.vue'
+import StockDetailPage from './components/mobile/asset/StockDetailPage.vue'
+import BuyStockPage from './components/mobile/asset/BuyStockPage.vue'
+import SellStockPage from './components/mobile/asset/SellStockPage.vue'
 
 const activeMenu = ref('expense')
 const menuVisible = ref<boolean>(false)
@@ -77,6 +80,9 @@ const selectedMonth = ref(3);
       fundDetail: FundDetailPage, // 映射到基金详情页面组件
       buyFund: BuyFundPage, // 映射到基金二次买入页面组件
       sellFund: SellFundPage, // 映射到基金卖出页面组件
+      stockDetail: StockDetailPage, // 映射到股票详情页面组件
+      buyStock: BuyStockPage, // 映射到股票买入页面组件
+      sellStock: SellStockPage, // 映射到股票卖出页面组件
       liability: LiabilityManagement,
       dashboard: FinancialDashboard,
       goal: FinancialGoal,
@@ -111,6 +117,21 @@ const componentProps = computed(() => {
   // 为基金卖出页面传递fundId参数
   if (activeMenu.value === 'sellFund' && navParams.value.fundId) {
     props.fundId = navParams.value.fundId;
+  }
+  
+  // 为股票详情页面传递stockId参数
+  if (activeMenu.value === 'stockDetail' && navParams.value.stockId) {
+    props.stockId = navParams.value.stockId;
+  }
+  
+  // 为股票买入页面传递stockId参数
+  if (activeMenu.value === 'buyStock' && navParams.value.stockId) {
+    props.stockId = navParams.value.stockId;
+  }
+  
+  // 为股票卖出页面传递stockId参数
+  if (activeMenu.value === 'sellStock' && navParams.value.stockId) {
+    props.stockId = navParams.value.stockId;
   }
   
   return props;

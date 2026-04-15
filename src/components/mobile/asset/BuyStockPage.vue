@@ -1,18 +1,18 @@
 <template>
   <PageTemplate 
-    title="新增股票"
+    title="股票买入"
     show-confirm-button
-    confirm-text="确认添加"
+    confirm-text="确认买入"
     @back="goBack"
-    @confirm="addStock"
+    @confirm="buyStock"
   >
     <div class="form-container">
       <el-form :model="stockForm" label-width="100px">
         <el-form-item label="股票名称" required>
-          <el-input v-model="stockForm.name" placeholder="请输入股票名称" />
+          <el-input v-model="stockForm.name" placeholder="请输入股票名称" disabled />
         </el-form-item>
         <el-form-item label="股票代码" required>
-          <el-input v-model="stockForm.code" placeholder="请输入股票代码" />
+          <el-input v-model="stockForm.code" placeholder="请输入股票代码" disabled />
         </el-form-item>
         <el-form-item label="买入价格" required>
           <el-input v-model.number="stockForm.price" placeholder="请输入买入价格" type="number" min="0" step="0.01" />
@@ -41,6 +41,13 @@ import { ref, onMounted } from 'vue'
 import PageTemplate from '../../common/PageTemplate.vue'
 import db from '../../../database/index.js'
 
+const props = defineProps({
+  stockId: {
+    type: String,
+    required: true
+  }
+})
+
 const emit = defineEmits(['navigate'])
 
 // 账户数据
@@ -60,6 +67,7 @@ const stockForm = ref({
 
 onMounted(async () => {
   await loadAccounts()
+  await loadStockData()
 })
 
 const loadAccounts = async () => {
@@ -71,26 +79,26 @@ const loadAccounts = async () => {
   }
 }
 
-const goBack = () => {
-  emit('navigate', 'asset')
+const loadStockData = async () => {
+  try {
+    const stockData = await db.query('SELECT * FROM stocks WHERE id = ?', [props.stockId])
+    if (stockData.length > 0) {
+      const stock = stockData[0]
+      stockForm.value.id = stock.id
+      stockForm.value.name = stock.name
+      stockForm.value.code = stock.code
+    }
+  } catch (error) {
+    console.error('加载股票数据失败:', error)
+  }
 }
 
-const addStock = async () => {
+const goBack = () => {
+  emit('navigate', { key: 'stockDetail', params: { stockId: props.stockId } })
+}
+
+const buyStock = async () => {
   // 验证必填字段
-  if (!stockForm.value.name) {
-    alert('请输入股票名称')
-    return
-  }
-  if (!stockForm.value.code) {
-    alert('请输入股票代码')
-    return
-  }
-  // 股票代码格式验证：6位数字
-  const codePattern = /^\d{6}$/
-  if (!codePattern.test(stockForm.value.code)) {
-    alert('股票代码必须为6位数字')
-    return
-  }
   if (!stockForm.value.price || stockForm.value.price <= 0) {
     alert('请输入有效的买入价格')
     return
@@ -109,21 +117,14 @@ const addStock = async () => {
   }
   
   try {
-    // 检查是否已存在相同股票（通过股票代码）
-    const existingStocks = await db.query('SELECT * FROM stocks WHERE code = ?', [stockForm.value.code])
-    
-    if (existingStocks.length > 0) {
-      const existingStock = existingStocks[0]
-      // 股票代码已存在，检查是否已结束
-      if (existingStock.ended === 0 || existingStock.ended === false) {
-        // 未结束，提示已存在
-        alert('已存在该股票，不允许重复添加')
-      } else {
-        // 已结束，提示到历史记录查看
-        alert('已存在该股票，请到历史记录中查看')
-      }
+    // 获取当前股票数据
+    const stockData = await db.query('SELECT * FROM stocks WHERE id = ?', [props.stockId])
+    if (stockData.length === 0) {
+      alert('股票不存在')
       return
     }
+    
+    const currentStock = stockData[0]
     
     // 检查账户余额
     const accountData = await db.query('SELECT * FROM accounts WHERE id = ?', [stockForm.value.account_id])
@@ -140,56 +141,55 @@ const addStock = async () => {
       return
     }
     
-    // 不存在，创建新股票记录
-    const stockId = Date.now().toString()
+    // 计算新的成本价格（加权平均）= ((持有成本价 * 持有数量) + (本次买入价格 * 本次买入数量) + 本次买入手续费) / (持有数量 + 本次买入数量)
+    const total_cost = (currentStock.quantity * currentStock.cost_price) + (stockForm.value.price * stockForm.value.quantity) + stockForm.value.fee
+    const new_quantity = currentStock.quantity + stockForm.value.quantity
+    const new_cost_price = total_cost / new_quantity
+    const new_current_price = stockForm.value.price
     
-    const statements = []
+    // 检查股票是否已结束，如果已结束则重置为未结束状态
+    const new_ended = 0 // 买入后设置为未结束
     
-    // 计算成本价 = ((当前价 * 数量) + 手续费) / 数量
-    // const totalCost = (stockForm.value.price * stockForm.value.quantity) + stockForm.value.fee
-    const costPrice = totalCost / stockForm.value.quantity
-    
-    // 创建股票记录
-    statements.push({
-      statement: 'INSERT INTO stocks (id, name, code, quantity, current_price, cost_price, first_buy_date, account_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      values: [stockId, stockForm.value.name, stockForm.value.code, stockForm.value.quantity, stockForm.value.price, costPrice, stockForm.value.transaction_time, stockForm.value.account_id]
-    })
-    
+    // 准备事务语句
     const holdingId = Date.now().toString() + '_hold'
     const transactionId = Date.now().toString()
-    
-    // 创建股票持有记录
-    statements.push({
-      statement: 'INSERT INTO stock_holdings (id, stock_id, price, quantity, remaining_quantity, fee, transaction_time, account_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      values: [holdingId, stockId, stockForm.value.price, stockForm.value.quantity, stockForm.value.quantity, stockForm.value.fee, stockForm.value.transaction_time, stockForm.value.account_id]
-    })
-    
-    // 创建股票交易记录（买入）
-    statements.push({
-      statement: 'INSERT INTO stock_transactions (id, stock_id, price, quantity, type, hold_ids, fee, transaction_time, account_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      values: [transactionId, stockId, stockForm.value.price, stockForm.value.quantity, '买入', holdingId, stockForm.value.fee, stockForm.value.transaction_time, stockForm.value.account_id]
-    })
-    
-    // 扣除账户余额
-    statements.push({
-      statement: 'UPDATE accounts SET balance = balance - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-      values: [totalCost, stockForm.value.account_id]
-    })
-    
-    // 创建账户流水记录
     const accountTransactionId = Date.now().toString() + '_acc'
-    statements.push({
-      statement: 'INSERT INTO account_transactions (id, account_id, type, amount, balance_after, description, transaction_time) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      values: [accountTransactionId, stockForm.value.account_id, '支出', totalCost, account.balance - totalCost, `股票买入：${stockForm.value.name}`, stockForm.value.transaction_time]
-    })
+    
+    const statements = [
+      // 创建股票持有记录
+      {
+        statement: 'INSERT INTO stock_holdings (id, stock_id, price, quantity, remaining_quantity, fee, transaction_time, account_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        values: [holdingId, props.stockId, stockForm.value.price, stockForm.value.quantity, stockForm.value.quantity, stockForm.value.fee, stockForm.value.transaction_time, stockForm.value.account_id]
+      },
+      // 创建股票交易记录（买入）
+      {
+        statement: 'INSERT INTO stock_transactions (id, stock_id, price, quantity, type, hold_ids, fee, transaction_time, account_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        values: [transactionId, props.stockId, stockForm.value.price, stockForm.value.quantity, '买入', holdingId, stockForm.value.fee, stockForm.value.transaction_time, stockForm.value.account_id]
+      },
+      // 更新股票记录（包括重置ended状态为0）
+      {
+        statement: 'UPDATE stocks SET quantity = ?, current_price = ?, cost_price = ?, ended = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+        values: [new_quantity, new_current_price, new_cost_price, new_ended, props.stockId]
+      },
+      // 扣除账户余额
+      {
+        statement: 'UPDATE accounts SET balance = balance - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+        values: [totalCost, stockForm.value.account_id]
+      },
+      // 创建账户流水记录
+      {
+        statement: 'INSERT INTO account_transactions (id, account_id, type, amount, balance_after, description, transaction_time) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        values: [accountTransactionId, stockForm.value.account_id, '支出', totalCost, account.balance - totalCost, `股票买入：${currentStock.name}`, stockForm.value.transaction_time]
+      }
+    ]
     
     // 使用事务执行所有操作
     await db.executeTransaction(statements)
     
     emit('navigate', 'asset')
   } catch (error) {
-    console.error('新增股票失败:', error)
-    alert('新增股票失败，请重试')
+    console.error('股票买入失败:', error)
+    alert('股票买入失败，请重试')
   }
 }
 </script>
