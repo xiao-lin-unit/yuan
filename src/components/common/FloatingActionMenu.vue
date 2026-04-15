@@ -76,12 +76,14 @@ const toggleMenu = () => {
   justify-content: center;
   box-shadow: 0 4px 12px rgba(64, 158, 255, 0.5);
   cursor: pointer;
+  opacity: 0.7;
   transition: all 0.3s ease;
 }
 
 .floating-action-button:hover {
   transform: scale(1.1);
   box-shadow: 0 6px 16px rgba(64, 158, 255, 0.5);
+  opacity: 1;
 }
 
 .floating-menu {
@@ -105,6 +107,7 @@ const toggleMenu = () => {
   justify-content: center;
   box-shadow: 0 4px 12px rgba(64, 158, 255, 0.5);
   cursor: pointer;
+  opacity: 0.8;
   transition: all 0.3s ease;
   position: relative;
 }
@@ -112,6 +115,7 @@ const toggleMenu = () => {
 .floating-menu-item:hover {
   transform: scale(1.1);
   box-shadow: 0 6px 16px rgba(64, 158, 255, 0.5);
+  opacity: 1;
 }
 
 .floating-menu-item span {
