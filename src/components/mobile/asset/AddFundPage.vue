@@ -130,8 +130,15 @@ const addFund = async () => {
     const existingFunds = await db.query('SELECT * FROM funds WHERE code = ?', [fundForm.value.code])
     
     if (existingFunds.length > 0) {
-      // 基金代码已存在，提示用户
-      alert('该基金代码已存在，不允许重复添加')
+      const existingFund = existingFunds[0]
+      // 基金代码已存在，检查是否已结束
+      if (existingFund.ended === 0 || existingFund.ended === false) {
+        // 未结束，提示已存在
+        alert('已存在该基金，不允许重复添加')
+      } else {
+        // 已结束，提示到历史记录查看
+        alert('已存在该基金，请到历史记录中查看')
+      }
       return
     }
     

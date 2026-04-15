@@ -1,14 +1,19 @@
 <template>
   <div class="asset-page">
+    <!-- 页面标题 -->
+    <div class="page-header">
+      <h2 class="page-title">{{ showEndedAssets ? '历史资产' : '当前资产' }}</h2>
+    </div>
+    
     <!-- 资产卡片容器 -->
     <div class="asset-cards-container">
-      <div v-if="generalAssets.length === 0 && stocks.length === 0 && funds.length === 0" class="no-assets">
-        <el-empty description="暂无资产" />
+      <div v-if="displayGeneralAssets.length === 0 && displayStocks.length === 0 && displayFunds.length === 0" class="no-assets">
+        <el-empty :description="showEndedAssets ? '暂无历史资产' : '暂无资产'" />
       </div>
       <template v-else>
         <!-- 通用资产 -->
         <AssetCard 
-          v-for="asset in generalAssets" 
+          v-for="asset in displayGeneralAssets" 
           :key="asset.id"
           :title="asset.name"
           :amount="asset.amount"
@@ -21,7 +26,7 @@
         
         <!-- 股票资产 -->
         <AssetCard 
-          v-for="stock in stocks" 
+          v-for="stock in displayStocks" 
           :key="stock.id"
           :title="stock.name"
           :amount="stock.costPrice * stock.quantity"
@@ -34,7 +39,7 @@
         
         <!-- 基金资产 -->
         <AssetCard 
-          v-for="fund in funds" 
+          v-for="fund in displayFunds" 
           :key="fund.id"
           :title="fund.name"
           :amount="fund.cost_nav * fund.shares"
@@ -47,8 +52,14 @@
       </template>
     </div>
     
+    <!-- 切换当前/历史资产按钮 -->
+    <div class="toggle-assets-button" @click="toggleAssetsView">
+      <el-icon style="color: white;"><Switch /></el-icon>
+      <span class="toggle-text">{{ showEndedAssets ? '当前资产' : '历史资产' }}</span>
+    </div>
+    
     <!-- 浮动操作按钮 -->
-    <div class="floating-action-menu">
+    <div class="floating-action-menu" v-if="!showEndedAssets">
       <div class="floating-action-button" @click="toggleMoreMenu">
         <el-icon style="color: white;"><More /></el-icon>
       </div>
@@ -73,8 +84,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
-import { Setting, Plus, More, Goods, TrendCharts, DataAnalysis } from '@element-plus/icons-vue';
+import { ref, onMounted, computed } from 'vue';
+import { Setting, Plus, More, Goods, TrendCharts, DataAnalysis, Switch } from '@element-plus/icons-vue';
 import AssetCard from './AssetCard.vue';
 import db from '../../../database/index.js';
 
@@ -98,10 +109,40 @@ const dialogVisible = ref({
 // 浮动菜单状态
 const isMoreMenuExpanded = ref(false);
 
+// 是否显示已结束资产
+const showEndedAssets = ref(false);
+
 // 切换菜单展开状态
 const toggleMoreMenu = () => {
   isMoreMenuExpanded.value = !isMoreMenuExpanded.value;
 };
+
+// 切换当前/历史资产视图
+const toggleAssetsView = () => {
+  showEndedAssets.value = !showEndedAssets.value;
+};
+
+// 计算属性：根据ended状态过滤资产
+const displayGeneralAssets = computed(() => {
+  return generalAssets.value.filter(asset => {
+    const isEnded = asset.ended === 1 || asset.ended === true;
+    return showEndedAssets.value ? isEnded : !isEnded;
+  });
+});
+
+const displayStocks = computed(() => {
+  return stocks.value.filter(stock => {
+    const isEnded = stock.ended === 1 || stock.ended === true;
+    return showEndedAssets.value ? isEnded : !isEnded;
+  });
+});
+
+const displayFunds = computed(() => {
+  return funds.value.filter(fund => {
+    const isEnded = fund.ended === 1 || fund.ended === true;
+    return showEndedAssets.value ? isEnded : !isEnded;
+  });
+});
 
 // 表单数据
 const assetForm = ref({
@@ -237,6 +278,22 @@ const navigateToAddFund = () => {
   min-height: 100%;
 }
 
+/* 页面标题 */
+.page-header {
+  padding: 16px;
+  background-color: white;
+  border-bottom: 1px solid #e0e0e0;
+  margin-bottom: 10px;
+}
+
+.page-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #333333;
+  text-align: center;
+}
+
 /* 隐藏滚动条但保留滚动功能 */
 .asset-page::-webkit-scrollbar {
   display: none;
@@ -268,6 +325,34 @@ const navigateToAddFund = () => {
 }
 
 
+
+/* 切换资产按钮 */
+.toggle-assets-button {
+  position: fixed;
+  bottom: 80px;
+  left: 20px;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background-color: #67c23a;
+  border-radius: 24px;
+  box-shadow: 0 4px 12px rgba(103, 194, 58, 0.5);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.toggle-assets-button:hover {
+  transform: scale(1.05);
+  box-shadow: 0 6px 16px rgba(103, 194, 58, 0.5);
+}
+
+.toggle-text {
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+}
 
 /* 浮动操作菜单 */
 .floating-action-menu {

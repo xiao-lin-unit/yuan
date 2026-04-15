@@ -158,15 +158,23 @@ export const useAccountStore = defineStore('account', {
           throw new Error('余额不足')
         }
 
-        // 更新账户余额
-        await db.run('UPDATE accounts SET balance = ? WHERE id = ?', [newBalance, data.accountId])
-
-        // 记录流水
+        // 准备事务语句
         const transactionId = Date.now().toString()
-        await db.run(
-          'INSERT INTO transactions (id, type, amount, account_id, balance_after, remark) VALUES (?, ?, ?, ?, ?, ?)',
-          [transactionId, '余额调整', data.amount, data.accountId, newBalance, data.remark]
-        )
+        const statements = [
+          // 更新账户余额
+          {
+            statement: 'UPDATE accounts SET balance = ? WHERE id = ?',
+            values: [newBalance, data.accountId]
+          },
+          // 记录流水
+          {
+            statement: 'INSERT INTO transactions (id, type, amount, account_id, balance_after, remark) VALUES (?, ?, ?, ?, ?, ?)',
+            values: [transactionId, '余额调整', data.amount, data.accountId, newBalance, data.remark]
+          }
+        ]
+
+        // 使用事务执行所有操作
+        await db.executeTransaction(statements)
 
         // 重新加载账户列表
         await this.loadAccounts()

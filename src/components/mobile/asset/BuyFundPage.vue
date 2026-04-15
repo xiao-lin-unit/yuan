@@ -99,7 +99,7 @@ const loadFundData = async () => {
 }
 
 const goBack = () => {
-  emit('navigate', { key: 'fundDetail', params: { fundId } })
+  emit('navigate', { key: 'fundDetail', params: { fundId: props.fundId } })
 }
 
 const buyFund = async () => {
@@ -131,35 +131,47 @@ const buyFund = async () => {
       lockEndDate.setMonth(lockEndDate.getMonth() + lockPeriod)
     }
     
-    // 创建基金持有记录
-    const holdingId = Date.now().toString() + '_hold'
-    await db.run(
-      'INSERT INTO fund_holdings (id, fund_id, nav, shares, remaining_shares, fee, lock_period, lock_end_date, transaction_time, account_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [holdingId, props.fundId, fundForm.value.cost_nav, fundForm.value.shares, fundForm.value.shares, fundForm.value.fee, lockPeriod, lockEndDate, fundForm.value.transaction_time, fundForm.value.account_id]
-    )
-    
-    // 创建基金交易记录（买入）
-    const transactionId = Date.now().toString()
-    await db.run(
-      'INSERT INTO fund_transactions (id, fund_id, transaction_nav, shares, type, hold_ids, fee, transaction_time, account_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [transactionId, props.fundId, fundForm.value.cost_nav, fundForm.value.shares, '买入', holdingId, fundForm.value.fee, fundForm.value.transaction_time, fundForm.value.account_id]
-    )
-    
-    // 更新基金表中的基金持有份额、基金持有成本净值和当前净值
+    // 获取当前基金数据
     const fundData = await db.query('SELECT * FROM funds WHERE id = ?', [props.fundId])
-    if (fundData.length > 0) {
-      const currentFund = fundData[0]
-      const total_cost = (currentFund.shares * currentFund.cost_nav) + (fundForm.value.cost_nav * fundForm.value.shares)
-      const new_shares = currentFund.shares + fundForm.value.shares
-      const new_cost_nav = total_cost / new_shares
-      const new_current_nav = fundForm.value.cost_nav
-      
-      // 更新基金记录
-      await db.run(
-        'UPDATE funds SET shares = ?, current_nav = ?, cost_nav = ?, total_fee = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-        [new_shares, new_current_nav, new_cost_nav, currentFund.total_fee + fundForm.value.fee, props.fundId]
-      )
+    if (fundData.length === 0) {
+      alert('基金不存在')
+      return
     }
+    
+    const currentFund = fundData[0]
+    const total_cost = (currentFund.shares * currentFund.cost_nav) + (fundForm.value.cost_nav * fundForm.value.shares)
+    const new_shares = currentFund.shares + fundForm.value.shares
+    const new_cost_nav = total_cost / new_shares
+    const new_current_nav = fundForm.value.cost_nav
+    
+    // 检查基金是否已结束，如果已结束则重置为未结束状态
+    const wasEnded = currentFund.ended === 1 || currentFund.ended === true
+    const new_ended = 0 // 买入后设置为未结束
+    
+    // 准备事务语句
+    const holdingId = Date.now().toString() + '_hold'
+    const transactionId = Date.now().toString()
+    
+    const statements = [
+      // 创建基金持有记录
+      {
+        statement: 'INSERT INTO fund_holdings (id, fund_id, nav, shares, remaining_shares, fee, lock_period, lock_end_date, transaction_time, account_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        values: [holdingId, props.fundId, fundForm.value.cost_nav, fundForm.value.shares, fundForm.value.shares, fundForm.value.fee, lockPeriod, lockEndDate, fundForm.value.transaction_time, fundForm.value.account_id]
+      },
+      // 创建基金交易记录（买入）
+      {
+        statement: 'INSERT INTO fund_transactions (id, fund_id, transaction_nav, shares, type, hold_ids, fee, transaction_time, account_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        values: [transactionId, props.fundId, fundForm.value.cost_nav, fundForm.value.shares, '买入', holdingId, fundForm.value.fee, fundForm.value.transaction_time, fundForm.value.account_id]
+      },
+      // 更新基金记录（包括重置ended状态为0）
+      {
+        statement: 'UPDATE funds SET shares = ?, current_nav = ?, cost_nav = ?, total_fee = ?, ended = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+        values: [new_shares, new_current_nav, new_cost_nav, currentFund.total_fee + fundForm.value.fee, new_ended, props.fundId]
+      }
+    ]
+    
+    // 使用事务执行所有操作
+    await db.executeTransaction(statements)
     
     emit('navigate', 'asset')
   } catch (error) {

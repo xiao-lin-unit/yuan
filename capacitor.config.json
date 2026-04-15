@@ -1,6 +1,6 @@
 {
   "appId": "com.finance.app",
-  "appName": "财务APP",
+  "appName": "裕安",
   "webDir": "dist",
   "bundledWebRuntime": false,
   "plugins": {

@@ -209,8 +209,7 @@ const navigateToConvertFund = () => {
 
 // 跳转到基金卖出页面
 const navigateToSellFund = () => {
-  // 这里可以实现基金卖出的逻辑
-  console.log('卖出基金');
+  emit('navigate', { key: 'sellFund', params: { fundId: props.fundId } });
 };
 
 // 定义按钮列表
@@ -220,11 +219,11 @@ const actionButtons = [
     icon: Plus,
     action: navigateToBuyFund
   },
-  {
-    text: '转换',
-    icon: Switch,
-    action: navigateToConvertFund
-  },
+  // {
+  //   text: '转换',
+  //   icon: Switch,
+  //   action: navigateToConvertFund
+  // },
   {
     text: '卖出',
     icon: Minus,

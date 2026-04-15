@@ -476,6 +476,7 @@ class DatabaseManager {
               amount REAL DEFAULT 0,
               account_id TEXT,
               period TEXT,
+              ended INTEGER DEFAULT 0,
               created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
               updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
               FOREIGN KEY (account_id) REFERENCES accounts(id)
@@ -495,6 +496,7 @@ class DatabaseManager {
               confirmed_profit REAL DEFAULT 0,
               first_buy_date TIMESTAMP,
               account_id TEXT,
+              ended INTEGER DEFAULT 0,
               created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
               updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
               FOREIGN KEY (account_id) REFERENCES accounts(id)
@@ -555,6 +557,7 @@ class DatabaseManager {
               has_lock BOOLEAN DEFAULT 0,
               lock_period INTEGER DEFAULT 0,
               account_id TEXT,
+              ended INTEGER DEFAULT 0,
               created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
               updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
               FOREIGN KEY (account_id) REFERENCES accounts(id)
@@ -690,80 +693,6 @@ class DatabaseManager {
 
       // 批量执行
       await this.batch(createStatements)
-
-      // 处理数据库结构变更（针对现有用户）
-      try {
-        // 检查并添加股票表的current_price字段
-        const stockColumns = await this.getColumns('stocks')
-        if (!stockColumns.includes('current_price')) {
-          await this.run('ALTER TABLE stocks ADD COLUMN current_price REAL DEFAULT 0')
-          console.log('已添加stocks表的current_price字段')
-        }
-        
-        // 检查并添加基金表的current_nav字段
-        const fundColumns = await this.getColumns('funds')
-        if (!fundColumns.includes('current_nav')) {
-          await this.run('ALTER TABLE funds ADD COLUMN current_nav REAL DEFAULT 0')
-          console.log('已添加funds表的current_nav字段')
-        }
-        
-        // 检查并添加基金表的lock_period字段
-        if (!fundColumns.includes('lock_period')) {
-          await this.run('ALTER TABLE funds ADD COLUMN lock_period INTEGER DEFAULT 0')
-          console.log('已添加funds表的lock_period字段')
-        }
-        
-        // 检查并添加基金交易记录表的transaction_nav、lock_period和lock_end_date字段
-        const fundTransactionColumns = await this.getColumns('fund_transactions')
-        if (!fundTransactionColumns.includes('transaction_nav')) {
-          await this.run('ALTER TABLE fund_transactions ADD COLUMN transaction_nav REAL DEFAULT 0')
-          console.log('已添加fund_transactions表的transaction_nav字段')
-        }
-        if (!fundTransactionColumns.includes('lock_period')) {
-          await this.run('ALTER TABLE fund_transactions ADD COLUMN lock_period INTEGER DEFAULT 0')
-          console.log('已添加fund_transactions表的lock_period字段')
-        }
-        if (!fundTransactionColumns.includes('lock_end_date')) {
-          await this.run('ALTER TABLE fund_transactions ADD COLUMN lock_end_date TIMESTAMP')
-          console.log('已添加fund_transactions表的lock_end_date字段')
-        }
-        if (!fundTransactionColumns.includes('fee')) {
-          await this.run('ALTER TABLE fund_transactions ADD COLUMN fee REAL DEFAULT 0')
-          console.log('已添加fund_transactions表的fee字段')
-        }
-        if (!fundTransactionColumns.includes('hold_ids')) {
-          await this.run('ALTER TABLE fund_transactions ADD COLUMN hold_ids TEXT')
-          console.log('已添加fund_transactions表的hold_ids字段')
-        }
-        
-        // 检查并添加股票交易记录表的相关字段
-        const stockTransactionColumns = await this.getColumns('stock_transactions')
-        if (!stockTransactionColumns.includes('hold_ids')) {
-          await this.run('ALTER TABLE stock_transactions ADD COLUMN hold_ids TEXT')
-          console.log('已添加stock_transactions表的hold_ids字段')
-        }
-        
-        // 检查并添加股票表的确认收益字段
-        if (!stockColumns.includes('confirmed_profit')) {
-          await this.run('ALTER TABLE stocks ADD COLUMN confirmed_profit REAL DEFAULT 0')
-          console.log('已添加stocks表的confirmed_profit字段')
-        }
-        
-        // 检查并添加基金表的确认收益字段
-        if (!fundColumns.includes('confirmed_profit')) {
-          await this.run('ALTER TABLE funds ADD COLUMN confirmed_profit REAL DEFAULT 0')
-          console.log('已添加funds表的confirmed_profit字段')
-        }
-        
-        // 检查并添加基金表的总手续费字段
-        if (!fundColumns.includes('total_fee')) {
-          await this.run('ALTER TABLE funds ADD COLUMN total_fee REAL DEFAULT 0')
-          console.log('已添加funds表的total_fee字段')
-        }
-      } catch (e) {
-        console.error('更新表结构失败:', e)
-        // 忽略错误，继续执行
-      }
 
       this.initialized = true
       if (PERFORMANCE_CONFIG.DEBUG) {
