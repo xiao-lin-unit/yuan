@@ -186,8 +186,10 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import { ArrowLeft, Plus, Minus, More, Switch } from '@element-plus/icons-vue';
+import { ArrowLeft, Plus, Minus, More, Switch, Edit } from '@element-plus/icons-vue';
+import { ElMessageBox, ElMessage } from 'element-plus';
 import FloatingActionMenu from '../../../components/common/FloatingActionMenu.vue';
+import db from '../../../database/index.js';
 
 const props = defineProps({
   fundId: {
@@ -212,12 +214,59 @@ const navigateToSellFund = () => {
   emit('navigate', { key: 'sellFund', params: { fundId: props.fundId } });
 };
 
+// 修改基金净值
+const editFundNav = async () => {
+  try {
+    const { value } = await ElMessageBox.prompt(
+      '请输入新的基金净值',
+      '修改净值',
+      {
+        confirmButtonText: '确认',
+        cancelButtonText: '取消',
+        inputPattern: /^\d+(\.\d{1,4})?$/,
+        inputErrorMessage: '请输入有效的净值（最多4位小数）',
+        inputValue: fundInfo.value.currentNav.toFixed(4)
+      }
+    );
+    
+    const newNav = parseFloat(value);
+    if (isNaN(newNav) || newNav <= 0) {
+      ElMessage.error('请输入有效的净值');
+      return;
+    }
+    
+    // 更新数据库
+    await db.run(
+      'UPDATE funds SET current_nav = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      [newNav, props.fundId]
+    );
+    
+    // 更新本地显示
+    fundInfo.value.currentNav = newNav;
+    
+    // 重新计算收益
+    await loadFundDetail();
+    
+    ElMessage.success('净值更新成功');
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('修改净值失败:', error);
+      ElMessage.error('修改净值失败');
+    }
+  }
+};
+
 // 定义按钮列表
 const actionButtons = [
   {
     text: '买入',
     icon: Plus,
     action: navigateToBuyFund
+  },
+  {
+    text: '修改净值',
+    icon: Edit,
+    action: editFundNav
   },
   // {
   //   text: '转换',
@@ -273,9 +322,6 @@ const formatDate = (dateString) => {
     minute: '2-digit'
   });
 };
-
-// 导入数据库管理类
-import db from '../../../database/index.js';
 
 // 加载基金详情数据
 const loadFundDetail = async () => {

@@ -139,6 +139,22 @@ const buyFund = async () => {
     }
     
     const currentFund = fundData[0]
+    
+    // 检查账户余额
+    const accountData = await db.query('SELECT * FROM accounts WHERE id = ?', [fundForm.value.account_id])
+    if (accountData.length === 0) {
+      alert('所选账户不存在')
+      return
+    }
+    
+    const account = accountData[0]
+    const totalCost = (fundForm.value.cost_nav * fundForm.value.shares) + fundForm.value.fee
+    
+    if (account.balance < totalCost) {
+      alert(`账户余额不足，需要 ¥${totalCost.toFixed(2)}，当前余额 ¥${account.balance.toFixed(2)}`)
+      return
+    }
+    
     const total_cost = (currentFund.shares * currentFund.cost_nav) + (fundForm.value.cost_nav * fundForm.value.shares)
     const new_shares = currentFund.shares + fundForm.value.shares
     const new_cost_nav = total_cost / new_shares
@@ -151,6 +167,7 @@ const buyFund = async () => {
     // 准备事务语句
     const holdingId = Date.now().toString() + '_hold'
     const transactionId = Date.now().toString()
+    const accountTransactionId = Date.now().toString() + '_acc'
     
     const statements = [
       // 创建基金持有记录
@@ -167,6 +184,16 @@ const buyFund = async () => {
       {
         statement: 'UPDATE funds SET shares = ?, current_nav = ?, cost_nav = ?, total_fee = ?, ended = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
         values: [new_shares, new_current_nav, new_cost_nav, currentFund.total_fee + fundForm.value.fee, new_ended, props.fundId]
+      },
+      // 扣除账户余额
+      {
+        statement: 'UPDATE accounts SET balance = balance - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+        values: [totalCost, fundForm.value.account_id]
+      },
+      // 创建账户流水记录
+      {
+        statement: 'INSERT INTO account_transactions (id, account_id, type, amount, balance_after, description, transaction_time) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        values: [accountTransactionId, fundForm.value.account_id, '支出', totalCost, account.balance - totalCost, `基金买入：${currentFund.name}`, fundForm.value.transaction_time]
       }
     ]
     

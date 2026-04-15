@@ -466,6 +466,22 @@ class DatabaseManager {
             )
           `
         },
+        // 创建账户交易流水表（记录账户余额变动）
+        {
+          sql: `
+            CREATE TABLE IF NOT EXISTS account_transactions (
+              id TEXT PRIMARY KEY,
+              account_id TEXT NOT NULL,
+              type TEXT NOT NULL,
+              amount REAL NOT NULL,
+              balance_after REAL NOT NULL,
+              description TEXT,
+              transaction_time TIMESTAMP NOT NULL,
+              created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+              FOREIGN KEY (account_id) REFERENCES accounts(id)
+            )
+          `
+        },
         // 创建资产表
         {
           sql: `
@@ -680,6 +696,7 @@ class DatabaseManager {
         { sql: 'CREATE INDEX IF NOT EXISTS idx_accounts_type ON accounts(type)' },
         { sql: 'CREATE INDEX IF NOT EXISTS idx_accounts_is_liquid ON accounts(is_liquid)' },
         { sql: 'CREATE INDEX IF NOT EXISTS idx_transactions_account_id ON transactions(account_id)' },
+        { sql: 'CREATE INDEX IF NOT EXISTS idx_account_transactions_account_id ON account_transactions(account_id)' },
         { sql: 'CREATE INDEX IF NOT EXISTS idx_transactions_created_at ON transactions(created_at)' },
         { sql: 'CREATE INDEX IF NOT EXISTS idx_assets_account_id ON assets(account_id)' },
         { sql: 'CREATE INDEX IF NOT EXISTS idx_stocks_account_id ON stocks(account_id)' },

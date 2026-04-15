@@ -100,6 +100,12 @@ const addFund = async () => {
     alert('请输入基金代码')
     return
   }
+  // 基金代码格式验证：6位数字
+  const codePattern = /^\d{6}$/
+  if (!codePattern.test(fundForm.value.code)) {
+    alert('基金代码必须为6位数字')
+    return
+  }
   if (!fundForm.value.type) {
     alert('请选择交易类型')
     return
@@ -142,12 +148,27 @@ const addFund = async () => {
       return
     }
     
+    // 检查账户余额（买入时需要扣款）并保存账户数据供后续使用
+    let accountBalance = 0
+    if (fundForm.value.type === '买入') {
+      const accountData = await db.query('SELECT * FROM accounts WHERE id = ?', [fundForm.value.account_id])
+      if (accountData.length === 0) {
+        alert('所选账户不存在')
+        return
+      }
+      
+      const account = accountData[0]
+      accountBalance = account.balance
+      const totalCost = (fundForm.value.cost_nav * fundForm.value.shares) + fundForm.value.fee
+      
+      if (account.balance < totalCost) {
+        alert(`账户余额不足，需要 ¥${totalCost.toFixed(2)}，当前余额 ¥${account.balance.toFixed(2)}`)
+        return
+      }
+    }
+    
     // 不存在，创建新基金记录
     const fundId = Date.now().toString()
-    await db.run(
-      'INSERT INTO funds (id, name, code, shares, current_nav, cost_nav, total_fee, first_buy_date, has_lock, lock_period, account_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [fundId, fundForm.value.name, fundForm.value.code, fundForm.value.shares, fundForm.value.cost_nav, fundForm.value.cost_nav, fundForm.value.fee, fundForm.value.transaction_time, fundForm.value.has_lock, fundForm.value.lock_period, fundForm.value.account_id]
-    )
     
     // 计算锁定期限的最后一日
     let lockEndDate = null
@@ -156,28 +177,71 @@ const addFund = async () => {
       lockEndDate.setMonth(lockEndDate.getMonth() + fundForm.value.lock_period)
     }
     
+    const statements = []
+    
+    // 创建基金记录
+    statements.push({
+      statement: 'INSERT INTO funds (id, name, code, shares, current_nav, cost_nav, total_fee, first_buy_date, has_lock, lock_period, account_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      values: [fundId, fundForm.value.name, fundForm.value.code, fundForm.value.shares, fundForm.value.cost_nav, fundForm.value.cost_nav, fundForm.value.fee, fundForm.value.transaction_time, fundForm.value.has_lock, fundForm.value.lock_period, fundForm.value.account_id]
+    })
+    
     if (fundForm.value.type === '买入') {
-      // 创建基金持有记录
       const holdingId = Date.now().toString() + '_hold'
-      await db.run(
-        'INSERT INTO fund_holdings (id, fund_id, nav, shares, remaining_shares, fee, lock_period, lock_end_date, transaction_time, account_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [holdingId, fundId, fundForm.value.cost_nav, fundForm.value.shares, fundForm.value.shares, fundForm.value.fee, fundForm.value.lock_period, lockEndDate, fundForm.value.transaction_time, fundForm.value.account_id]
-      )
+      const transactionId = Date.now().toString()
+      const totalCost = (fundForm.value.cost_nav * fundForm.value.shares) + fundForm.value.fee
+      
+      // 创建基金持有记录
+      statements.push({
+        statement: 'INSERT INTO fund_holdings (id, fund_id, nav, shares, remaining_shares, fee, lock_period, lock_end_date, transaction_time, account_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        values: [holdingId, fundId, fundForm.value.cost_nav, fundForm.value.shares, fundForm.value.shares, fundForm.value.fee, fundForm.value.lock_period, lockEndDate, fundForm.value.transaction_time, fundForm.value.account_id]
+      })
       
       // 创建基金交易记录（买入）
-      const transactionId = Date.now().toString()
-      await db.run(
-        'INSERT INTO fund_transactions (id, fund_id, transaction_nav, shares, type, hold_ids, fee, transaction_time, account_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [transactionId, fundId, fundForm.value.cost_nav, fundForm.value.shares, '买入', holdingId, fundForm.value.fee, fundForm.value.transaction_time, fundForm.value.account_id]
-      )
+      statements.push({
+        statement: 'INSERT INTO fund_transactions (id, fund_id, transaction_nav, shares, type, hold_ids, fee, transaction_time, account_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        values: [transactionId, fundId, fundForm.value.cost_nav, fundForm.value.shares, '买入', holdingId, fundForm.value.fee, fundForm.value.transaction_time, fundForm.value.account_id]
+      })
+      
+      // 扣除账户余额
+      statements.push({
+        statement: 'UPDATE accounts SET balance = balance - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+        values: [totalCost, fundForm.value.account_id]
+      })
+      
+      // 创建账户流水记录
+      const accountTransactionId = Date.now().toString() + '_acc'
+      statements.push({
+        statement: 'INSERT INTO account_transactions (id, account_id, type, amount, balance_after, description, transaction_time) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        values: [accountTransactionId, fundForm.value.account_id, '支出', totalCost, accountBalance - totalCost, `基金买入：${fundForm.value.name}`, fundForm.value.transaction_time]
+      })
     } else if (fundForm.value.type === '卖出') {
-      // 创建基金交易记录（卖出）
       const transactionId = Date.now().toString()
-      await db.run(
-        'INSERT INTO fund_transactions (id, fund_id, transaction_nav, shares, type, fee, transaction_time, account_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-        [transactionId, fundId, fundForm.value.cost_nav, fundForm.value.shares, '卖出', fundForm.value.fee, fundForm.value.transaction_time, fundForm.value.account_id]
-      )
+      const netProceeds = (fundForm.value.cost_nav * fundForm.value.shares) - fundForm.value.fee
+      
+      // 创建基金交易记录（卖出）
+      statements.push({
+        statement: 'INSERT INTO fund_transactions (id, fund_id, transaction_nav, shares, type, fee, transaction_time, account_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        values: [transactionId, fundId, fundForm.value.cost_nav, fundForm.value.shares, '卖出', fundForm.value.fee, fundForm.value.transaction_time, fundForm.value.account_id]
+      })
+      
+      // 增加账户余额
+      statements.push({
+        statement: 'UPDATE accounts SET balance = balance + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+        values: [netProceeds, fundForm.value.account_id]
+      })
+      
+      // 创建账户流水记录
+      const accountTransactionId = Date.now().toString() + '_acc'
+      const accountData = await db.query('SELECT balance FROM accounts WHERE id = ?', [fundForm.value.account_id])
+      const currentBalance = accountData.length > 0 ? accountData[0].balance : 0
+      statements.push({
+        statement: 'INSERT INTO account_transactions (id, account_id, type, amount, balance_after, description, transaction_time) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        values: [accountTransactionId, fundForm.value.account_id, '收入', netProceeds, currentBalance + netProceeds, `基金卖出：${fundForm.value.name}`, fundForm.value.transaction_time]
+      })
     }
+    
+    // 使用事务执行所有操作
+    await db.executeTransaction(statements)
     
     // 新增基金时，基金表成本净值和当前净值为本次新增的基金的成本净值
     // if (fundForm.value.type === '买入') {

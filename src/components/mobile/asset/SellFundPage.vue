@@ -203,6 +203,26 @@ const sellFund = async () => {
       values: [newShares, fundForm.value.current_nav, newConfirmedProfit, isEnded, props.fundId]
     })
     
+    // 计算卖出实际到账金额
+    const netProceeds = (fundForm.value.current_nav * fundForm.value.shares) - fundForm.value.fee
+    
+    // 获取账户当前余额
+    const accountData = await db.query('SELECT balance FROM accounts WHERE id = ?', [fundForm.value.account_id])
+    const currentBalance = accountData.length > 0 ? accountData[0].balance : 0
+    
+    // 增加账户余额
+    statements.push({
+      statement: 'UPDATE accounts SET balance = balance + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      values: [netProceeds, fundForm.value.account_id]
+    })
+    
+    // 创建账户流水记录
+    const accountTransactionId = Date.now().toString() + '_acc'
+    statements.push({
+      statement: 'INSERT INTO account_transactions (id, account_id, type, amount, balance_after, description, transaction_time) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      values: [accountTransactionId, fundForm.value.account_id, '收入', netProceeds, currentBalance + netProceeds, `基金卖出：${fund.name}`, fundForm.value.transaction_time]
+    })
+    
     // 使用事务执行所有操作
     await db.executeTransaction(statements)
     
