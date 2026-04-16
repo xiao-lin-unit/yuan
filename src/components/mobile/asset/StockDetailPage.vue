@@ -174,7 +174,13 @@ import { ref, onMounted } from 'vue';
 import { ArrowLeft, Plus, Minus, Edit } from '@element-plus/icons-vue';
 import { ElMessageBox, ElMessage } from 'element-plus';
 import FloatingActionMenu from '../../../components/common/FloatingActionMenu.vue';
-import db from '../../../database/index.js';
+import {
+  getStockDetail,
+  getStockHoldings,
+  getStockTransactions,
+  updateStockPrice
+} from '../../../services/asset/stockService';
+import type { StockHolding, StockTransaction } from '../../../types/asset/stock';
 
 const props = defineProps({
   stockId: {
@@ -207,25 +213,19 @@ const editStockPrice = async () => {
         inputValue: stockInfo.value.currentPrice.toFixed(2)
       }
     );
-    
+
     const newPrice = parseFloat(value);
     if (isNaN(newPrice) || newPrice <= 0) {
       ElMessage.error('请输入有效的价格');
       return;
     }
-    
-    // 更新数据库
-    await db.run(
-      'UPDATE stocks SET current_price = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-      [newPrice, props.stockId]
-    );
-    
-    // 更新本地显示
-    stockInfo.value.currentPrice = newPrice;
-    
-    // 重新计算收益
+
+    // 调用服务更新价格
+    await updateStockPrice(props.stockId, newPrice);
+
+    // 重新加载详情
     await loadStockDetail();
-    
+
     ElMessage.success('价格更新成功');
   } catch (error) {
     if (error !== 'cancel') {
@@ -272,20 +272,20 @@ const stockInfo = ref({
 const activeTag = ref('holdings');
 
 // 持有记录数据
-const holdings = ref([]);
+const holdings = ref<StockHolding[]>([]);
 
 // 买入记录数据
-const buyTransactions = ref([]);
+const buyTransactions = ref<StockTransaction[]>([]);
 
 // 卖出记录数据
-const sellTransactions = ref([]);
+const sellTransactions = ref<StockTransaction[]>([]);
 
 const goBack = () => {
   emit('navigate', 'asset');
 };
 
 // 格式化日期函数
-const formatDate = (dateString) => {
+const formatDate = (dateString: string | Date) => {
   const date = new Date(dateString);
   return date.toLocaleString('zh-CN', {
     year: 'numeric',
@@ -299,127 +299,52 @@ const formatDate = (dateString) => {
 // 加载股票详情数据
 const loadStockDetail = async () => {
   console.log('Loading stock detail for:', props.stockId);
-  
-  try {
-    // 连接数据库
-    await db.connect();
-    
-    // 查询股票基本信息
-    const stockData = await db.query('SELECT * FROM stocks WHERE id = ?', [props.stockId]);
-    console.log('Stock data:', JSON.stringify(stockData));
-    if (stockData.length > 0) {
-      const stock = stockData[0];
-      
-      // 防御性检查，确保所有必要字段都存在
-      const quantity = stock.quantity || 0;
-      const current_price = stock.current_price || 0;
-      const cost_price = stock.cost_price || 0;
-      
-      // 计算持有金额
-      const costAmount = quantity * cost_price;
-      const holdReturn = (current_price - cost_price) * quantity;
-      const confirmedReturn = stock.confirmed_profit || 0;
-      const totalReturn = holdReturn + confirmedReturn;
-      
-      // 更新股票信息
-      stockInfo.value = {
-        name: stock.name || '未知股票',
-        code: stock.code || '',
-        costAmount: costAmount,
-        costPrice: cost_price,
-        currentPrice: current_price,
-        quantity: quantity,
-        confirmedReturn: confirmedReturn,
-        holdReturn: holdReturn,
-        totalReturn: totalReturn
-      };
-      
-      console.log('Stock detail loaded:', stockInfo.value);
-      
-      // 加载持有记录
-      await loadHoldings();
-      
-      // 加载交易记录
-      await loadTransactions();
-    } else {
-      console.error('Stock not found:', props.stockId);
-      // 设置默认值，避免模板渲染错误
-      stockInfo.value = {
-        name: '未知股票',
-        code: '',
-        costAmount: 0,
-        costPrice: 0,
-        currentPrice: 0,
-        quantity: 0,
-        confirmedReturn: 0,
-        holdReturn: 0,
-        totalReturn: 0
-      };
-    }
-  } catch (error) {
-    console.error('Error loading stock detail:', error);
-  }
-};
 
-// 加载持有记录
-const loadHoldings = async () => {
   try {
-    // 查询持有记录，按时间倒序
-    const holdingData = await db.query(
-      'SELECT * FROM stock_holdings WHERE stock_id = ? ORDER BY transaction_time DESC', 
-      [props.stockId]
-    );
-    
-    holdings.value = holdingData.map(holding => ({
-      ...holding,
-      price: holding.price || 0,
-      quantity: holding.quantity || 0,
-      remaining_quantity: holding.remaining_quantity || 0,
-      fee: holding.fee || 0,
-      sell_status: holding.sell_status || '未卖出',
-      transaction_time: holding.transaction_time || new Date()
-    }));
-    
+    // 使用服务获取股票详情
+    const stock = await getStockDetail(props.stockId);
+    console.log('Stock detail loaded:', stock);
+
+    // 计算持有收益
+const holdReturn = (stock.currentPrice - stock.costPrice) * stock.quantity;
+
+    stockInfo.value = {
+      name: stock.name,
+      code: stock.code,
+      costAmount: stock.costAmount,
+      costPrice: stock.costPrice,
+      currentPrice: stock.currentPrice,
+      quantity: stock.quantity,
+      confirmedReturn: stock.confirmedProfit,
+      holdReturn: holdReturn,
+      totalReturn: holdReturn + stock.confirmedProfit
+    };
+
+    // 加载持有记录
+    holdings.value = await getStockHoldings(props.stockId);
+
+    // 加载交易记录
+    const transactions = await getStockTransactions(props.stockId);
+    buyTransactions.value = transactions.buyTransactions;
+    sellTransactions.value = transactions.sellTransactions;
+
     console.log('Holdings loaded:', holdings.value);
-  } catch (error) {
-    console.error('Error loading holdings:', error);
-  }
-};
-
-// 加载交易记录
-const loadTransactions = async () => {
-  try {
-    // 查询交易记录，按时间倒序
-    const transactionData = await db.query(
-      'SELECT * FROM stock_transactions WHERE stock_id = ? ORDER BY transaction_time DESC', 
-      [props.stockId]
-    );
-    
-    // 分离买入和卖出记录
-    buyTransactions.value = transactionData
-      .filter(transaction => transaction.type === '买入')
-      .map(transaction => ({
-        ...transaction,
-        price: transaction.price || 0,
-        quantity: transaction.quantity || 0,
-        fee: transaction.fee || 0,
-        transaction_time: transaction.transaction_time || new Date()
-      }));
-    
-    sellTransactions.value = transactionData
-      .filter(transaction => transaction.type === '卖出')
-      .map(transaction => ({
-        ...transaction,
-        price: transaction.price || 0,
-        quantity: transaction.quantity || 0,
-        fee: transaction.fee || 0,
-        transaction_time: transaction.transaction_time || new Date()
-      }));
-    
     console.log('Buy transactions loaded:', buyTransactions.value);
     console.log('Sell transactions loaded:', sellTransactions.value);
   } catch (error) {
-    console.error('Error loading transactions:', error);
+    console.error('Error loading stock detail:', error);
+    // 设置默认値，避免模板渲染错误
+    stockInfo.value = {
+      name: '未知股票',
+      code: '',
+      costAmount: 0,
+      costPrice: 0,
+      currentPrice: 0,
+      quantity: 0,
+      confirmedReturn: 0,
+      holdReturn: 0,
+      totalReturn: 0
+    };
   }
 };
 

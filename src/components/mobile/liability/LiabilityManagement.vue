@@ -47,18 +47,7 @@
         </el-form-item>
         <el-form-item label="负债类型">
           <el-select v-model="liabilityForm.type" placeholder="请选择负债类型">
-            <el-option label="房贷" value="房贷" />
-            <el-option label="车贷" value="车贷" />
-            <el-option label="信用卡" value="信用卡" />
-            <el-option label="消费贷" value="消费贷" />
-            <el-option label="装修贷" value="装修贷" />
-            <el-option label="助学贷款" value="助学贷款" />
-            <el-option label="网贷" value="网贷" />
-            <el-option label="电商分期" value="电商分期" />
-            <el-option label="租金分期" value="租金分期" />
-            <el-option label="亲友借款" value="亲友借款" />
-            <el-option label="经营贷" value="经营贷" />
-            <el-option label="其他负债" value="其他负债" />
+            <el-option v-for="item in liabilityTypes" :key="item.value" :label="item.label" :value="item.value" />
           </el-select>
         </el-form-item>
         <el-form-item label="本金">
@@ -75,9 +64,7 @@
         </el-form-item>
         <el-form-item label="还款方式">
           <el-select v-model="liabilityForm.repayment_method" placeholder="请选择还款方式">
-            <el-option label="等额本息" value="等额本息" />
-            <el-option label="等额本金" value="等额本金" />
-            <el-option label="随借随还" value="随借随还" />
+            <el-option v-for="item in repaymentMethods" :key="item.value" :label="item.label" :value="item.value" />
           </el-select>
         </el-form-item>
         <el-form-item label="还款日" v-if="liabilityForm.repayment_method !== '随借随还'">
@@ -111,18 +98,7 @@
         </el-form-item>
         <el-form-item label="负债类型">
           <el-select v-model="liabilityForm.type" placeholder="请选择负债类型">
-            <el-option label="房贷" value="房贷" />
-            <el-option label="车贷" value="车贷" />
-            <el-option label="信用卡" value="信用卡" />
-            <el-option label="消费贷" value="消费贷" />
-            <el-option label="装修贷" value="装修贷" />
-            <el-option label="助学贷款" value="助学贷款" />
-            <el-option label="网贷" value="网贷" />
-            <el-option label="电商分期" value="电商分期" />
-            <el-option label="租金分期" value="租金分期" />
-            <el-option label="亲友借款" value="亲友借款" />
-            <el-option label="经营贷" value="经营贷" />
-            <el-option label="其他负债" value="其他负债" />
+            <el-option v-for="item in liabilityTypes" :key="item.value" :label="item.label" :value="item.value" />
           </el-select>
         </el-form-item>
         <el-form-item label="本金">
@@ -142,9 +118,7 @@
         </el-form-item>
         <el-form-item label="还款方式">
           <el-select v-model="liabilityForm.repayment_method" placeholder="请选择还款方式">
-            <el-option label="等额本息" value="等额本息" />
-            <el-option label="等额本金" value="等额本金" />
-            <el-option label="随借随还" value="随借随还" />
+            <el-option v-for="item in repaymentMethods" :key="item.value" :label="item.label" :value="item.value" />
           </el-select>
         </el-form-item>
         <el-form-item label="还款日" v-if="liabilityForm.repayment_method !== '随借随还'">
@@ -163,8 +137,7 @@
         </el-form-item>
         <el-form-item label="状态">
           <el-select v-model="liabilityForm.status" placeholder="请选择状态">
-            <el-option label="未结清" value="未结清" />
-            <el-option label="已结清" value="已结清" />
+            <el-option v-for="item in liabilityStatuses" :key="item.value" :label="item.label" :value="item.value" />
           </el-select>
         </el-form-item>
       </el-form>
@@ -184,8 +157,7 @@
         </el-form-item>
         <el-form-item label="还款方式">
           <el-select v-model="repaymentForm.type" placeholder="请选择还款方式">
-            <el-option label="正常还款" value="正常还款" />
-            <el-option label="提前还款" value="提前还款" />
+            <el-option v-for="item in repaymentTypes" :key="item.value" :label="item.label" :value="item.value" />
           </el-select>
         </el-form-item>
         <el-form-item label="备注">
@@ -205,6 +177,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useAccountStore } from '../../../stores/account'
+import { liabilityTypes, repaymentMethods, liabilityStatuses, repaymentTypes } from '../../../utils/dictionaries'
 
 const accountStore = useAccountStore()
 const accounts = ref([])

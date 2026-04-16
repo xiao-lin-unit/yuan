@@ -39,7 +39,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import PageTemplate from '../../common/PageTemplate.vue'
-import db from '../../../database/index.js'
+import { sellFund as sellFundService, getAvailableAccounts, getFundById } from '../../../services/asset/fundService'
 
 const props = defineProps({
   fundId: {
@@ -75,8 +75,7 @@ onMounted(async () => {
 
 const loadAccounts = async () => {
   try {
-    const accountData = await db.query('SELECT * FROM accounts WHERE type != ?', ['信用卡'])
-    accounts.value = accountData
+    accounts.value = await getAvailableAccounts()
   } catch (error) {
     console.error('加载账户数据失败:', error)
   }
@@ -84,9 +83,8 @@ const loadAccounts = async () => {
 
 const loadFundData = async () => {
   try {
-    const fundData = await db.query('SELECT * FROM funds WHERE id = ?', [props.fundId])
-    if (fundData.length > 0) {
-      const fund = fundData[0]
+    const fund = await getFundById(props.fundId)
+    if (fund) {
       fundForm.value.id = fund.id
       fundForm.value.name = fund.name
       fundForm.value.code = fund.code
@@ -121,115 +119,18 @@ const sellFund = async () => {
   }
   
   try {
-    // 检查基金总份额
-    const fundData = await db.query('SELECT * FROM funds WHERE id = ?', [props.fundId])
-    if (fundData.length === 0) {
-      alert('基金不存在')
-      return
-    }
-    
-    const fund = fundData[0]
-    if (fundForm.value.shares > fund.shares) {
-      alert('卖出份额不能大于基金的总份额')
-      return
-    }
-    
-    // 查询未卖出和部分卖出且锁定期已过期的持有记录，按照时间正序排序
-    const currentDate = new Date().toISOString()
-    const holdings = await db.query(
-      'SELECT * FROM fund_holdings WHERE fund_id = ? AND sell_status != ? AND lock_end_date <= ? ORDER BY transaction_time ASC',
-      [props.fundId, '已卖出', currentDate]
-    )
-    
-    if (holdings.length === 0) {
-      alert('没有可卖出的持有记录（所有记录均在锁定期内）')
-      return
-    }
-    
-    // 计算所有可卖出的持有记录的总可用份额
-    const totalAvailableShares = holdings.reduce((total, holding) => total + holding.remaining_shares, 0)
-    if (fundForm.value.shares > totalAvailableShares) {
-      alert(`卖出份额不能大于可卖出的总份额（当前可卖出份额：${totalAvailableShares}）`)
-      return
-    }
-    
-    // 准备事务语句数组
-    const statements = []
-    let remainingSharesToSell = fundForm.value.shares
-    const soldHoldIds = []
-    
-    // 从最早买入的持有记录开始扣除卖出份额
-    for (const holding of holdings) {
-      if (remainingSharesToSell <= 0) break
-      
-      const availableShares = holding.remaining_shares
-      const sharesToDeduct = Math.min(availableShares, remainingSharesToSell)
-      
-      // 更新持有记录
-      const newRemainingShares = availableShares - sharesToDeduct
-      let newSellStatus = holding.sell_status
-      
-      if (newRemainingShares === 0) {
-        newSellStatus = '已卖出'
-      } else if (newRemainingShares < availableShares) {
-        newSellStatus = '部分卖出'
-      }
-      
-      statements.push({
-        statement: 'UPDATE fund_holdings SET remaining_shares = ?, sell_status = ? WHERE id = ?',
-        values: [newRemainingShares, newSellStatus, holding.id]
-      })
-      
-      soldHoldIds.push(holding.id)
-      remainingSharesToSell -= sharesToDeduct
-    }
-    
-    // 创建基金交易记录（卖出）
-    const transactionId = Date.now().toString()
-    statements.push({
-      statement: 'INSERT INTO fund_transactions (id, fund_id, transaction_nav, shares, type, hold_ids, fee, transaction_time, account_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      values: [transactionId, props.fundId, fundForm.value.current_nav, fundForm.value.shares, '卖出', soldHoldIds.join(','), fundForm.value.fee, fundForm.value.transaction_time, fundForm.value.account_id]
+    await sellFundService(props.fundId, {
+      nav: fundForm.value.current_nav,
+      shares: fundForm.value.shares,
+      fee: fundForm.value.fee,
+      transaction_time: fundForm.value.transaction_time,
+      account_id: fundForm.value.account_id
     })
-    
-    // 更新基金表中的基金持有份额、当前净值和确认收益
-    const newShares = fund.shares - fundForm.value.shares
-    const newConfirmedProfit = (fund.confirmed_profit || 0) + (fundForm.value.current_nav - fund.cost_nav) * fundForm.value.shares - fundForm.value.fee
-    
-    // 判断基金是否结束（剩余份额为0则标记为已结束）
-    const isEnded = newShares === 0 ? 1 : 0
-    
-    statements.push({
-      statement: 'UPDATE funds SET shares = ?, current_nav = ?, confirmed_profit = ?, ended = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-      values: [newShares, fundForm.value.current_nav, newConfirmedProfit, isEnded, props.fundId]
-    })
-    
-    // 计算卖出实际到账金额
-    const netProceeds = (fundForm.value.current_nav * fundForm.value.shares) - fundForm.value.fee
-    
-    // 获取账户当前余额
-    const accountData = await db.query('SELECT balance FROM accounts WHERE id = ?', [fundForm.value.account_id])
-    const currentBalance = accountData.length > 0 ? accountData[0].balance : 0
-    
-    // 增加账户余额
-    statements.push({
-      statement: 'UPDATE accounts SET balance = balance + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-      values: [netProceeds, fundForm.value.account_id]
-    })
-    
-    // 创建账户流水记录
-    const accountTransactionId = Date.now().toString() + '_acc'
-    statements.push({
-      statement: 'INSERT INTO account_transactions (id, account_id, type, amount, balance_after, description, transaction_time) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      values: [accountTransactionId, fundForm.value.account_id, '收入', netProceeds, currentBalance + netProceeds, `基金卖出：${fund.name}`, fundForm.value.transaction_time]
-    })
-    
-    // 使用事务执行所有操作
-    await db.executeTransaction(statements)
     
     emit('navigate', 'asset')
-  } catch (error) {
+  } catch (error: any) {
     console.error('基金卖出失败:', error)
-    alert('基金卖出失败，请重试')
+    alert(error.message || '基金卖出失败，请重试')
   }
 }
 </script>

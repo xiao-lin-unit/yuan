@@ -5,11 +5,7 @@
     </el-form-item>
     <el-form-item label="账户类型">
       <el-select v-model="form.type" placeholder="请选择账户类型">
-        <el-option label="现金" value="现金" />
-        <el-option label="微信" value="微信" />
-        <el-option label="支付宝" value="支付宝" />
-        <el-option label="储蓄卡" value="储蓄卡" />
-        <el-option label="社保卡" value="社保卡" />
+        <el-option v-for="item in accountTypes" :key="item.value" :label="item.label" :value="item.value" />
       </el-select>
     </el-form-item>
     <el-form-item label="备注">
@@ -20,6 +16,7 @@
 
 <script setup lang="ts">
 import { ref, defineProps, defineEmits } from 'vue'
+import { accountTypes } from '../../../utils/dictionaries'
 
 interface Account {
   id: string

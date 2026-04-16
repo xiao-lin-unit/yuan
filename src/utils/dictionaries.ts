@@ -3,15 +3,56 @@
  * 集中管理项目中使用的所有字典数据
  */
 
-// 账户类型
+// ==================== 账户相关 ====================
+
+// 账户类型（完整列表，含信用卡）
 export const accountTypes = [
   { label: '现金', value: '现金' },
   { label: '微信', value: '微信' },
   { label: '支付宝', value: '支付宝' },
   { label: '储蓄卡', value: '储蓄卡' },
   { label: '社保卡', value: '社保卡' },
+  { label: '公积金', value: '公积金' },
   { label: '信用卡', value: '信用卡' }
 ]
+
+// 余额调整类型
+export const adjustmentTypes = [
+  { label: '修正错误', value: '修正错误' },
+  { label: '现金赠与', value: '现金赠与' },
+  { label: '资产盘盈', value: '资产盘盈' }
+]
+
+// ==================== 资产相关 ====================
+
+// 通用资产类型
+export const assetTypes = [
+  { label: '工资', value: '工资' },
+  { label: '租金', value: '租金' },
+  { label: '利息', value: '利息' },
+  { label: '版权', value: '版权' },
+  { label: '副业', value: '副业' },
+  { label: '被动收入', value: '被动收入' },
+  { label: '社保', value: '社保' },
+  { label: '公积金', value: '公积金' },
+  { label: '其他', value: '其他' }
+]
+
+// 收益周期类型
+export const periodTypes = [
+  { label: '每年', value: '年' },
+  { label: '每月', value: '月' }
+]
+
+// ==================== 基金/股票交易相关 ====================
+
+// 交易类型（基金/股票买卖）
+export const transactionTypes = [
+  { label: '买入', value: '买入' },
+  { label: '卖出', value: '卖出' }
+]
+
+// ==================== 负债相关 ====================
 
 // 负债类型
 export const liabilityTypes = [
@@ -48,6 +89,8 @@ export const repaymentTypes = [
   { label: '提前还款', value: '提前还款' }
 ]
 
+// ==================== 财务目标相关 ====================
+
 // 财务目标类型
 export const goalTypes = [
   { label: '储蓄类', value: '储蓄类' },
@@ -62,28 +105,4 @@ export const goalStatuses = [
   { label: '进行中', value: '进行中' },
   { label: '已完成', value: '已完成' },
   { label: '已终止', value: '已终止' }
-]
-
-// 资产类型
-export const assetTypes = [
-  { label: '工资', value: '工资' },
-  { label: '租金', value: '租金' },
-  { label: '利息', value: '利息' },
-  { label: '版权', value: '版权' },
-  { label: '副业', value: '副业' },
-  { label: '被动收入', value: '被动收入' },
-  { label: '自定义', value: '自定义' }
-]
-
-// 交易类型
-export const transactionTypes = [
-  { label: '买入', value: '买入' },
-  { label: '卖出', value: '卖出' }
-]
-
-// 调整类型
-export const adjustmentTypes = [
-  { label: '修正错误', value: '修正错误' },
-  { label: '现金赠与', value: '现金赠与' },
-  { label: '资产盘盈', value: '资产盘盈' }
 ]

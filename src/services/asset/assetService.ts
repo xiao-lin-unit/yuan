@@ -1,0 +1,164 @@
+/**
+ * Asset Service
+ * Handles general asset operations
+ */
+
+import db from '../../database/index.js'
+import type { Asset, AssetInput } from '../../types/asset/asset.js'
+
+/**
+ * Calculate next income date based on period and income date
+ */
+function calculateNextIncomeDate(period: string, incomeDate: string): string {
+  if (!period || !incomeDate) return ''
+
+  const now = new Date()
+  const incomeParts = incomeDate.split('-')
+
+  if (period === '年') {
+    // 每年：income_date format is MM-DD, next income date is this year or next year
+    const [month, day] = incomeParts
+    let nextDate = new Date(now.getFullYear(), parseInt(month) - 1, parseInt(day))
+    
+    // If this year's income date has passed, next year
+    if (nextDate <= now) {
+      nextDate = new Date(now.getFullYear() + 1, parseInt(month) - 1, parseInt(day))
+    }
+    
+    return nextDate.toISOString().split('T')[0]
+  } else if (period === '月') {
+    // 每月：income_date format is DD, next income date is this month or next month
+    const [day] = incomeParts
+    let nextDate = new Date(now.getFullYear(), now.getMonth(), parseInt(day))
+    
+    // If this month's income date has passed, next month
+    if (nextDate <= now) {
+      nextDate = new Date(now.getFullYear(), now.getMonth() + 1, parseInt(day))
+    }
+    
+    return nextDate.toISOString().split('T')[0]
+  }
+
+  return ''
+}
+
+/**
+ * Add a new general asset
+ */
+export async function addAsset(assetData: AssetInput): Promise<void> {
+  const id = Date.now().toString()
+  
+  // Calculate next income date
+  let nextIncomeDate = ''
+  if (assetData.period && assetData.income_date) {
+    nextIncomeDate = calculateNextIncomeDate(assetData.period, assetData.income_date)
+  }
+
+  await db.run(
+    'INSERT INTO assets (id, type, name, amount, account_id, period, period_count, income_date, next_income_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    [
+      id,
+      assetData.type,
+      assetData.name,
+      assetData.amount,
+      assetData.account_id,
+      assetData.period || null,
+      assetData.period_count || 0,
+      assetData.income_date || null,
+      nextIncomeDate || null
+    ]
+  )
+}
+
+/**
+ * Get all assets
+ */
+export async function getAssets(): Promise<Asset[]> {
+  return await db.query('SELECT * FROM assets ORDER BY created_at DESC')
+}
+
+/**
+ * Get assets by type
+ */
+export async function getAssetsByType(type: string): Promise<Asset[]> {
+  return await db.query('SELECT * FROM assets WHERE type = ? ORDER BY created_at DESC', [type])
+}
+
+/**
+ * Get active assets (not ended)
+ */
+export async function getActiveAssets(): Promise<Asset[]> {
+  return await db.query('SELECT * FROM assets WHERE ended = 0 ORDER BY created_at DESC')
+}
+
+/**
+ * Get asset by ID
+ */
+export async function getAssetById(assetId: string): Promise<Asset | null> {
+  const result = await db.query('SELECT * FROM assets WHERE id = ?', [assetId])
+  return result.length > 0 ? result[0] : null
+}
+
+/**
+ * Update asset
+ */
+export async function updateAsset(assetId: string, data: Partial<Asset>): Promise<void> {
+  const fields: string[] = []
+  const values: any[] = []
+
+  if (data.name !== undefined) {
+    fields.push('name = ?')
+    values.push(data.name)
+  }
+  if (data.amount !== undefined) {
+    fields.push('amount = ?')
+    values.push(data.amount)
+  }
+  if (data.account_id !== undefined) {
+    fields.push('account_id = ?')
+    values.push(data.account_id)
+  }
+  if (data.period !== undefined) {
+    fields.push('period = ?')
+    values.push(data.period)
+  }
+  if (data.period_count !== undefined) {
+    fields.push('period_count = ?')
+    values.push(data.period_count)
+  }
+  if (data.income_date !== undefined) {
+    fields.push('income_date = ?')
+    values.push(data.income_date)
+  }
+  if (data.ended !== undefined) {
+    fields.push('ended = ?')
+    values.push(data.ended)
+  }
+
+  if (fields.length === 0) return
+
+  fields.push('updated_at = CURRENT_TIMESTAMP')
+  values.push(assetId)
+
+  await db.run(
+    `UPDATE assets SET ${fields.join(', ')} WHERE id = ?`,
+    values
+  )
+}
+
+/**
+ * Delete asset
+ */
+export async function deleteAsset(assetId: string): Promise<void> {
+  await db.run('DELETE FROM assets WHERE id = ?', [assetId])
+}
+
+/**
+ * Mark asset as ended
+ */
+export async function endAsset(assetId: string): Promise<void> {
+  await db.run(
+    'UPDATE assets SET ended = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+    [assetId]
+  )
+}

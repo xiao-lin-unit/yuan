@@ -13,12 +13,7 @@
         </el-form-item>
         <el-form-item label="账户类型" required>
           <el-select v-model="accountForm.type" placeholder="请选择账户类型">
-            <el-option label="现金" value="现金" />
-            <el-option label="微信" value="微信" />
-            <el-option label="支付宝" value="支付宝" />
-            <el-option label="储蓄卡" value="储蓄卡" />
-            <el-option label="社保卡" value="社保卡" />
-            <el-option label="信用卡" value="信用卡" />
+            <el-option v-for="item in accountTypes" :key="item.value" :label="item.label" :value="item.value" />
           </el-select>
         </el-form-item>
         <el-form-item label="余额" v-if="accountForm.type !== '信用卡'">
@@ -45,6 +40,7 @@
 import { ref, watch } from 'vue'
 import PageTemplate from '../../common/PageTemplate.vue'
 import { useAccountStore } from '../../../stores/account'
+import { accountTypes } from '../../../utils/dictionaries'
 
 const emit = defineEmits(['navigate'])
 const accountStore = useAccountStore()
@@ -83,6 +79,12 @@ const addAccount = async () => {
     return
   }
   
+  if (accountForm.value.type === '信用卡' || accountForm.value.type === '社保卡' || accountForm.value.type === '公积金') {
+    accountForm.value.isLiquid = false
+  } else if (accountForm.value.type) {
+    accountForm.value.isLiquid = true
+  }
+
   try {
     console.log('Submitting account form:', accountForm.value)
     await accountStore.addAccount(accountForm.value)

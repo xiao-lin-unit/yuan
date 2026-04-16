@@ -39,7 +39,11 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import PageTemplate from '../../common/PageTemplate.vue'
-import db from '../../../database/index.js'
+import {
+  sellStock as sellStockService,
+  getAvailableAccounts,
+  getStockDetail
+} from '../../../services/asset/stockService'
 
 const props = defineProps({
   stockId: {
@@ -51,11 +55,10 @@ const props = defineProps({
 const emit = defineEmits(['navigate'])
 
 // 账户数据
-const accounts = ref([])
+const accounts = ref<Array<{ id: string; name: string; balance: number }>>([])
 
 // 表单数据
 const stockForm = ref({
-  id: '',
   name: '',
   code: '',
   current_price: 0,
@@ -72,8 +75,7 @@ onMounted(async () => {
 
 const loadAccounts = async () => {
   try {
-    const accountData = await db.query('SELECT * FROM accounts WHERE type != ?', ['信用卡'])
-    accounts.value = accountData
+    accounts.value = await getAvailableAccounts()
   } catch (error) {
     console.error('加载账户数据失败:', error)
   }
@@ -81,14 +83,10 @@ const loadAccounts = async () => {
 
 const loadStockData = async () => {
   try {
-    const stockData = await db.query('SELECT * FROM stocks WHERE id = ?', [props.stockId])
-    if (stockData.length > 0) {
-      const stock = stockData[0]
-      stockForm.value.id = stock.id
-      stockForm.value.name = stock.name
-      stockForm.value.code = stock.code
-      stockForm.value.current_price = stock.current_price
-    }
+    const stock = await getStockDetail(props.stockId)
+    stockForm.value.name = stock.name
+    stockForm.value.code = stock.code
+    stockForm.value.current_price = stock.currentPrice
   } catch (error) {
     console.error('加载股票数据失败:', error)
   }
@@ -116,118 +114,21 @@ const sellStock = async () => {
     alert('请选择关联账户')
     return
   }
-  
+
   try {
-    // 检查股票总数量
-    const stockData = await db.query('SELECT * FROM stocks WHERE id = ?', [props.stockId])
-    if (stockData.length === 0) {
-      alert('股票不存在')
-      return
-    }
-    
-    const stock = stockData[0]
-    if (stockForm.value.quantity > stock.quantity) {
-      alert('卖出数量不能大于股票的总数量')
-      return
-    }
-    
-    // 查询未卖出和部分卖出的持有记录，按照时间正序排序（FIFO）
-    const holdings = await db.query(
-      'SELECT * FROM stock_holdings WHERE stock_id = ? AND sell_status != ? ORDER BY transaction_time ASC',
-      [props.stockId, '已卖出']
-    )
-    
-    if (holdings.length === 0) {
-      alert('没有可卖出的持有记录')
-      return
-    }
-    
-    // 计算所有可卖出的持有记录的总可用数量
-    const totalAvailableQuantity = holdings.reduce((total, holding) => total + holding.remaining_quantity, 0)
-    if (stockForm.value.quantity > totalAvailableQuantity) {
-      alert(`卖出数量不能大于可卖出的总数量（当前可卖出数量：${totalAvailableQuantity}）`)
-      return
-    }
-    
-    // 准备事务语句数组
-    const statements = []
-    let remainingQuantityToSell = stockForm.value.quantity
-    const soldHoldIds = []
-    
-    // 从最早买入的持有记录开始扣除卖出数量（FIFO）
-    for (const holding of holdings) {
-      if (remainingQuantityToSell <= 0) break
-      
-      const availableQuantity = holding.remaining_quantity
-      const quantityToDeduct = Math.min(availableQuantity, remainingQuantityToSell)
-      
-      // 更新持有记录
-      const newRemainingQuantity = availableQuantity - quantityToDeduct
-      let newSellStatus = holding.sell_status
-      
-      if (newRemainingQuantity === 0) {
-        newSellStatus = '已卖出'
-      } else if (newRemainingQuantity < availableQuantity) {
-        newSellStatus = '部分卖出'
-      }
-      
-      statements.push({
-        statement: 'UPDATE stock_holdings SET remaining_quantity = ?, sell_status = ? WHERE id = ?',
-        values: [newRemainingQuantity, newSellStatus, holding.id]
-      })
-      
-      soldHoldIds.push(holding.id)
-      remainingQuantityToSell -= quantityToDeduct
-    }
-    
-    // 创建股票交易记录（卖出）
-    const transactionId = Date.now().toString()
-    statements.push({
-      statement: 'INSERT INTO stock_transactions (id, stock_id, price, quantity, type, hold_ids, fee, transaction_time, account_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      values: [transactionId, props.stockId, stockForm.value.current_price, stockForm.value.quantity, '卖出', soldHoldIds.join(','), stockForm.value.fee, stockForm.value.transaction_time, stockForm.value.account_id]
+    // 调用服务卖出股票
+    await sellStockService(props.stockId, {
+      price: stockForm.value.current_price,
+      quantity: stockForm.value.quantity,
+      fee: stockForm.value.fee,
+      transaction_time: stockForm.value.transaction_time,
+      account_id: stockForm.value.account_id
     })
-    
-    // 更新股票表中的股票持有数量、当前价格和确认收益
-    // 确认收益 = (卖出价格 - 持有成本价) * 卖出数量 - 手续费
-    const newQuantity = stock.quantity - stockForm.value.quantity
-    const confirmedProfit = (stockForm.value.current_price - stock.cost_price) * stockForm.value.quantity - stockForm.value.fee
-    const newConfirmedProfit = (stock.confirmed_profit || 0) + confirmedProfit
-    
-    // 判断股票是否结束（剩余数量为0则标记为已结束）
-    const isEnded = newQuantity === 0 ? 1 : 0
-    
-    statements.push({
-      statement: 'UPDATE stocks SET quantity = ?, current_price = ?, confirmed_profit = ?, ended = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-      values: [newQuantity, stockForm.value.current_price, newConfirmedProfit, isEnded, props.stockId]
-    })
-    
-    // 计算卖出实际到账金额
-    const netProceeds = (stockForm.value.current_price * stockForm.value.quantity) - stockForm.value.fee
-    
-    // 获取账户当前余额
-    const accountData = await db.query('SELECT balance FROM accounts WHERE id = ?', [stockForm.value.account_id])
-    const currentBalance = accountData.length > 0 ? accountData[0].balance : 0
-    
-    // 增加账户余额
-    statements.push({
-      statement: 'UPDATE accounts SET balance = balance + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-      values: [netProceeds, stockForm.value.account_id]
-    })
-    
-    // 创建账户流水记录
-    const accountTransactionId = Date.now().toString() + '_acc'
-    statements.push({
-      statement: 'INSERT INTO account_transactions (id, account_id, type, amount, balance_after, description, transaction_time) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      values: [accountTransactionId, stockForm.value.account_id, '收入', netProceeds, currentBalance + netProceeds, `股票卖出：${stock.name}`, stockForm.value.transaction_time]
-    })
-    
-    // 使用事务执行所有操作
-    await db.executeTransaction(statements)
-    
+
     emit('navigate', 'asset')
   } catch (error) {
     console.error('股票卖出失败:', error)
-    alert('股票卖出失败，请重试')
+    alert(error instanceof Error ? error.message : '股票卖出失败，请重试')
   }
 }
 </script>

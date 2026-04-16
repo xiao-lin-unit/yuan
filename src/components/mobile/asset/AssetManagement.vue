@@ -87,17 +87,24 @@
 import { ref, onMounted, computed } from 'vue';
 import { Setting, Plus, More, Goods, TrendCharts, DataAnalysis, Switch } from '@element-plus/icons-vue';
 import AssetCard from './AssetCard.vue';
-import db from '../../../database/index.js';
+import { getAllStocks } from '../../../services/asset/stockService';
+import { getAllFunds } from '../../../services/asset/fundService';
+import { getAssets } from '../../../services/asset/assetService';
+import { getAccounts } from '../../../services/account/accountService';
+import type { Stock } from '../../../types/asset/stock';
+import type { Fund } from '../../../types/asset/fund';
+import type { Asset } from '../../../types/asset/asset';
+import type { Account } from '../../../types/account/account';
 
 const emit = defineEmits(['navigate']);
 
 // 资产数据
-const generalAssets = ref([]);
-const stocks = ref([]);
-const funds = ref([]);
+const generalAssets = ref<any[]>([]);
+const stocks = ref<any[]>([]);
+const funds = ref<any[]>([]);
 
 // 账户数据
-const accounts = ref([]);
+const accounts = ref<Account[]>([]);
 
 // 对话框状态
 const dialogVisible = ref({
@@ -125,21 +132,21 @@ const toggleAssetsView = () => {
 // 计算属性：根据ended状态过滤资产
 const displayGeneralAssets = computed(() => {
   return generalAssets.value.filter(asset => {
-    const isEnded = asset.ended === 1 || asset.ended === true;
+    const isEnded = asset.ended === 1;
     return showEndedAssets.value ? isEnded : !isEnded;
   });
 });
 
 const displayStocks = computed(() => {
   return stocks.value.filter(stock => {
-    const isEnded = stock.ended === 1 || stock.ended === true;
+    const isEnded = stock.ended === 1;
     return showEndedAssets.value ? isEnded : !isEnded;
   });
 });
 
 const displayFunds = computed(() => {
   return funds.value.filter(fund => {
-    const isEnded = fund.ended === 1 || fund.ended === true;
+    const isEnded = fund.ended === 1;
     return showEndedAssets.value ? isEnded : !isEnded;
   });
 });
@@ -185,35 +192,35 @@ onMounted(async () => {
 
 const loadAssetData = async () => {
   try {
-    // 从数据库加载资产数据和账户数据
+    // 使用服务加载资产数据和账户数据
     const [assets, stockData, fundData, accountData] = await Promise.all([
-      db.query('SELECT * FROM assets'),
-      db.query('SELECT * FROM stocks'),
-      db.query('SELECT * FROM funds'),
-      db.query('SELECT * FROM accounts')
+      getAssets(),
+      getAllStocks(),
+      getAllFunds(),
+      getAccounts()
     ]);
-    
+
     // 处理通用资产数据
     generalAssets.value = assets.map(asset => ({
       ...asset,
       icon: '💼',
       color: '#52c41a'
     }));
-    
+
     // 处理股票数据
     stocks.value = stockData.map(stock => ({
       ...stock,
       icon: '📈',
       color: '#faad14'
     }));
-    
+
     // 处理基金数据
     funds.value = fundData.map(fund => ({
       ...fund,
       icon: '📊',
       color: '#722ed1'
     }));
-    
+
     // 处理账户数据
     accounts.value = accountData;
   } catch (error) {
@@ -239,17 +246,17 @@ const loadMockData = () => {
 
 
 
-const viewAssetDetail = (assetId) => {
+const viewAssetDetail = (assetId: string) => {
     console.log('查看资产详情:', assetId);
-    // 这里可以跳转到资产详情页面
+    emit('navigate', { key: 'assetDetail', params: { assetId } });
   };
   
-  const viewStockDetail = (stockId) => {
+  const viewStockDetail = (stockId: string) => {
     console.log('查看股票详情:', stockId);
     emit('navigate', { key: 'stockDetail', params: { stockId } });
   };
   
-  const viewFundDetail = (fundId) => {
+  const viewFundDetail = (fundId: string) => {
     console.log('查看基金详情:', fundId);
     emit('navigate', { key: 'fundDetail', params: { fundId } });
   };

@@ -13,15 +13,7 @@
         </el-form-item>
         <el-form-item label="资产类型" required>
           <el-select v-model="assetForm.type" placeholder="请选择资产类型">
-            <el-option label="工资" value="工资" />
-            <el-option label="租金" value="租金" />
-            <el-option label="利息" value="利息" />
-            <el-option label="版权" value="版权" />
-            <el-option label="副业" value="副业" />
-            <el-option label="被动收入" value="被动收入" />
-            <el-option label="社保" value="社保" />
-            <el-option label="公积金" value="公积金" />
-            <el-option label="其他" value="其他" />
+            <el-option v-for="item in assetTypes" :key="item.value" :label="item.label" :value="item.value" />
           </el-select>
         </el-form-item>
         <el-form-item label="金额" required>
@@ -39,9 +31,47 @@
         </el-form-item>
         <el-form-item label="收益周期">
           <el-select v-model="assetForm.period" placeholder="请选择周期（可选）">
-            <el-option label="每年" value="年" />
-            <el-option label="每月" value="月" />
+            <el-option v-for="item in periodTypes" :key="item.value" :label="item.label" :value="item.value" />
           </el-select>
+        </el-form-item>
+        <el-form-item label="收益日" v-if="assetForm.period">
+          <div v-if="assetForm.period === '年'" class="income-date-year">
+            <el-select v-model="assetForm.income_month" placeholder="月" style="width: 45%; margin-right: 5px;">
+              <el-option 
+                v-for="m in 12" 
+                :key="m" 
+                :label="`${m}月`" 
+                :value="m" 
+              />
+            </el-select>
+            <el-select v-model="assetForm.income_day" placeholder="日" style="width: 45%;">
+              <el-option 
+                v-for="d in 31" 
+                :key="d" 
+                :label="`${d}日`" 
+                :value="d" 
+              />
+            </el-select>
+          </div>
+          <el-select v-else-if="assetForm.period === '月'" v-model="assetForm.income_day" placeholder="请选择日期" style="width: 100%;">
+            <el-option 
+              v-for="d in 31" 
+              :key="d" 
+              :label="`${d}日`" 
+              :value="d" 
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="周期数量" v-if="assetForm.period">
+          <el-input
+            v-model.number="assetForm.period_count"
+            placeholder="请输入周期数量"
+            type="number"
+            min="1"
+            step="1"
+          >
+            <template #append>{{ assetForm.period }}</template>
+          </el-input>
         </el-form-item>
       </el-form>
     </div>
@@ -51,7 +81,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import PageTemplate from '../../common/PageTemplate.vue'
-import db from '../../../database/index.js'
+import { assetTypes, periodTypes } from '../../../utils/dictionaries'
+import { addAsset as addAssetService } from '../../../services/asset/assetService'
+import { getNonCreditCardAccounts } from '../../../services/account/accountService'
 
 const emit = defineEmits(['navigate'])
 
@@ -65,7 +97,10 @@ const assetForm = ref({
   type: '',
   amount: 0,
   account_id: '',
-  period: ''
+  period: '',
+  period_count: 0,
+  income_month: 0,
+  income_day: 0
 })
 
 // 过滤后的账户列表
@@ -85,8 +120,7 @@ onMounted(async () => {
 
 const loadAccounts = async () => {
   try {
-    const accountData = await db.query('SELECT * FROM accounts')
-    accounts.value = accountData
+    accounts.value = await getNonCreditCardAccounts()
   } catch (error) {
     console.error('加载账户数据失败:', error)
   }
@@ -123,13 +157,27 @@ const addAsset = async () => {
       return
     }
   }
+
+  // 构建收益日字符串
+  let incomeDate = ''
+  if (assetForm.value.period) {
+    if (assetForm.value.period === '年' && assetForm.value.income_month && assetForm.value.income_day) {
+      incomeDate = `${String(assetForm.value.income_month).padStart(2, '0')}-${String(assetForm.value.income_day).padStart(2, '0')}`
+    } else if (assetForm.value.period === '月' && assetForm.value.income_day) {
+      incomeDate = `${String(assetForm.value.income_day).padStart(2, '0')}`
+    }
+  }
   
   try {
-    const id = Date.now().toString()
-    await db.run(
-      'INSERT INTO assets (id, type, name, amount, account_id, period) VALUES (?, ?, ?, ?, ?, ?)',
-      [id, assetForm.value.type, assetForm.value.name, assetForm.value.amount, assetForm.value.account_id, assetForm.value.period]
-    )
+    await addAssetService({
+      type: assetForm.value.type,
+      name: assetForm.value.name,
+      amount: assetForm.value.amount,
+      account_id: assetForm.value.account_id,
+      period: assetForm.value.period,
+      period_count: assetForm.value.period_count,
+      income_date: incomeDate
+    })
     emit('navigate', 'asset')
   } catch (error) {
     console.error('新增资产失败:', error)
@@ -210,6 +258,12 @@ const addAsset = async () => {
 .el-select:focus-within {
   box-shadow: none;
   border-color: transparent;
+}
+
+.income-date-year {
+  display: flex;
+  width: 100%;
+  align-items: center;
 }
 
 /* 响应式设计 */

@@ -189,7 +189,13 @@ import { ref, onMounted } from 'vue';
 import { ArrowLeft, Plus, Minus, More, Switch, Edit } from '@element-plus/icons-vue';
 import { ElMessageBox, ElMessage } from 'element-plus';
 import FloatingActionMenu from '../../../components/common/FloatingActionMenu.vue';
-import db from '../../../database/index.js';
+import {
+  getFundDetail,
+  getFundHoldings,
+  getFundTransactions,
+  updateFundNav
+} from '../../../services/asset/fundService';
+import type { FundHolding, FundTransaction } from '../../../types/asset/fund';
 
 const props = defineProps({
   fundId: {
@@ -214,44 +220,38 @@ const navigateToSellFund = () => {
   emit('navigate', { key: 'sellFund', params: { fundId: props.fundId } });
 };
 
-// 修改基金净值
+// 修改基金净値
 const editFundNav = async () => {
   try {
     const { value } = await ElMessageBox.prompt(
-      '请输入新的基金净值',
-      '修改净值',
+      '请输入新的基金净値',
+      '修改净値',
       {
         confirmButtonText: '确认',
         cancelButtonText: '取消',
         inputPattern: /^\d+(\.\d{1,4})?$/,
-        inputErrorMessage: '请输入有效的净值（最多4位小数）',
+        inputErrorMessage: '请输入有效的净値（最多4位小数）',
         inputValue: fundInfo.value.currentNav.toFixed(4)
       }
     );
-    
+
     const newNav = parseFloat(value);
     if (isNaN(newNav) || newNav <= 0) {
-      ElMessage.error('请输入有效的净值');
+      ElMessage.error('请输入有效的净値');
       return;
     }
-    
-    // 更新数据库
-    await db.run(
-      'UPDATE funds SET current_nav = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-      [newNav, props.fundId]
-    );
-    
-    // 更新本地显示
-    fundInfo.value.currentNav = newNav;
-    
-    // 重新计算收益
+
+    // 调用服务更新净値
+    await updateFundNav(props.fundId, newNav);
+
+    // 重新加载详情
     await loadFundDetail();
-    
-    ElMessage.success('净值更新成功');
+
+    ElMessage.success('净値更新成功');
   } catch (error) {
     if (error !== 'cancel') {
-      console.error('修改净值失败:', error);
-      ElMessage.error('修改净值失败');
+      console.error('修改净値失败:', error);
+      ElMessage.error('修改净値失败');
     }
   }
 };
@@ -264,7 +264,7 @@ const actionButtons = [
     action: navigateToBuyFund
   },
   {
-    text: '修改净值',
+    text: '修改净値',
     icon: Edit,
     action: editFundNav
   },
@@ -299,20 +299,20 @@ const fundInfo = ref({
 const activeTag = ref('holdings');
 
 // 持有记录数据
-const holdings = ref([]);
+const holdings = ref<FundHolding[]>([]);
 
 // 买入记录数据
-const buyTransactions = ref([]);
+const buyTransactions = ref<FundTransaction[]>([]);
 
 // 卖出记录数据
-const sellTransactions = ref([]);
+const sellTransactions = ref<FundTransaction[]>([]);
 
 const goBack = () => {
   emit('navigate', 'asset');
 };
 
 // 格式化日期函数
-const formatDate = (dateString) => {
+const formatDate = (dateString: string | Date) => {
   const date = new Date(dateString);
   return date.toLocaleString('zh-CN', {
     year: 'numeric',
@@ -326,130 +326,51 @@ const formatDate = (dateString) => {
 // 加载基金详情数据
 const loadFundDetail = async () => {
   console.log('Loading fund detail for:', props.fundId);
-  
-  try {
-    // 连接数据库
-    await db.connect();
-    
-    // 查询基金基本信息
-    const fundData = await db.query('SELECT * FROM funds WHERE id = ?', [props.fundId]);
-    console.log('Fund data:', JSON.stringify(fundData));
-    if (fundData.length > 0) {
-      const fund = fundData[0];
-      
-      // 防御性检查，确保所有必要字段都存在
-      const shares = fund.shares;
-      const current_nav = fund.current_nav;
-      const cost_nav = fund.cost_nav;
-      const total_fee = fund.total_fee || 0;
-      
-      // 计算持有金额
-      const costAmount = shares * cost_nav;
-      const holdReturn = (current_nav - cost_nav) * shares; // 持有收益 = （当前净值-持有成本净值）* 持有份额
-      const confirmedReturn = fund.confirmed_profit || 0; // 确认收益默认为0，只有卖出时才计算
-      const totalReturn = holdReturn + confirmedReturn; // 总收益 = 持有收益 + 确认收益
-      
-      // 更新基金信息
-      fundInfo.value = {
-        name: fund.name || '未知基金',
-        code: fund.code || '',
-        costAmount: costAmount,
-        costFee: total_fee,
-        costNav: cost_nav,
-        currentNav: current_nav,
-        shares: shares,
-        confirmedReturn: confirmedReturn, // 确认收益默认为0，只有卖出时才计算
-        holdReturn: holdReturn, // 持有收益 = （当前净值-持有成本净值）* 持有份额
-        totalReturn: totalReturn // 总收益 = 持有收益 + 确认收益
-      };
-      
-      console.log('Fund detail loaded:', fundInfo.value);
-      
-      // 加载持有记录
-      await loadHoldings();
-      
-      // 加载交易记录
-      await loadTransactions();
-    } else {
-      console.error('Fund not found:', props.fundId);
-      // 设置默认值，避免模板渲染错误
-      fundInfo.value = {
-        name: '未知基金',
-        code: '',
-        costAmount: 0,
-        costFee: 0,
-        costNav: 0,
-        currentNav: 0,
-        shares: 0,
-        confirmedReturn: 0,
-        holdReturn: 0,
-        totalReturn: 0
-      };
-    }
-  } catch (error) {
-    console.error('Error loading fund detail:', error);
-  }
-};
 
-// 加载持有记录
-const loadHoldings = async () => {
   try {
-    // 查询持有记录，按时间倒序
-    const holdingData = await db.query(
-      'SELECT * FROM fund_holdings WHERE fund_id = ? ORDER BY transaction_time DESC', 
-      [props.fundId]
-    );
-    
-    holdings.value = holdingData.map(holding => ({
-      ...holding,
-      nav: holding.nav || 0,
-      shares: holding.shares || 0,
-      remaining_shares: holding.remaining_shares || 0,
-      fee: holding.fee || 0,
-      sell_status: holding.sell_status || '未卖出',
-      transaction_time: holding.transaction_time || new Date()
-    }));
-    
+    // 使用服务获取基金详情
+    const fund = await getFundDetail(props.fundId);
+    console.log('Fund detail loaded:', fund);
+
+    fundInfo.value = {
+      name: fund.name,
+      code: fund.code,
+      costAmount: fund.costAmount,
+      costFee: fund.costFee,
+      costNav: fund.costNav,
+      currentNav: fund.currentNav,
+      shares: fund.shares,
+      confirmedReturn: fund.confirmedReturn,
+      holdReturn: fund.holdReturn,
+      totalReturn: fund.totalReturn
+    };
+
+    // 加载持有记录
+    holdings.value = await getFundHoldings(props.fundId);
+
+    // 加载交易记录
+    const transactions = await getFundTransactions(props.fundId);
+    buyTransactions.value = transactions.buyTransactions;
+    sellTransactions.value = transactions.sellTransactions;
+
     console.log('Holdings loaded:', holdings.value);
-  } catch (error) {
-    console.error('Error loading holdings:', error);
-  }
-};
-
-// 加载交易记录
-const loadTransactions = async () => {
-  try {
-    // 查询交易记录，按时间倒序
-    const transactionData = await db.query(
-      'SELECT * FROM fund_transactions WHERE fund_id = ? ORDER BY transaction_time DESC', 
-      [props.fundId]
-    );
-    
-    // 分离买入和卖出记录
-    buyTransactions.value = transactionData
-      .filter(transaction => transaction.type === '买入')
-      .map(transaction => ({
-        ...transaction,
-        transaction_nav: transaction.transaction_nav || 0,
-        shares: transaction.shares || 0,
-        fee: transaction.fee || 0,
-        transaction_time: transaction.transaction_time || new Date()
-      }));
-    
-    sellTransactions.value = transactionData
-      .filter(transaction => transaction.type === '卖出')
-      .map(transaction => ({
-        ...transaction,
-        transaction_nav: transaction.transaction_nav || 0,
-        shares: transaction.shares || 0,
-        fee: transaction.fee || 0,
-        transaction_time: transaction.transaction_time || new Date()
-      }));
-    
     console.log('Buy transactions loaded:', buyTransactions.value);
     console.log('Sell transactions loaded:', sellTransactions.value);
   } catch (error) {
-    console.error('Error loading transactions:', error);
+    console.error('Error loading fund detail:', error);
+    // 设置默认値，避免模板渲染错误
+    fundInfo.value = {
+      name: '未知基金',
+      code: '',
+      costAmount: 0,
+      costFee: 0,
+      costNav: 0,
+      currentNav: 0,
+      shares: 0,
+      confirmedReturn: 0,
+      holdReturn: 0,
+      totalReturn: 0
+    };
   }
 };
 

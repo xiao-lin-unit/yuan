@@ -53,6 +53,7 @@ import SellFundPage from './components/mobile/asset/SellFundPage.vue'
 import StockDetailPage from './components/mobile/asset/StockDetailPage.vue'
 import BuyStockPage from './components/mobile/asset/BuyStockPage.vue'
 import SellStockPage from './components/mobile/asset/SellStockPage.vue'
+import AssetDetailPage from './components/mobile/asset/AssetDetailPage.vue'
 
 const activeMenu = ref('expense')
 const menuVisible = ref<boolean>(false)
@@ -83,6 +84,7 @@ const selectedMonth = ref(3);
       stockDetail: StockDetailPage, // 映射到股票详情页面组件
       buyStock: BuyStockPage, // 映射到股票买入页面组件
       sellStock: SellStockPage, // 映射到股票卖出页面组件
+      assetDetail: AssetDetailPage, // 映射到通用资产详情页面组件
       liability: LiabilityManagement,
       dashboard: FinancialDashboard,
       goal: FinancialGoal,
@@ -132,6 +134,11 @@ const componentProps = computed(() => {
   // 为股票卖出页面传递stockId参数
   if (activeMenu.value === 'sellStock' && navParams.value.stockId) {
     props.stockId = navParams.value.stockId;
+  }
+
+  // 为通用资产详情页面传递assetId参数
+  if (activeMenu.value === 'assetDetail' && navParams.value.assetId) {
+    props.assetId = navParams.value.assetId;
   }
   
   return props;

@@ -2,9 +2,7 @@
   <el-form :model="form" label-width="80px">
     <el-form-item label="调整类型">
       <el-select v-model="form.type" placeholder="请选择调整类型">
-        <el-option label="修正错误" value="修正错误" />
-        <el-option label="现金赠与" value="现金赠与" />
-        <el-option label="资产盘盈" value="资产盘盈" />
+        <el-option v-for="item in adjustmentTypes" :key="item.value" :label="item.label" :value="item.value" />
       </el-select>
     </el-form-item>
     <el-form-item label="调整金额">
@@ -18,6 +16,7 @@
 
 <script setup lang="ts">
 import { ref, defineProps, defineEmits } from 'vue'
+import { adjustmentTypes } from '../../../utils/dictionaries'
 
 interface AdjustForm {
   accountId: string

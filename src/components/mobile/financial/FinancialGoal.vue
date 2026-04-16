@@ -42,10 +42,7 @@
         </el-form-item>
         <el-form-item label="目标类型">
           <el-select v-model="goalForm.type" placeholder="请选择目标类型">
-            <el-option label="储蓄类" value="储蓄类" />
-            <el-option label="还款类" value="还款类" />
-            <el-option label="投资类" value="投资类" />
-            <el-option label="应急金类" value="应急金类" />
+            <el-option v-for="item in goalTypes" :key="item.value" :label="item.label" :value="item.value" />
           </el-select>
         </el-form-item>
         <el-form-item label="目标金额">
@@ -79,10 +76,7 @@
         </el-form-item>
         <el-form-item label="目标类型">
           <el-select v-model="goalForm.type" placeholder="请选择目标类型">
-            <el-option label="储蓄类" value="储蓄类" />
-            <el-option label="还款类" value="还款类" />
-            <el-option label="投资类" value="投资类" />
-            <el-option label="应急金类" value="应急金类" />
+            <el-option v-for="item in goalTypes" :key="item.value" :label="item.label" :value="item.value" />
           </el-select>
         </el-form-item>
         <el-form-item label="目标金额">
@@ -101,10 +95,7 @@
         </el-form-item>
         <el-form-item label="状态">
           <el-select v-model="goalForm.status" placeholder="请选择状态">
-            <el-option label="未开始" value="未开始" />
-            <el-option label="进行中" value="进行中" />
-            <el-option label="已完成" value="已完成" />
-            <el-option label="已终止" value="已终止" />
+            <el-option v-for="item in goalStatuses" :key="item.value" :label="item.label" :value="item.value" />
           </el-select>
         </el-form-item>
       </el-form>
@@ -142,6 +133,7 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
 import { useAccountStore } from '../../../stores/account'
+import { goalTypes, goalStatuses } from '../../../utils/dictionaries'
 
 const accountStore = useAccountStore()
 const accounts = ref([])

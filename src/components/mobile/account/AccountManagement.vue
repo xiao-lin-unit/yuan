@@ -96,12 +96,7 @@
         </el-form-item>
         <el-form-item label="账户类型">
           <el-select v-model="accountForm.type" placeholder="请选择账户类型">
-            <el-option label="现金" value="现金" />
-            <el-option label="微信" value="微信" />
-            <el-option label="支付宝" value="支付宝" />
-            <el-option label="储蓄卡" value="储蓄卡" />
-            <el-option label="社保卡" value="社保卡" />
-            <el-option label="信用卡" value="信用卡" />
+            <el-option v-for="item in accountTypes" :key="item.value" :label="item.label" :value="item.value" />
           </el-select>
         </el-form-item>
         <el-form-item label="余额" v-if="accountForm.type !== '信用卡'">
@@ -133,9 +128,7 @@
       <el-form :model="adjustForm" label-width="80px">
         <el-form-item label="调整类型">
           <el-select v-model="adjustForm.type" placeholder="请选择调整类型">
-            <el-option label="修正错误" value="修正错误" />
-            <el-option label="现金赠与" value="现金赠与" />
-            <el-option label="资产盘盈" value="资产盘盈" />
+            <el-option v-for="item in adjustmentTypes" :key="item.value" :label="item.label" :value="item.value" />
           </el-select>
         </el-form-item>
         <el-form-item label="调整金额">
@@ -162,6 +155,7 @@ import CreditCardItem from './CreditCardItem.vue'
 import FundItem from './FundItem.vue'
 import FloatingActionMenu from '../../common/FloatingActionMenu.vue'
 import { ArrowDown, View, More, Plus, RefreshLeft, DataLine } from '@element-plus/icons-vue'
+import { accountTypes, adjustmentTypes } from '../../../utils/dictionaries'
 
 const emit = defineEmits(['navigate'])
 
