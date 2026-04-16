@@ -1,12 +1,12 @@
 <template>
   <el-form :model="form" label-width="80px">
     <el-form-item label="转出账户">
-      <el-select v-model="form.fromAccountId" placeholder="请选择转出账户">
+      <el-select v-model="form.from_account_id" placeholder="请选择转出账户">
         <el-option v-for="account in accounts" :key="account.id" :label="account.name" :value="account.id" />
       </el-select>
     </el-form-item>
     <el-form-item label="转入账户">
-      <el-select v-model="form.toAccountId" placeholder="请选择转入账户">
+      <el-select v-model="form.to_account_id" placeholder="请选择转入账户">
         <el-option v-for="account in accounts" :key="account.id" :label="account.name" :value="account.id" />
       </el-select>
     </el-form-item>
@@ -23,7 +23,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, defineProps, defineEmits } from 'vue'
+import { ref } from 'vue'
 
 interface Account {
   id: string
@@ -34,8 +34,8 @@ interface Account {
 }
 
 interface TransferForm {
-  fromAccountId: string
-  toAccountId: string
+  from_account_id: string
+  to_account_id: string
   amount: number
   remark: string
 }

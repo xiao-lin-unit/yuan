@@ -15,6 +15,14 @@ import type {
   FundDetail
 } from '../../types/asset/fund.js'
 import { calculateTotalCost, calculateFundWeightedNavCostPrice } from '../../utils/calculations.js'
+import { createDebitTransaction, createCreditTransaction } from '../account/accountService.js'
+
+/**
+ * Get all funds
+ */
+export async function getAllFunds(): Promise<Fund[]> {
+  return await db.query('SELECT * FROM funds ORDER BY created_at DESC')
+}
 
 /**
  * Validate fund code format (6 digits)
@@ -72,9 +80,8 @@ export async function addFund(fundData: FundInput): Promise<void> {
   const fundId = Date.now().toString()
   const totalCost = calculateTotalCost(fundData.cost_nav, fundData.shares, fundData.fee)
 
-  // Get account balance for transaction recording
-  const accountData = await db.query('SELECT balance FROM accounts WHERE id = ?', [fundData.account_id])
-  const accountBalance = accountData.length > 0 ? accountData[0].balance : 0
+  // 使用新的出账接口
+  const debitResult = await createDebitTransaction(fundData.account_id, totalCost, `基金买入：${fundData.name}`)
 
   // Calculate lock end date
   const lockEndDate = calculateLockEndDate(fundData.transaction_time, fundData.lock_period)
@@ -138,27 +145,8 @@ export async function addFund(fundData: FundInput): Promise<void> {
     ]
   })
 
-  // Deduct account balance
-  statements.push({
-    statement: 'UPDATE accounts SET balance = balance - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-    values: [totalCost, fundData.account_id]
-  })
-
-  // Create account transaction record
-  const accountTransactionId = Date.now().toString() + '_acc'
-  statements.push({
-    statement: `INSERT INTO account_transactions (id, account_id, type, amount, balance_after, description, transaction_time) 
-                VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    values: [
-      accountTransactionId,
-      fundData.account_id,
-      '支出',
-      totalCost,
-      accountBalance - totalCost,
-      `基金买入：${fundData.name}`,
-      fundData.transaction_time
-    ]
-  })
+  // 使用出账接口返回的SQL语句（已包含账户更新和交易记录）
+  statements.push(...debitResult.statements)
 
   await db.executeTransaction(statements)
 }
@@ -174,28 +162,20 @@ export async function buyFund(fundId: string, buyData: FundBuyInput): Promise<vo
   }
   const currentFund = fundData[0]
 
-  // Check account balance
-  const accountCheck = await checkAccountBalance(buyData.account_id, calculateTotalCost(buyData.nav, buyData.shares, buyData.fee))
-  if (!accountCheck.sufficient) {
-    throw new Error(`账户余额不足，需要 ¥${calculateTotalCost(buyData.nav, buyData.shares, buyData.fee).toFixed(2)}，当前余额 ¥${accountCheck.currentBalance.toFixed(2)}`)
-  }
-
   const totalCost = calculateTotalCost(buyData.nav, buyData.shares, buyData.fee)
 
-  // Calculate new cost NAV using weighted average
-  const newCostNav = calculateFundWeightedNavCostPrice(
-    currentFund.cost_nav,
-    currentFund.shares,
-    buyData.nav,
-    buyData.shares,
-    buyData.fee
-  )
+  // 使用新的出账接口
+  const debitResult = await createDebitTransaction(buyData.account_id, totalCost, `基金买入：${currentFund.name}`)
+
+  // Calculate new cost nav using weighted average
+  const currentTotalValue = currentFund.cost_nav * currentFund.shares
+  const newBuyValue = buyData.nav * buyData.shares
   const newShares = currentFund.shares + buyData.shares
+  const newCostNav = (currentTotalValue + newBuyValue) / newShares
 
   // Calculate lock end date
   const lockEndDate = calculateLockEndDate(buyData.transaction_time, buyData.lock_period)
 
-  // Prepare transaction statements
   const holdingId = Date.now().toString() + '_hold'
   const transactionId = Date.now().toString()
   const accountTransactionId = Date.now().toString() + '_acc'
@@ -239,25 +219,8 @@ export async function buyFund(fundId: string, buyData: FundBuyInput): Promise<vo
       statement: `UPDATE funds SET shares = ?, current_nav = ?, cost_nav = ?, total_fee = ?, ended = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
       values: [newShares, buyData.nav, newCostNav, currentFund.total_fee + buyData.fee, 0, fundId]
     },
-    // Deduct account balance
-    {
-      statement: 'UPDATE accounts SET balance = balance - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-      values: [totalCost, buyData.account_id]
-    },
-    // Create account transaction record
-    {
-      statement: `INSERT INTO account_transactions (id, account_id, type, amount, balance_after, description, transaction_time) 
-                  VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      values: [
-        accountTransactionId,
-        buyData.account_id,
-        '支出',
-        totalCost,
-        accountCheck.currentBalance - totalCost,
-        `基金买入：${currentFund.name}`,
-        buyData.transaction_time
-      ]
-    }
+    // 使用出账接口返回的SQL语句（已包含账户更新和交易记录）
+    ...debitResult.statements
   ]
 
   await db.executeTransaction(statements)
@@ -358,31 +321,11 @@ export async function sellFund(fundId: string, sellData: FundSellInput): Promise
   // Calculate net proceeds
   const netProceeds = (sellData.nav * sellData.shares) - sellData.fee
 
-  // Get current account balance
-  const accountData = await db.query('SELECT balance FROM accounts WHERE id = ?', [sellData.account_id])
-  const currentBalance = accountData.length > 0 ? accountData[0].balance : 0
+  // 使用新的入账接口（已包含账户更新和交易记录）
+  const creditResult = await createCreditTransaction(sellData.account_id, netProceeds, `基金卖出：${fund.name}`)
 
-  // Add to account balance
-  statements.push({
-    statement: 'UPDATE accounts SET balance = balance + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-    values: [netProceeds, sellData.account_id]
-  })
-
-  // Create account transaction record
-  const accountTransactionId = Date.now().toString() + '_acc'
-  statements.push({
-    statement: `INSERT INTO account_transactions (id, account_id, type, amount, balance_after, description, transaction_time) 
-                VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    values: [
-      accountTransactionId,
-      sellData.account_id,
-      '收入',
-      netProceeds,
-      currentBalance + netProceeds,
-      `基金卖出：${fund.name}`,
-      sellData.transaction_time
-    ]
-  })
+  // 添加入账接口返回的SQL语句
+  statements.push(...creditResult.statements)
 
   await db.executeTransaction(statements)
 
@@ -394,35 +337,32 @@ export async function sellFund(fundId: string, sellData: FundSellInput): Promise
 }
 
 /**
- * Get fund detail information
+ * Get fund detail by ID
  */
 export async function getFundDetail(fundId: string): Promise<FundDetail> {
-  const fundData = await db.query('SELECT * FROM funds WHERE id = ?', [fundId])
-
-  if (fundData.length === 0) {
+  const fund = await db.query('SELECT * FROM funds WHERE id = ?', [fundId])
+  if (fund.length === 0) {
     throw new Error('基金不存在')
   }
 
-  const fund = fundData[0]
-  const shares = fund.shares || 0
-  const currentNav = fund.current_nav || 0
-  const costNav = fund.cost_nav || 0
-  const totalFee = fund.total_fee || 0
+  const f = fund[0]
 
-  const costAmount = shares * costNav
-  const holdReturn = (currentNav - costNav) * shares
-  const confirmedReturn = fund.confirmed_profit || 0
-  const totalReturn = holdReturn + confirmedReturn
+  // Calculate derived values
+  const costAmount = f.cost_nav * f.shares
+  const currentAmount = f.current_nav * f.shares
+  const totalReturn = currentAmount - costAmount
+  const confirmedReturn = f.confirmed_profit || 0
+  const holdReturn = totalReturn - confirmedReturn
 
   return {
-    id: fund.id,
-    name: fund.name || '未知基金',
-    code: fund.code || '',
-    shares,
-    currentNav,
-    costNav,
+    id: f.id,
+    name: f.name,
+    code: f.code,
     costAmount,
-    costFee: totalFee,
+    costFee: f.cost_fee || 0,
+    costNav: f.cost_nav,
+    currentNav: f.current_nav,
+    shares: f.shares,
     confirmedReturn,
     holdReturn,
     totalReturn
@@ -433,58 +373,35 @@ export async function getFundDetail(fundId: string): Promise<FundDetail> {
  * Get fund holdings
  */
 export async function getFundHoldings(fundId: string): Promise<FundHolding[]> {
-  const holdingData = await db.query(
-    'SELECT * FROM fund_holdings WHERE fund_id = ? ORDER BY transaction_time DESC',
+  return await db.query(
+    'SELECT * FROM fund_holdings WHERE fund_id = ? ORDER BY transaction_time ASC',
     [fundId]
   )
-
-  return holdingData.map((holding: any) => ({
-    ...holding,
-    nav: holding.nav || 0,
-    shares: holding.shares || 0,
-    remaining_shares: holding.remaining_shares || 0,
-    fee: holding.fee || 0,
-    sell_status: holding.sell_status || '未卖出',
-    transaction_time: holding.transaction_time || new Date()
-  }))
 }
 
 /**
- * Get fund transactions
+ * Get fund transactions (buy and sell)
  */
 export async function getFundTransactions(fundId: string): Promise<{ buyTransactions: FundTransaction[]; sellTransactions: FundTransaction[] }> {
-  const transactionData = await db.query(
+  const transactions = await db.query(
     'SELECT * FROM fund_transactions WHERE fund_id = ? ORDER BY transaction_time DESC',
     [fundId]
   )
 
-  const buyTransactions = transactionData
-    .filter((transaction: any) => transaction.type === '买入')
-    .map((transaction: any) => ({
-      ...transaction,
-      transaction_nav: transaction.transaction_nav || 0,
-      shares: transaction.shares || 0,
-      fee: transaction.fee || 0,
-      transaction_time: transaction.transaction_time || new Date()
-    }))
-
-  const sellTransactions = transactionData
-    .filter((transaction: any) => transaction.type === '卖出')
-    .map((transaction: any) => ({
-      ...transaction,
-      transaction_nav: transaction.transaction_nav || 0,
-      shares: transaction.shares || 0,
-      fee: transaction.fee || 0,
-      transaction_time: transaction.transaction_time || new Date()
-    }))
-
-  return { buyTransactions, sellTransactions }
+  return {
+    buyTransactions: transactions.filter((t: FundTransaction) => t.type === '买入'),
+    sellTransactions: transactions.filter((t: FundTransaction) => t.type === '卖出')
+  }
 }
 
 /**
- * Update fund NAV
+ * Update fund NAV (current net asset value)
  */
 export async function updateFundNav(fundId: string, newNav: number): Promise<void> {
+  if (newNav <= 0) {
+    throw new Error('净值必须大于0')
+  }
+
   await db.run(
     'UPDATE funds SET current_nav = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
     [newNav, fundId]
@@ -492,16 +409,9 @@ export async function updateFundNav(fundId: string, newNav: number): Promise<voi
 }
 
 /**
- * Get fund by ID
+ * Get fund by ID (basic info)
  */
 export async function getFundById(fundId: string): Promise<Fund | null> {
-  const fundData = await db.query('SELECT * FROM funds WHERE id = ?', [fundId])
-  return fundData.length > 0 ? fundData[0] : null
-}
-
-/**
- * Get all funds
- */
-export async function getAllFunds(): Promise<Fund[]> {
-  return await db.query('SELECT * FROM funds ORDER BY created_at DESC')
+  const result = await db.query('SELECT * FROM funds WHERE id = ?', [fundId])
+  return result.length > 0 ? result[0] : null
 }

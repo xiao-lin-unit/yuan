@@ -1,16 +1,16 @@
 <template>
-  <div class="credit-card-item">
-    <div class="card-icon" :class="iconClass">{{ iconText }}</div>
+  <div class="credit-card-item" @click="handleClick">
+    <div class="card-icon">{{ card.name.charAt(0) }}</div>
     <div class="card-info">
       <div class="card-header-row">
         <div class="card-name">{{ card.name }}</div>
-        <div class="card-balance" v-if="card.usedLimit">{{ formatCurrency(card.usedLimit) }}</div>
+        <div class="card-balance" v-if="card.used_limit">{{ formatCurrency(card.used_limit) }}</div>
       </div>
-      <div class="card-progress" v-if="card.usedLimit && card.totalLimit">
+      <div class="card-progress" v-if="card.used_limit && card.total_limit">
         <div class="progress-bar">
           <div class="progress-fill" :style="{ width: progress + '%' }"></div>
         </div>
-        <div class="card-available">额度: {{ formatCurrency(card.totalLimit) }} | 已用: {{ formatCurrency(card.usedLimit) }}</div>
+        <div class="card-available">额度: {{ formatCurrency(card.total_limit) }} | 已用: {{ formatCurrency(card.used_limit) }}</div>
       </div>
       <div class="card-details" v-if="card.days">
         <span class="card-days">{{ card.days }}</span>
@@ -29,39 +29,19 @@ const props = defineProps({
   }
 })
 
-const iconClass = computed(() => {
-  switch (props.card.name) {
-    case '花呗':
-      return 'huabei-icon'
-    case '京东白条':
-      return 'jingdong-icon'
-    case '今日免息':
-      return 'free-icon'
-    default:
-      return ''
-  }
-})
-
-const iconText = computed(() => {
-  switch (props.card.name) {
-    case '花呗':
-      return '花'
-    case '京东白条':
-      return 'JD'
-    case '今日免息':
-      return '免'
-    default:
-      return ''
-  }
-})
-
 const progress = computed(() => {
-  if (!props.card.usedLimit || !props.card.totalLimit || props.card.totalLimit === 0) return 0
-  return (props.card.usedLimit / props.card.totalLimit) * 100
+  if (!props.card.used_limit || !props.card.total_limit || props.card.total_limit === 0) return 0
+  return (props.card.used_limit / props.card.total_limit) * 100
 })
+
+const emit = defineEmits(['click'])
 
 const formatCurrency = (value: number) => {
   return '¥' + value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+const handleClick = () => {
+  emit('click', props.card.id)
 }
 </script>
 
@@ -71,6 +51,11 @@ const formatCurrency = (value: number) => {
   align-items: center;
   padding-top: 15px;
   border-top: 1px solid #f0f0f0;
+  cursor: pointer;
+}
+
+.credit-card-item:active {
+  background-color: #f5f5f5;
 }
 
 .credit-card-item:first-child {
@@ -84,39 +69,12 @@ const formatCurrency = (value: number) => {
   border-radius: 50%;
   display: flex;
   align-items: center;
+  background-color: #409eff;
   justify-content: center;
   margin-right: 12px;
   font-size: 12px;
   font-weight: bold;
   color: white;
-}
-
-.card-icon免 {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background-color: #ff6b6b;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-right: 12px;
-  color: white;
-  font-weight: bold;
-  font-size: 12px;
-}
-
-.card-icon京东白条 {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background-color: #6a42f4;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-right: 12px;
-  color: white;
-  font-weight: bold;
-  font-size: 12px;
 }
 
 .card-info {

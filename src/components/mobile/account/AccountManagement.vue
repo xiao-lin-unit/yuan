@@ -56,7 +56,7 @@
         </div>
       </div>
 
-      <CreditCardItem v-for="card in creditCards" :key="card.id" :card="card" v-if="isCreditCardExpanded" />
+      <CreditCardItem v-for="card in creditCards" :key="card.id" :card="card" v-if="isCreditCardExpanded" @click="navigateToAccountDetail" />
     </div>
 
     <!-- 资金部分 -->
@@ -68,7 +68,7 @@
           <el-icon class="arrow-icon" :class="{ 'rotated': !isFundExpanded }"><ArrowDown /></el-icon>
         </div>
       </div>
-      <FundItem v-for="fund in funds" :key="fund.id" :fund="fund" v-if="isFundExpanded" />
+      <FundItem v-for="fund in funds" :key="fund.id" :fund="fund" v-if="isFundExpanded" @click="navigateToAccountDetail" />
     </div>
 
     <!-- 其他资金部分 -->
@@ -80,7 +80,7 @@
           <el-icon class="arrow-icon" :class="{ 'rotated': !isOtherFundExpanded }"><ArrowDown /></el-icon>
         </div>
       </div>
-      <FundItem v-for="fund in otherFunds" :key="fund.id" :fund="fund" v-if="isOtherFundExpanded" />
+      <FundItem v-for="fund in otherFunds" :key="fund.id" :fund="fund" v-if="isOtherFundExpanded" @click="navigateToAccountDetail" />
     </div>
 
     <!-- 浮动操作按钮 -->
@@ -103,13 +103,13 @@
           <el-input v-model.number="accountForm.balance" placeholder="请输入余额" type="number" step="0.01" />
         </el-form-item>
         <el-form-item label="已用额度" v-if="accountForm.type === '信用卡'">
-          <el-input v-model.number="accountForm.usedLimit" placeholder="请输入已用额度" type="number" step="0.01" />
+          <el-input v-model.number="accountForm.used_limit" placeholder="请输入已用额度" type="number" step="0.01" />
         </el-form-item>
         <el-form-item label="总额度" v-if="accountForm.type === '信用卡'">
-          <el-input v-model.number="accountForm.totalLimit" placeholder="请输入总额度" type="number" step="0.01" />
+          <el-input v-model.number="accountForm.total_limit" placeholder="请输入总额度" type="number" step="0.01" />
         </el-form-item>
-        <el-form-item label="流动资金" v-if="accountForm.type !== '信用卡' && accountForm.type !== '社保卡'">
-          <el-switch v-model="accountForm.isLiquid" />
+        <el-form-item label="流动资金" v-if="accountForm.type !== '信用卡' && accountForm.type !== '社保卡' && accountForm.type !== '公积金'">
+          <el-switch v-model="accountForm.is_liquid" />
         </el-form-item>
         <el-form-item label="备注">
           <el-input v-model="accountForm.remark" placeholder="请输入备注" />
@@ -150,16 +150,18 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onActivated, computed } from 'vue'
-import { useAccountStore } from '../../../stores/account'
 import CreditCardItem from './CreditCardItem.vue'
 import FundItem from './FundItem.vue'
 import FloatingActionMenu from '../../common/FloatingActionMenu.vue'
 import { ArrowDown, View, More, Plus, RefreshLeft, DataLine } from '@element-plus/icons-vue'
 import { accountTypes, adjustmentTypes } from '../../../utils/dictionaries'
+import { getAccounts, updateAccount as updateAccountService, deleteAccount as deleteAccountService, adjustBalance as adjustBalanceService } from '../../../services/account/accountService'
+import type { Account } from '../../../types/account/account'
 
 const emit = defineEmits(['navigate'])
 
-const accountStore = useAccountStore()
+// 账户数据
+const accounts = ref<Account[]>([])
 
 const dialogVisible = ref({
   add: false,
@@ -172,14 +174,14 @@ const accountForm = ref({
   name: '',
   type: '',
   balance: 0,
-  usedLimit: 0,
-  totalLimit: 0,
-  isLiquid: true,
+  used_limit: 0,
+  total_limit: 0,
+  is_liquid: true,
   remark: ''
 })
 
 const adjustForm = ref({
-  accountId: '',
+  account_id: '',
   type: '',
   amount: 0,
   remark: ''
@@ -187,14 +189,14 @@ const adjustForm = ref({
 
 // 计算数据
 const totalAssets = computed(() => {
-  return accountStore.accounts.reduce((total, account) => {
+  return accounts.value.reduce((total, account) => {
     if (account.balance > 0 && account.is_liquid !== 0 && account.is_liquid !== false) return total + account.balance
     return total
   }, 0)
 })
 
 const totalLiabilities = computed(() => {
-  return accountStore.accounts.reduce((total, account) => {
+  return accounts.value.reduce((total, account) => {
     if (account.type === '信用卡') {
       return total + (account.used_limit || 0)
     } else if (account.balance < 0) {
@@ -209,11 +211,11 @@ const netWorth = computed(() => {
 })
 
 const assetsCount = computed(() => {
-  return accountStore.accounts.filter(account => account.balance > 0).length
+  return accounts.value.filter(account => account.balance > 0).length
 })
 
 const liabilitiesCount = computed(() => {
-  return accountStore.accounts.filter(account => account.type === '信用卡' || account.balance < 0).length
+  return accounts.value.filter(account => account.type === '信用卡' || account.balance < 0).length
 })
 
 const debtRatio = computed(() => {
@@ -230,20 +232,22 @@ const totalBorrowed = ref(0)
 const totalLent = ref(40000)
 
 // 从accounts中计算信用卡和资金数据
+// 信用卡列表
 const creditCards = computed(() => {
-  return accountStore.accounts
+  return accounts.value
     .filter(account => account.type === '信用卡')
     .map(account => ({
       id: account.id,
       name: account.name,
-      usedLimit: account.used_limit || 0,
-      totalLimit: account.total_limit || 0
+      used_limit: account.used_limit || 0,
+      total_limit: account.total_limit || 0
     }))
 })
 
+// 流动资金列表（is_liquid = 1 或 true，且不是信用卡）
 const funds = computed(() => {
-  return accountStore.accounts
-    .filter(account => account.type !== '信用卡' && (account.is_liquid === 1 || account.is_liquid === true || account.is_liquid === undefined || account.is_liquid === null))
+  return accounts.value
+    .filter(account => account.type !== '信用卡' && (account.is_liquid === 1 || account.is_liquid === true))
     .map(account => ({
       id: account.id,
       name: account.name,
@@ -251,8 +255,9 @@ const funds = computed(() => {
     }))
 })
 
+// 其他资金列表（不是信用卡且is_liquid = 0 或 false）
 const otherFunds = computed(() => {
-  return accountStore.accounts
+  return accounts.value
     .filter(account => account.type !== '信用卡' && (account.is_liquid === 0 || account.is_liquid === false))
     .map(account => ({
       id: account.id,
@@ -301,6 +306,11 @@ const openDatabaseViewer = () => {
   emit('navigate', 'databaseViewer')
 }
 
+// 跳转到账户详情页面
+const navigateToAccountDetail = (accountId: string) => {
+  emit('navigate', { key: 'accountDetail', params: { accountId } })
+}
+
 // 定义按钮列表
 const actionButtons = [
   {
@@ -325,27 +335,36 @@ const formatCurrency = (value: number = 0) => {
   return '¥' + value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
+// 加载账户数据
+const loadAccounts = async () => {
+  try {
+    accounts.value = await getAccounts()
+  } catch (error) {
+    console.error('加载账户失败:', error)
+  }
+}
+
 onMounted(() => {
-  accountStore.loadAccounts()
+  loadAccounts()
 })
 
 onActivated(() => {
-  accountStore.loadAccounts()
+  loadAccounts()
 })
 
 const openEditAccountDialog = (account: any) => {
   accountForm.value = { 
     ...account,
-    usedLimit: account.used_limit || 0,
-    totalLimit: account.total_limit || 0,
-    isLiquid: account.is_liquid === 1 || account.is_liquid === true
+    used_limit: account.used_limit || 0,
+    total_limit: account.total_limit || 0,
+    is_liquid: account.is_liquid === 1 || account.is_liquid === true
   }
   dialogVisible.value.edit = true
 }
 
 const openBalanceAdjustDialog = (account: any) => {
   adjustForm.value = {
-    accountId: account.id,
+    account_id: account.id,
     type: '',
     amount: 0,
     remark: ''
@@ -353,20 +372,46 @@ const openBalanceAdjustDialog = (account: any) => {
   dialogVisible.value.adjust = true
 }
 
-
-
-const updateAccount = () => {
-  accountStore.updateAccount(accountForm.value)
-  dialogVisible.value.edit = false
+const updateAccount = async () => {
+  try {
+    await updateAccountService(accountForm.value.id, {
+      name: accountForm.value.name,
+      type: accountForm.value.type,
+      balance: accountForm.value.balance,
+      used_limit: accountForm.value.used_limit,
+      total_limit: accountForm.value.total_limit,
+      is_liquid: accountForm.value.is_liquid,
+      remark: accountForm.value.remark
+    })
+    await loadAccounts()
+    dialogVisible.value.edit = false
+  } catch (error) {
+    console.error('更新账户失败:', error)
+  }
 }
 
-const deleteAccount = (id: string) => {
-  accountStore.deleteAccount(id)
+const deleteAccount = async (id: string) => {
+  try {
+    await deleteAccountService(id)
+    await loadAccounts()
+  } catch (error) {
+    console.error('删除账户失败:', error)
+  }
 }
 
-const adjustBalance = () => {
-  accountStore.adjustBalance(adjustForm.value)
-  dialogVisible.value.adjust = false
+const adjustBalance = async () => {
+  try {
+    await adjustBalanceService({
+      account_id: adjustForm.value.account_id,
+      type: adjustForm.value.type,
+      amount: adjustForm.value.amount,
+      remark: adjustForm.value.remark
+    })
+    await loadAccounts()
+    dialogVisible.value.adjust = false
+  } catch (error) {
+    console.error('调整余额失败:', error)
+  }
 }
 </script>
 
@@ -621,7 +666,7 @@ const adjustBalance = () => {
     height: 50px;
   }
   
-  .floating-action-button deep(el-icon) {
+  .floating-action-menu :deep(.floating-action-button el-icon) {
     font-size: 20px;
   }
 }

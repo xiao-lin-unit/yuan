@@ -19,14 +19,14 @@
         <el-form-item label="余额" v-if="accountForm.type !== '信用卡'">
           <el-input v-model.number="accountForm.balance" placeholder="请输入余额" type="number" step="0.01" />
         </el-form-item>
-        <el-form-item label="流动资金" v-if="accountForm.type !== '信用卡' && accountForm.type !== '社保卡'">
-          <el-switch v-model="accountForm.isLiquid" />
-        </el-form-item>
         <el-form-item label="已用额度" v-if="accountForm.type === '信用卡'">
-          <el-input v-model.number="accountForm.usedLimit" placeholder="请输入已用额度" type="number" step="0.01" />
+          <el-input v-model.number="accountForm.used_limit" placeholder="请输入已用额度" type="number" step="0.01" />
         </el-form-item>
         <el-form-item label="总额度" v-if="accountForm.type === '信用卡'">
-          <el-input v-model.number="accountForm.totalLimit" placeholder="请输入总额度" type="number" step="0.01" />
+          <el-input v-model.number="accountForm.total_limit" placeholder="请输入总额度" type="number" step="0.01" />
+        </el-form-item>
+        <el-form-item label="流动资金" v-if="accountForm.type !== '信用卡' && accountForm.type !== '社保卡' && accountForm.type !== '公积金'">
+          <el-switch v-model="accountForm.is_liquid" />
         </el-form-item>
         <el-form-item label="备注">
           <el-input v-model="accountForm.remark" placeholder="请输入备注" />
@@ -39,28 +39,27 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import PageTemplate from '../../common/PageTemplate.vue'
-import { useAccountStore } from '../../../stores/account'
 import { accountTypes } from '../../../utils/dictionaries'
+import { addAccount as addAccountService } from '../../../services/account/accountService'
 
 const emit = defineEmits(['navigate'])
-const accountStore = useAccountStore()
 
 const accountForm = ref({
   name: '',
   type: '',
   balance: 0,
-  usedLimit: 0,
-  totalLimit: 0,
-  isLiquid: true,
+  used_limit: 0,
+  total_limit: 0,
+  is_liquid: true,
   remark: ''
 })
 
 // 监听账户类型变化，自动更新流动资金状态
 watch(() => accountForm.value.type, (newType) => {
-  if (newType === '信用卡' || newType === '社保卡') {
-    accountForm.value.isLiquid = false
+  if (newType === '信用卡' || newType === '社保卡' || newType === '公积金') {
+    accountForm.value.is_liquid = false
   } else if (newType) {
-    accountForm.value.isLiquid = true
+    accountForm.value.is_liquid = true
   }
 })
 
@@ -80,14 +79,22 @@ const addAccount = async () => {
   }
   
   if (accountForm.value.type === '信用卡' || accountForm.value.type === '社保卡' || accountForm.value.type === '公积金') {
-    accountForm.value.isLiquid = false
+    accountForm.value.is_liquid = false
   } else if (accountForm.value.type) {
-    accountForm.value.isLiquid = true
+    accountForm.value.is_liquid = true
   }
 
   try {
     console.log('Submitting account form:', accountForm.value)
-    await accountStore.addAccount(accountForm.value)
+    await addAccountService({
+      name: accountForm.value.name,
+      type: accountForm.value.type,
+      balance: accountForm.value.balance,
+      used_limit: accountForm.value.used_limit,
+      total_limit: accountForm.value.total_limit,
+      is_liquid: accountForm.value.is_liquid,
+      remark: accountForm.value.remark
+    })
     console.log('Account added successfully, navigating back...')
     emit('navigate', 'account')
   } catch (error: any) {

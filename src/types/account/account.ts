@@ -11,6 +11,7 @@ export interface Account {
   used_limit?: number
   total_limit?: number
   is_liquid?: boolean | number
+  status?: string
   remark?: string
   created_at?: Date | string
   updated_at?: Date | string
@@ -33,15 +34,15 @@ export interface AccountInput {
   name: string
   type: string
   balance: number
-  usedLimit?: number
-  totalLimit?: number
-  isLiquid?: boolean
+  used_limit?: number
+  total_limit?: number
+  is_liquid?: boolean
   remark?: string
 }
 
 // Input for balance adjustment
 export interface BalanceAdjustInput {
-  accountId: string
+  account_id: string
   type: string
   amount: number
   remark?: string
@@ -49,8 +50,17 @@ export interface BalanceAdjustInput {
 
 // Input for transfer
 export interface TransferInput {
-  fromAccountId: string
-  toAccountId: string
+  from_account_id: string
+  to_account_id: string
   amount: number
+  remark?: string
+}
+
+// Input for credit card repayment
+export interface RepayCreditCardInput {
+  credit_card_id: string
+  from_account_id: string
+  amount: number
+  transaction_time: Date
   remark?: string
 }

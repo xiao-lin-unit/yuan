@@ -41,6 +41,8 @@ import FinancialKnowledge from './components/mobile/financial/FinancialKnowledge
 import MoreFeatures from './components/mobile/more/MoreFeatures.vue'
 import ExpensePage from './components/mobile/expense/ExpensePage.vue'
 import AddAccountPage from './components/mobile/account/AddAccountPage.vue'
+import AccountDetailPage from './components/mobile/account/AccountDetailPage.vue'
+import RepayCreditCardPage from './components/mobile/account/RepayCreditCardPage.vue'
 import AddExpensePage from './components/mobile/expense/AddExpensePage.vue'
 import ExpenseStats from './components/mobile/expense/ExpenseStats.vue'
 import DatabaseViewer from './components/mobile/DatabaseViewer.vue'
@@ -70,6 +72,8 @@ const selectedMonth = ref(3);
     const componentMap: Record<string, any> = {
       account: MobileAccountManagement,
       addAccount: AddAccountPage,
+      accountDetail: AccountDetailPage,
+      repayCreditCard: RepayCreditCardPage,
       expense: ExpensePage, // 映射到支出页面组件
       addExpense: AddExpensePage, // 映射到新增支出页面组件
       expenseStats: ExpenseStats, // 映射到支出统计页面组件
@@ -139,6 +143,16 @@ const componentProps = computed(() => {
   // 为通用资产详情页面传递assetId参数
   if (activeMenu.value === 'assetDetail' && navParams.value.assetId) {
     props.assetId = navParams.value.assetId;
+  }
+
+  // 为账户详情页面传递accountId参数
+  if (activeMenu.value === 'accountDetail' && navParams.value.accountId) {
+    props.accountId = navParams.value.accountId;
+  }
+
+  // 为信用卡还款页面传递accountId参数
+  if (activeMenu.value === 'repayCreditCard' && navParams.value.accountId) {
+    props.accountId = navParams.value.accountId;
   }
   
   return props;

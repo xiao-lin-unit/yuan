@@ -442,6 +442,7 @@ class DatabaseManager {
               used_limit REAL DEFAULT 0,
               total_limit REAL DEFAULT 0,
               is_liquid INTEGER DEFAULT 1,
+              status TEXT DEFAULT '启用',
               remark TEXT,
               created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
               updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

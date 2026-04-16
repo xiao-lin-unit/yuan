@@ -15,6 +15,14 @@ import type {
   StockDetail
 } from '../../types/asset/stock.js'
 import { calculateTotalCost, calculateCostPrice, calculateWeightedCostPrice, calculateSellProfit } from '../../utils/calculations.js'
+import { createDebitTransaction, createCreditTransaction } from '../account/accountService.js'
+
+/**
+ * Get all stocks
+ */
+export async function getAllStocks(): Promise<Stock[]> {
+  return await db.query('SELECT * FROM stocks ORDER BY created_at DESC')
+}
 
 /**
  * Validate stock code format (6 digits)
@@ -62,9 +70,8 @@ export async function addStock(stockData: StockInput): Promise<void> {
   const stockId = Date.now().toString()
   const totalCost = calculateTotalCost(stockData.price, stockData.quantity, stockData.fee)
 
-  // Get account balance for transaction recording
-  const accountData = await db.query('SELECT balance FROM accounts WHERE id = ?', [stockData.account_id])
-  const accountBalance = accountData.length > 0 ? accountData[0].balance : 0
+  // 使用新的出账接口
+  const debitResult = await createDebitTransaction(stockData.account_id, totalCost, `股票买入：${stockData.name}`)
 
   // Calculate cost price
   const costPrice = calculateCostPrice(stockData.price, stockData.quantity, stockData.fee)
@@ -123,27 +130,8 @@ export async function addStock(stockData: StockInput): Promise<void> {
     ]
   })
 
-  // Deduct account balance
-  statements.push({
-    statement: 'UPDATE accounts SET balance = balance - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-    values: [totalCost, stockData.account_id]
-  })
-
-  // Create account transaction record
-  const accountTransactionId = Date.now().toString() + '_acc'
-  statements.push({
-    statement: `INSERT INTO account_transactions (id, account_id, type, amount, balance_after, description, transaction_time) 
-                VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    values: [
-      accountTransactionId,
-      stockData.account_id,
-      '支出',
-      totalCost,
-      accountBalance - totalCost,
-      `股票买入：${stockData.name}`,
-      stockData.transaction_time
-    ]
-  })
+  // 使用出账接口返回的SQL语句（已包含账户更新和交易记录）
+  statements.push(...debitResult.statements)
 
   await db.executeTransaction(statements)
 }
@@ -167,6 +155,9 @@ export async function buyStock(stockId: string, buyData: StockBuyInput): Promise
 
   const totalCost = calculateTotalCost(buyData.price, buyData.quantity, buyData.fee)
 
+  // 使用新的出账接口
+  const debitResult = await createDebitTransaction(buyData.account_id, totalCost, `股票买入：${currentStock.name}`)
+
   // Calculate new cost price using weighted average
   const newCostPrice = calculateWeightedCostPrice(
     currentStock.cost_price,
@@ -180,7 +171,6 @@ export async function buyStock(stockId: string, buyData: StockBuyInput): Promise
   // Prepare transaction statements
   const holdingId = Date.now().toString() + '_hold'
   const transactionId = Date.now().toString()
-  const accountTransactionId = Date.now().toString() + '_acc'
 
   const statements = [
     // Create stock holding record
@@ -219,25 +209,8 @@ export async function buyStock(stockId: string, buyData: StockBuyInput): Promise
       statement: `UPDATE stocks SET quantity = ?, current_price = ?, cost_price = ?, ended = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
       values: [newQuantity, buyData.price, newCostPrice, 0, stockId]
     },
-    // Deduct account balance
-    {
-      statement: 'UPDATE accounts SET balance = balance - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-      values: [totalCost, buyData.account_id]
-    },
-    // Create account transaction record
-    {
-      statement: `INSERT INTO account_transactions (id, account_id, type, amount, balance_after, description, transaction_time) 
-                  VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      values: [
-        accountTransactionId,
-        buyData.account_id,
-        '支出',
-        totalCost,
-        accountCheck.currentBalance - totalCost,
-        `股票买入：${currentStock.name}`,
-        buyData.transaction_time
-      ]
-    }
+    // 使用出账接口返回的SQL语句（已包含账户更新和交易记录）
+    ...debitResult.statements
   ]
 
   await db.executeTransaction(statements)
@@ -337,31 +310,11 @@ export async function sellStock(stockId: string, sellData: StockSellInput): Prom
   // Calculate net proceeds
   const netProceeds = (sellData.price * sellData.quantity) - sellData.fee
 
-  // Get current account balance
-  const accountData = await db.query('SELECT balance FROM accounts WHERE id = ?', [sellData.account_id])
-  const currentBalance = accountData.length > 0 ? accountData[0].balance : 0
+  // 使用新的入账接口（已包含账户更新和交易记录）
+  const creditResult = await createCreditTransaction(sellData.account_id, netProceeds, `股票卖出：${stock.name}`)
 
-  // Add to account balance
-  statements.push({
-    statement: 'UPDATE accounts SET balance = balance + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-    values: [netProceeds, sellData.account_id]
-  })
-
-  // Create account transaction record
-  const accountTransactionId = Date.now().toString() + '_acc'
-  statements.push({
-    statement: `INSERT INTO account_transactions (id, account_id, type, amount, balance_after, description, transaction_time) 
-                VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    values: [
-      accountTransactionId,
-      sellData.account_id,
-      '收入',
-      netProceeds,
-      currentBalance + netProceeds,
-      `股票卖出：${stock.name}`,
-      sellData.transaction_time
-    ]
-  })
+  // 添加入账接口返回的SQL语句
+  statements.push(...creditResult.statements)
 
   await db.executeTransaction(statements)
 
@@ -373,33 +326,33 @@ export async function sellStock(stockId: string, sellData: StockSellInput): Prom
 }
 
 /**
- * Get stock detail information
+ * Get stock detail by ID
  */
 export async function getStockDetail(stockId: string): Promise<StockDetail> {
-  const stockData = await db.query('SELECT * FROM stocks WHERE id = ?', [stockId])
-
-  if (stockData.length === 0) {
+  const stock = await db.query('SELECT * FROM stocks WHERE id = ?', [stockId])
+  if (stock.length === 0) {
     throw new Error('股票不存在')
   }
 
-  const stock = stockData[0]
-  const quantity = stock.quantity || 0
-  const currentPrice = stock.current_price || 0
-  const costPrice = stock.cost_price || 0
+  const s = stock[0]
 
-  const costAmount = quantity * costPrice
-  const marketValue = quantity * currentPrice
+  // Calculate derived values
+  const costAmount = s.cost_price * s.quantity
+  const currentAmount = s.current_price * s.quantity
+  const totalReturn = currentAmount - costAmount
+  const confirmedReturn = s.confirmed_profit || 0
+  const holdReturn = totalReturn - confirmedReturn
 
   return {
-    id: stock.id,
-    name: stock.name || '未知股票',
-    code: stock.code || '',
-    quantity,
-    currentPrice,
-    costPrice,
+    id: s.id,
+    name: s.name,
+    code: s.code,
     costAmount,
-    confirmedProfit: stock.confirmed_profit || 0,
-    marketValue
+    costPrice: s.cost_price,
+    currentPrice: s.current_price,
+    quantity: s.quantity,
+    confirmedProfit: confirmedReturn,
+    marketValue: currentAmount
   }
 }
 
@@ -407,65 +360,35 @@ export async function getStockDetail(stockId: string): Promise<StockDetail> {
  * Get stock holdings
  */
 export async function getStockHoldings(stockId: string): Promise<StockHolding[]> {
-  const holdingData = await db.query(
-    'SELECT * FROM stock_holdings WHERE stock_id = ? ORDER BY transaction_time DESC',
+  return await db.query(
+    'SELECT * FROM stock_holdings WHERE stock_id = ? ORDER BY transaction_time ASC',
     [stockId]
   )
-
-  return holdingData.map((holding: any) => ({
-    ...holding,
-    price: holding.price || 0,
-    quantity: holding.quantity || 0,
-    remaining_quantity: holding.remaining_quantity || 0,
-    fee: holding.fee || 0,
-    sell_status: holding.sell_status || '未卖出',
-    transaction_time: holding.transaction_time || new Date()
-  }))
 }
 
 /**
- * Get stock transactions
+ * Get stock transactions (buy and sell)
  */
 export async function getStockTransactions(stockId: string): Promise<{ buyTransactions: StockTransaction[]; sellTransactions: StockTransaction[] }> {
-  const transactionData = await db.query(
+  const transactions = await db.query(
     'SELECT * FROM stock_transactions WHERE stock_id = ? ORDER BY transaction_time DESC',
     [stockId]
   )
 
-  const buyTransactions = transactionData
-    .filter((transaction: any) => transaction.type === '买入')
-    .map((transaction: any) => ({
-      ...transaction,
-      price: transaction.price || 0,
-      quantity: transaction.quantity || 0,
-      fee: transaction.fee || 0,
-      transaction_time: transaction.transaction_time || new Date()
-    }))
-
-  const sellTransactions = transactionData
-    .filter((transaction: any) => transaction.type === '卖出')
-    .map((transaction: any) => ({
-      ...transaction,
-      price: transaction.price || 0,
-      quantity: transaction.quantity || 0,
-      fee: transaction.fee || 0,
-      transaction_time: transaction.transaction_time || new Date()
-    }))
-
-  return { buyTransactions, sellTransactions }
-}
-
-/**
- * Get all stocks
- */
-export async function getAllStocks(): Promise<Stock[]> {
-  return await db.query('SELECT * FROM stocks ORDER BY created_at DESC')
+  return {
+    buyTransactions: transactions.filter((t: StockTransaction) => t.type === '买入'),
+    sellTransactions: transactions.filter((t: StockTransaction) => t.type === '卖出')
+  }
 }
 
 /**
  * Update stock current price
  */
 export async function updateStockPrice(stockId: string, newPrice: number): Promise<void> {
+  if (newPrice <= 0) {
+    throw new Error('股价必须大于0')
+  }
+
   await db.run(
     'UPDATE stocks SET current_price = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
     [newPrice, stockId]
@@ -473,7 +396,7 @@ export async function updateStockPrice(stockId: string, newPrice: number): Promi
 }
 
 /**
- * Get stock by ID
+ * Get stock by ID (basic info)
  */
 export async function getStockById(stockId: string): Promise<Stock | null> {
   const result = await db.query('SELECT * FROM stocks WHERE id = ?', [stockId])

@@ -142,7 +142,7 @@ const accounts = computed(() => {
   console.log("账户列表：", JSON.stringify(accountStore.accounts))
   return accountStore.accounts.filter(account => {
     console.log("账户：", JSON.stringify(account))
-    return account.isLiquid || account.type === '信用卡'
+    return account.is_liquid || account.type === '信用卡'
   })
 })
 
@@ -394,13 +394,13 @@ const saveExpense = async () => {
     return
   }
 
-  if (selectedAccountObj.isLiquid) {
+  if (selectedAccountObj.is_liquid) {
     if (selectedAccountObj.balance < amountNumber) {
       alert(`账户余额不足，当前余额: ¥${selectedAccountObj.balance}`)
       return
     }
   } else if (selectedAccountObj.type === '信用卡') {
-    const availableLimit = selectedAccountObj.totalLimit - selectedAccountObj.usedLimit
+    const availableLimit = selectedAccountObj.total_limit - selectedAccountObj.used_limit
     if (availableLimit < amountNumber) {
       alert(`信用卡可用额度不足，当前可用额度: ¥${availableLimit}`)
       return
@@ -408,12 +408,12 @@ const saveExpense = async () => {
   }
 
   let newBalance = selectedAccountObj.balance
-  let newUsedLimit = selectedAccountObj.usedLimit
+  let newUsedLimit = selectedAccountObj.used_limit
 
-  if (selectedAccountObj.isLiquid) {
+  if (selectedAccountObj.is_liquid) {
     newBalance = selectedAccountObj.balance - amountNumber
   } else if (selectedAccountObj.type === '信用卡') {
-    newUsedLimit = selectedAccountObj.usedLimit + amountNumber
+    newUsedLimit = selectedAccountObj.used_limit + amountNumber
   }
 
   try {
@@ -442,7 +442,7 @@ const saveExpense = async () => {
       statement: '',
       values: []
     }
-    if (selectedAccountObj.isLiquid) {
+    if (selectedAccountObj.is_liquid) {
         udpate.statement = 'UPDATE accounts SET balance = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
         udpate.values = [newBalance, selectedAccountObj.id]
     } else {

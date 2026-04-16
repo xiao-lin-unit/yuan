@@ -1,6 +1,6 @@
 <template>
-  <div class="fund-item">
-    <div class="fund-icon" :class="'fund-icon' + fund.name">
+  <div class="fund-item" @click="handleClick">
+    <div class="fund-icon" :class="'fund-icon'">
       {{ fund.name.charAt(0) }}
     </div>
     <div class="fund-name">{{ fund.name }}</div>
@@ -16,8 +16,14 @@ const props = defineProps({
   }
 })
 
+const emit = defineEmits(['click'])
+
 const formatCurrency = (value: number) => {
   return '¥' + value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+const handleClick = () => {
+  emit('click', props.fund.id)
 }
 </script>
 
@@ -27,6 +33,11 @@ const formatCurrency = (value: number) => {
   align-items: center;
   padding: 15px 0;
   border-top: 1px solid #f0f0f0;
+  cursor: pointer;
+}
+
+.fund-item:active {
+  background-color: #f5f5f5;
 }
 
 .fund-item:first-child {
@@ -47,34 +58,6 @@ const formatCurrency = (value: number) => {
   font-weight: bold;
   color: white;
 }
-
-/* .fund-icon招商银行 {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background-color: #409eff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-right: 12px;
-  color: white;
-  font-weight: bold;
-  font-size: 12px;
-}
-
-.fund-icon中国银行 {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background-color: #f56c6c;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-right: 12px;
-  color: white;
-  font-weight: bold;
-  font-size: 12px;
-} */
 
 .fund-name {
   flex: 1;
