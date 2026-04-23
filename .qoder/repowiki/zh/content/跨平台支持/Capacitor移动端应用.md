@@ -11,6 +11,9 @@
 - [scripts/postinstall.js](file://scripts/postinstall.js)
 - [src/components/mobile/account/AccountManagement.vue](file://src/components/mobile/account/AccountManagement.vue)
 - [src/components/mobile/expense/ExpensePage.vue](file://src/components/mobile/expense/ExpensePage.vue)
+- [src/components/mobile/expense/AddExpensePage.vue](file://src/components/mobile/expense/AddExpensePage.vue)
+- [src/components/mobile/expense/NumberKeypad.vue](file://src/components/mobile/expense/NumberKeypad.vue)
+- [src/components/mobile/account/AccountForm.vue](file://src/components/mobile/account/AccountForm.vue)
 - [src/database/index.js](file://src/database/index.js)
 - [src/stores/account.ts](file://src/stores/account.ts)
 - [src/database/adapter.js](file://src/database/adapter.js)
@@ -29,7 +32,7 @@
 10. [附录](#附录)
 
 ## 简介
-本项目是一个基于Vue 3和Capacitor的移动端财务管理应用，采用现代前端技术栈构建，支持跨平台部署到iOS和Android平台。应用实现了完整的财务管理体系，包括账户管理、收支记录、资产管理、负债管理和财务分析等功能模块。
+本项目是一个基于Vue 3和Capacitor的移动端财务管理应用，采用现代前端技术栈构建，支持跨平台部署到iOS和Android平台。应用实现了完整的财务管理体系，包括账户管理、收支记录、资产管理、负债管理和财务分析等功能模块。**最新更新**：集成了Capacitor键盘插件系统，通过'none'模式有效防止虚拟键盘导致的页面变形，显著提升了移动端用户体验。
 
 ## 项目结构
 该项目采用模块化架构设计，主要分为以下几个层次：
@@ -40,6 +43,7 @@ subgraph "应用层"
 App[App.vue 主应用]
 Components[组件层]
 Stores[状态管理]
+Keyboard[键盘插件系统]
 end
 subgraph "数据层"
 Database[数据库管理]
@@ -55,6 +59,7 @@ Scripts[构建脚本]
 end
 App --> Components
 App --> Stores
+App --> Keyboard
 Stores --> Database
 Database --> Adapter
 Capacitor --> Platform
@@ -73,13 +78,16 @@ Scripts --> Config
 - [package.json:1-72](file://package.json#L1-L72)
 
 ## 核心组件
-应用的核心组件包括主应用界面、数据库管理系统、状态管理模块和平台适配层。
+应用的核心组件包括主应用界面、数据库管理系统、状态管理模块、**键盘插件系统**和平台适配层。
 
 ### 主应用架构
 应用采用响应式设计，通过Pinia进行状态管理，实现了完整的财务数据生命周期管理。
 
 ### 数据库系统
 实现了跨平台的数据库抽象层，支持Capacitor SQLite和Web环境下的SQL.js两种实现方式。
+
+### 键盘插件系统
+**新增功能**：集成了Capacitor键盘插件，通过配置`"resize": "none"`和JavaScript API调用，有效防止虚拟键盘弹出时导致的页面变形和布局错乱。
 
 ### 插件系统
 集成了多个Capacitor官方插件，包括键盘适配、启动画面等原生功能。
@@ -90,17 +98,19 @@ Scripts --> Config
 - [src/stores/account.ts:27-32](file://src/stores/account.ts#L27-L32)
 
 ## 架构概览
-应用采用分层架构设计，确保了良好的可维护性和扩展性。
+应用采用分层架构设计，确保了良好的可维护性和扩展性。**最新架构**：新增了键盘插件系统层，专门处理移动端键盘交互问题。
 
 ```mermaid
 graph TD
 subgraph "表现层"
 UI[用户界面组件]
 Navigation[导航系统]
+KeyboardUI[键盘UI组件]
 end
 subgraph "业务逻辑层"
 Services[业务服务]
 Validation[数据验证]
+KeyboardLogic[键盘逻辑处理]
 end
 subgraph "数据访问层"
 DataManager[数据管理器]
@@ -109,6 +119,7 @@ end
 subgraph "平台适配层"
 CapacitorBridge[Capacitor桥接]
 NativePlugins[原生插件]
+KeyboardPlugin[键盘插件]
 end
 UI --> Services
 Services --> DataManager
@@ -116,6 +127,9 @@ DataManager --> Cache
 Services --> Validation
 UI --> CapacitorBridge
 CapacitorBridge --> NativePlugins
+NativePlugins --> KeyboardPlugin
+KeyboardPlugin --> KeyboardUI
+KeyboardLogic --> KeyboardPlugin
 ```
 
 **图表来源**
@@ -124,6 +138,47 @@ CapacitorBridge --> NativePlugins
 - [src/stores/account.ts:34-53](file://src/stores/account.ts#L34-L53)
 
 ## 详细组件分析
+
+### 键盘插件系统
+**新增功能**：应用集成了Capacitor键盘插件系统，专门解决移动端虚拟键盘导致的页面变形问题。
+
+```mermaid
+sequenceDiagram
+participant App as 主应用
+participant KeyboardAPI as 键盘API
+participant NativeKeyboard as 原生键盘
+participant CSS as CSS样式系统
+App->>KeyboardAPI : setResizeMode({mode : 'none'})
+KeyboardAPI->>NativeKeyboard : 配置键盘模式
+NativeKeyboard-->>KeyboardAPI : 模式设置成功
+KeyboardAPI-->>App : 初始化完成
+App->>KeyboardAPI : 监听键盘事件
+KeyboardAPI->>App : keyboardWillShow
+App->>CSS : 添加keyboard-open类
+KeyboardAPI->>App : keyboardDidHide
+App->>CSS : 移除keyboard-open类
+```
+
+**图表来源**
+- [src/App.vue:177-203](file://src/App.vue#L177-L203)
+- [capacitor.config.json:10-12](file://capacitor.config.json#L10-L12)
+
+#### 键盘配置详解
+- **配置文件设置**：在`capacitor.config.json`中设置`"resize": "none"`，这是防止页面变形的关键配置
+- **JavaScript初始化**：在`App.vue`中使用`Keyboard.setResizeMode({ mode: 'none' })`进行程序化配置
+- **事件监听**：监听键盘显示/隐藏事件，用于日志记录和状态跟踪
+- **CSS样式配合**：使用`:global(body.keyboard-open)`选择器确保键盘打开时页面布局稳定
+
+#### 键盘交互优化
+- **防止页面上移**：通过'none'模式完全阻止键盘弹出时的页面布局调整
+- **固定容器高度**：确保应用容器始终保持100vh高度，不受键盘影响
+- **底部导航栏可见性**：保证底部导航栏始终可见，提升用户体验
+- **输入焦点管理**：仅监听键盘事件而不直接操作DOM，避免影响输入焦点
+
+**章节来源**
+- [capacitor.config.json:10-12](file://capacitor.config.json#L10-L12)
+- [src/App.vue:177-203](file://src/App.vue#L177-L203)
+- [src/App.vue:206-237](file://src/App.vue#L206-L237)
 
 ### 数据库管理系统
 数据库管理系统是应用的核心基础设施，实现了高性能的数据持久化解决方案。
@@ -268,9 +323,11 @@ Ready --> UserInteraction{用户交互}
 UserInteraction --> |账户操作| AccountOps[账户管理]
 UserInteraction --> |财务分析| FinanceAnalysis[财务分析]
 UserInteraction --> |数据同步| SyncData[数据同步]
+UserInteraction --> |键盘交互| KeyboardInteraction[键盘交互]
 AccountOps --> UpdateUI[更新界面]
 FinanceAnalysis --> UpdateUI
 SyncData --> UpdateUI
+KeyboardInteraction --> UpdateUI
 UpdateUI --> Ready
 ```
 
@@ -287,6 +344,7 @@ Vue[Vue 3.5.32]
 Pinia[Pinia 2.1.7]
 ElementPlus[Element Plus 2.13.7]
 Capacitor[Capacitor 6.1.2]
+KeyboardPlugin[@capacitor/keyboard 6.1.2]
 end
 subgraph "数据库依赖"
 SQLitePlugin[@capacitor-community/sqlite 6.0.1]
@@ -296,6 +354,7 @@ subgraph "开发工具"
 Vite[Vite 5.3.1]
 TypeScript[TypeScript 5.2.2]
 ESLint[ESLint]
+PostInstall[postinstall.js]
 end
 subgraph "原生平台"
 Android[Android 6.1.2]
@@ -306,7 +365,9 @@ Vue --> ElementPlus
 Vue --> Capacitor
 Capacitor --> Android
 Capacitor --> iOS
+Capacitor --> KeyboardPlugin
 Capacitor --> SQLitePlugin
+KeyboardPlugin --> PostInstall
 SQLitePlugin --> SQLJS
 ```
 
@@ -335,6 +396,12 @@ SQLitePlugin --> SQLJS
 - **防抖机制**：对高频操作进行防抖处理，避免过度渲染
 - **虚拟滚动**：对大量数据进行虚拟化处理，提升滚动性能
 - **渐进式加载**：优先加载关键数据，其他数据异步加载
+- **键盘交互优化**：**新增**：通过'none'模式防止键盘导致的页面变形，提升输入体验
+
+### 键盘交互性能优化
+- **事件监听优化**：仅监听必要事件，避免频繁DOM操作
+- **CSS样式优化**：使用全局选择器减少样式计算开销
+- **内存管理**：合理管理键盘事件监听器，避免内存泄漏
 
 ## 故障排除指南
 
@@ -345,14 +412,16 @@ SQLitePlugin --> SQLJS
    - 确认平台兼容性设置
 
 2. **键盘适配问题**
-   - 确认Keyboard插件配置正确
+   - **新增**：确认Keyboard插件配置正确，检查`"resize": "none"`设置
    - 检查键盘事件监听是否正常工作
-   - 验证平台特定的键盘行为
+   - 验证CSS样式是否正确应用
+   - 确认postinstall脚本是否正确修改了Java版本
 
 3. **构建配置问题**
    - 检查Java版本兼容性
    - 验证Android构建选项设置
    - 确认Capacitor CLI版本匹配
+   - **新增**：检查键盘插件的build.gradle文件是否正确修改
 
 **章节来源**
 - [scripts/postinstall.js:40-145](file://scripts/postinstall.js#L40-L145)
@@ -364,7 +433,8 @@ SQLitePlugin --> SQLJS
 1. **跨平台一致性**：统一的代码基础支持iOS和Android平台
 2. **高性能数据处理**：智能的数据库抽象层和缓存机制
 3. **原生功能集成**：完善的Capacitor插件生态系统
-4. **用户体验优化**：针对移动端特点的深度优化
+4. **用户体验优化**：**新增**：通过键盘插件系统有效防止页面变形，显著提升移动端输入体验
+5. **键盘交互优化**：**新增**：通过'none'模式和事件监听机制，确保键盘弹出时的界面稳定性
 
 该应用为类似的企业级财务管理应用提供了优秀的参考模板，展示了如何在保持功能完整性的同时，实现卓越的性能和用户体验。
 
@@ -382,10 +452,11 @@ SQLitePlugin --> SQLJS
 1. **开发环境搭建**：安装Node.js和npm，配置Capacitor CLI
 2. **依赖安装**：执行npm install安装项目依赖
 3. **平台添加**：使用Capacitor CLI添加iOS和Android平台
-4. **代码构建**：使用Vite进行开发构建
-5. **原生平台同步**：执行cap sync同步原生平台代码
-6. **应用调试**：在模拟器或真机上进行调试测试
-7. **生产构建**：生成最终的应用包
+4. **键盘插件配置**：**新增**：确保postinstall脚本正确执行，修改键盘插件的Java版本
+5. **代码构建**：使用Vite进行开发构建
+6. **原生平台同步**：执行cap sync同步原生平台代码
+7. **应用调试**：在模拟器或真机上进行调试测试
+8. **生产构建**：生成最终的应用包
 
 ### 最佳实践建议
 - 定期备份数据库文件
@@ -393,3 +464,5 @@ SQLitePlugin --> SQLJS
 - 进行充分的跨平台测试
 - 优化应用启动时间和内存使用
 - 实施错误监控和日志记录
+- **新增**：定期测试键盘交互功能，确保在不同设备上的兼容性
+- **新增**：监控键盘事件监听器的内存使用情况，避免内存泄漏

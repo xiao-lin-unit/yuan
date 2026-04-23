@@ -301,7 +301,7 @@ const renderCategoryChart = async (labels: string[], data: number[]) => {
       show: true,
       formatter: function(params: any) {
         const data = params.data;
-        return `${data.name} ¥${data.value}`;
+        return `${data.name} ¥${data.value.toFixed(2)} ${data.percentage}%`;
       },
       fontSize: 12,
     },
@@ -313,8 +313,9 @@ const renderCategoryChart = async (labels: string[], data: number[]) => {
     series: [
       {
         type: 'pie',
-        radius: ['30%', '70%'],
-        avoidLabelOverlap: false, // 必须设为false，防止中心label被挪位
+        radius: ['35%', '60%'],
+        center: ['50%', '50%'],
+        avoidLabelOverlap: true,
         itemStyle: {
           borderRadius: 3,
           borderColor: '#fff',
@@ -322,20 +323,26 @@ const renderCategoryChart = async (labels: string[], data: number[]) => {
         },
         label: {
           show: true,
-          fontSize: 12,
+          fontSize: 11,
           formatter: function(params: any) {
             const data = params.data;
-            return `${data.name} ${data.percentage}%`;
+            // Truncate long names to prevent overflow
+            const name = data.name.length > 4 ? data.name.substring(0, 4) + '..' : data.name;
+            return `${name}`;
           },
           position: 'outside'
         },
         emphasis: {
           label: {
-            show: false
+            show: true,
+            fontSize: 12,
+            fontWeight: 'bold'
           }
         },
         labelLine: {
-          show: true
+          show: true,
+          length: 10,
+          length2: 8
         },
         data: chartData
       }
@@ -775,7 +782,7 @@ const handleDateClick = (date) => {
 .category-report-section {
   background-color: white;
   border-radius: 12px;
-  padding: 15px;
+  padding: 15px 20px;
   margin: 0 15px 20px 15px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
@@ -787,11 +794,12 @@ const handleDateClick = (date) => {
 }
 
 .pie-chart-container {
-  height: 300px;
+  height: 320px;
   margin-bottom: 15px;
   display: flex;
   justify-content: center;
   align-items: center;
+  overflow: visible;
 }
 
 /* 分类支出列表 */
