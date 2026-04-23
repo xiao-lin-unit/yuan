@@ -1,5 +1,5 @@
 <template>
-  <div class="expense-stats">
+  <div class="income-stats">
     <!-- 顶部导航栏 -->
     <div class="page-header">
       <el-icon @click="goBack">
@@ -47,8 +47,8 @@
           width="100%"
           :year="selectedYear"
           :month="selectedMonth"
-          :amount="Object.fromEntries(dailyExpenses)"
-          type="expense"
+          :amount="Object.fromEntries(dailyIncomes)" 
+          type="income"
           @click="handleDateClick"
         />
       </div>
@@ -123,11 +123,11 @@ const currentDate = ref(new Date());
 const startDate = ref(new Date(selectedYear.value, selectedMonth.value - 1, 1));
 const endDate = ref(new Date(selectedYear.value, selectedMonth.value, 0));
 
-// 每日支出数据
-const dailyExpenses = ref(new Map<string, number>());
+// 每日收入数据
+const dailyIncomes = ref(new Map<string, number>());
 
-// 从数据库中获取每日支出数据
-const loadDailyExpenses = async () => {
+// 从数据库中获取每日收入数据
+const loadDailyIncomes = async () => {
   try {
     // 连接数据库
     await db.connect();
@@ -136,34 +136,34 @@ const loadDailyExpenses = async () => {
     const start = new Date(selectedYear.value, selectedMonth.value - 1, 1).toISOString();
     const end = new Date(selectedYear.value, selectedMonth.value, 0, 23, 59, 59).toISOString();
     
-    // 从流水表中查询类型为账户支出的记录
+    // 从流水表中查询类型为账户收入的记录
     const transactions = await db.query(
       'SELECT DATE(created_at) as date, SUM(amount) as total FROM transactions WHERE type = ? AND created_at BETWEEN ? AND ? GROUP BY DATE(created_at) ORDER BY date',
-      ['账户支出', start, end]
+      ['账户收入', start, end]
     );
     
     // 处理数据
-    const expensesMap = new Map<string, number>();
+    const incomesMap = new Map<string, number>();
     
     transactions.forEach(transaction => {
-      expensesMap.set(transaction.date, transaction.total);
+      incomesMap.set(transaction.date, transaction.total);
     });
     
-    dailyExpenses.value = expensesMap;
+    dailyIncomes.value = incomesMap;
     
     // 更新日历的开始和结束日期
     startDate.value = new Date(selectedYear.value, selectedMonth.value - 1, 1);
     endDate.value = new Date(selectedYear.value, selectedMonth.value, 0);
     currentDate.value = new Date(selectedYear.value, selectedMonth.value - 1, 1);
   } catch (error) {
-    console.error('加载每日支出数据失败:', error);
+    console.error('加载每日收入数据失败:', error);
   }
 };
 
-// 根据日期获取支出金额
-const getExpenseByDate = (date: Date): number => {
+// 根据日期获取收入金额
+const getIncomeByDate = (date: Date): number => {
   const dateStr = date.toISOString().split('T')[0];
-  return dailyExpenses.value.get(dateStr) || 0;
+  return dailyIncomes.value.get(dateStr) || 0;
 };
 
 // 判断是否是当天
@@ -178,12 +178,12 @@ const isCurrentDay = (date: Date): boolean => {
 const handleMonthChange = (date: Date) => {
   selectedYear.value = date.getFullYear();
   selectedMonth.value = date.getMonth() + 1;
-  loadDailyExpenses();
-  loadCategoryExpenses();
+  loadDailyIncomes();
+  loadCategoryIncomes();
 };
 
-// 从数据库中获取分类支出数据
-const loadCategoryExpenses = async () => {
+// 从数据库中获取分类收入数据
+const loadCategoryIncomes = async () => {
   try {
     // 连接数据库
     await db.connect();
@@ -192,10 +192,10 @@ const loadCategoryExpenses = async () => {
     const startDate = new Date(selectedYear.value, selectedMonth.value - 1, 1).toISOString();
     const endDate = new Date(selectedYear.value, selectedMonth.value, 0, 23, 59, 59).toISOString();
     
-    // 从流水表中查询类型为账户支出的记录，按subType分组
+    // 从流水表中查询类型为账户收入的记录，按subType分组
     const transactions = await db.query(
       'SELECT sub_type as category, SUM(amount) as total FROM transactions WHERE type = ? AND created_at BETWEEN ? AND ? GROUP BY sub_type',
-      ['账户支出', startDate, endDate]
+      ['账户收入', startDate, endDate]
     );
     
     // 处理数据
@@ -210,11 +210,11 @@ const loadCategoryExpenses = async () => {
     // 渲染分类报表图表
     renderCategoryChart(labels, data);
   } catch (error) {
-    console.error('加载分类支出数据失败:', error);
+    console.error('加载分类收入数据失败:', error);
   }
 };
 
-// 从数据库中获取日支出数据
+// 从数据库中获取日收入数据
 const loadDailyChartData = async () => {
   try {
     // 连接数据库
@@ -224,10 +224,10 @@ const loadDailyChartData = async () => {
     const startDate = new Date(selectedYear.value, selectedMonth.value - 1, 1).toISOString();
     const endDate = new Date(selectedYear.value, selectedMonth.value, 0, 23, 59, 59).toISOString();
     
-    // 从流水表中查询类型为账户支出的记录，按日期分组
+    // 从流水表中查询类型为账户收入的记录，按日期分组
     const transactions = await db.query(
       'SELECT DATE(created_at) as date, SUM(amount) as total FROM transactions WHERE type = ? AND created_at BETWEEN ? AND ? GROUP BY DATE(created_at) ORDER BY date',
-      ['账户支出', startDate, endDate]
+      ['账户收入', startDate, endDate]
     );
     
     // 生成当月所有日期
@@ -242,7 +242,7 @@ const loadDailyChartData = async () => {
       data.push(0);
     }
     
-    // 填充有支出的日期数据
+    // 填充有收入的日期数据
     transactions.forEach(transaction => {
       const dateParts = transaction.date.split('-');
       const day = parseInt(dateParts[2]);
@@ -254,7 +254,7 @@ const loadDailyChartData = async () => {
     // 渲染日统计报表图表
     renderDailyChart(labels, data);
   } catch (error) {
-    console.error('加载日支出数据失败:', error);
+    console.error('加载日收入数据失败:', error);
   }
 };
 
@@ -262,9 +262,9 @@ const loadDailyChartData = async () => {
 
 // 渲染分类报表图表
 const renderCategoryChart = async (labels: string[], data: number[]) => {
-  // 获取支出分类的翻译
-  const expenseCategories = await CategoryService.getCategories('expense');
-  const categoryMap = new Map(expenseCategories.map(c => [c.id, c.name]));
+  // 获取收入分类的翻译
+  const incomeCategories = await CategoryService.getCategories('income');
+  const categoryMap = new Map(incomeCategories.map(c => [c.id, c.name]));
   
   // 检查是否有数据
   const hasData = data.length > 0 && data.some(value => value > 0);
@@ -273,12 +273,12 @@ const renderCategoryChart = async (labels: string[], data: number[]) => {
   
   if (hasData) {
     // 有数据时，使用实际数据
-    const totalExpense = data.reduce((sum, val) => sum + val, 0);
+    const totalIncome = data.reduce((sum, val) => sum + val, 0);
     
     chartData = labels.map((label, index) => {
       const translatedName = categoryMap.get(label) || label;
       const value = data[index];
-      const percentage = totalExpense > 0 ? ((value / totalExpense) * 100).toFixed(1) : '0.0';
+      const percentage = totalIncome > 0 ? ((value / totalIncome) * 100).toFixed(1) : '0.0';
       return {
         name: translatedName,
         value: value,
@@ -288,12 +288,12 @@ const renderCategoryChart = async (labels: string[], data: number[]) => {
     });
   } else {
     // 没有数据时，将所有分类平均展示
-    const equalValue = 100 / expenseCategories.length;
-    chartData = expenseCategories.map(category => ({
+    const equalValue = 100 / incomeCategories.length;
+    chartData = incomeCategories.map(category => ({
       name: category.name,
       value: equalValue,
       originalLabel: category.id,
-      percentage: (100 / expenseCategories.length).toFixed(1)
+      percentage: (100 / incomeCategories.length).toFixed(1)
     }));
   }
   
@@ -392,15 +392,15 @@ const renderDailyChart = (labels: string[], data: number[]) => {
         symbolSize: 6,
         lineStyle: {
           width: 1,
-          color: 'rgba(103, 194, 58, 1)'
+          color: 'rgba(245, 108, 108, 1)'
         },
         itemStyle: {
-          color: 'rgba(103, 194, 58, 1)',
+          color: 'rgba(245, 108, 108, 1)',
           borderColor: '#fff',
           borderWidth: 1
         },
         areaStyle: {
-          color: 'rgba(103, 194, 58, 0.2)'
+          color: 'rgba(245, 108, 108, 0.2)'
         }
       }
     ]
@@ -410,8 +410,8 @@ const renderDailyChart = (labels: string[], data: number[]) => {
 // 选择年份
 const selectYear = (year: number) => {
   selectedYear.value = year;
-  loadDailyExpenses();
-  loadCategoryExpenses();
+  loadDailyIncomes();
+  loadCategoryIncomes();
   loadDailyChartData();
 };
 
@@ -419,53 +419,53 @@ const selectYear = (year: number) => {
 const selectMonth = (month: number) => {
   selectedMonth.value = month;
   showDatePicker.value = false;
-  loadDailyExpenses();
-  loadCategoryExpenses();
+  loadDailyIncomes();
+  loadCategoryIncomes();
   loadDailyChartData();
 };
 
 // 返回上一页
 const goBack = () => {
-  emit('navigate', 'expense');
+  emit('navigate', 'income');
 };
 
 // 组件挂载时加载数据
 onMounted(() => {
-  loadDailyExpenses();
-  loadCategoryExpenses();
+  loadDailyIncomes();
+  loadCategoryIncomes();
   loadDailyChartData();
 });
 
 // 组件被激活时重新加载数据
 onActivated(() => {
-  loadDailyExpenses();
-  loadCategoryExpenses();
+  loadDailyIncomes();
+  loadCategoryIncomes();
   loadDailyChartData();
 });
 
 // 监听年份变化，重新加载数据
 watch(selectedYear, () => {
-  loadDailyExpenses();
-  loadCategoryExpenses();
+  loadDailyIncomes();
+  loadCategoryIncomes();
   loadDailyChartData();
 });
 
 // 监听月份变化，重新加载数据
 watch(selectedMonth, () => {
-  loadDailyExpenses();
-  loadCategoryExpenses();
+  loadDailyIncomes();
+  loadCategoryIncomes();
   loadDailyChartData();
 });
 
 // 处理日期点击事件
 const handleDateClick = (date) => {
   console.log('Date clicked:', date);
-  // 可以在这里添加日期点击后的逻辑，例如显示该日期的详细支出信息
+  // 可以在这里添加日期点击后的逻辑，例如显示该日期的详细收入信息
 };
 </script>
 
 <style scoped>
-.expense-stats {
+.income-stats {
   min-height: 100vh;
   background-color: #f5f7fa;
   padding-bottom: 20px;
@@ -695,9 +695,9 @@ const handleDateClick = (date) => {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
-.calendar-day.has-expense {
-  background-color: #ecf5ff;
-  border: 1px solid #d9ecff;
+.calendar-day.has-income {
+  background-color: #fef0f0;
+  border: 1px solid #fde2e2;
 }
 
 .calendar-day.current-day {
@@ -735,9 +735,9 @@ const handleDateClick = (date) => {
   margin-bottom: 2px;
 }
 
-.expense-amount {
+.income-amount {
   font-size: 12px;
-  color: #67c23a;
+  color: #f56c6c;
   font-weight: 500;
   background-color: rgba(255, 255, 255, 0.8);
   padding: 2px 8px;
@@ -745,8 +745,8 @@ const handleDateClick = (date) => {
   margin-top: 2px;
 }
 
-.calendar-day.current-day .expense-amount {
-  color: #409eff;
+.calendar-day.current-day .income-amount {
+  color: #f56c6c;
   background-color: rgba(255, 255, 255, 0.9);
 }
 
@@ -803,7 +803,7 @@ const handleDateClick = (date) => {
   overflow: visible;
 }
 
-/* 分类支出列表 */
+/* 分类收入列表 */
 .category-list-section {
   background-color: white;
   border-radius: 12px;

@@ -1,7 +1,7 @@
 <template>
-  <div class="add-expense-page">
+  <div class="add-income-page">
     <!-- 顶部导航栏 -->
-    <PageHeader title="支出" @back="goBack" />
+    <PageHeader title="收入" @back="goBack" />
     
     
     <!-- 中间内容区域 -->
@@ -99,7 +99,7 @@
       <NumberKeypad 
         @number-click="addNumber"
         @delete="deleteNumber"
-        @save="saveExpense"
+        @save="saveIncome"
       />
     </div>
   </div>
@@ -114,8 +114,8 @@ import CategoryItem from '../../common/CategoryItem.vue'
 import type { Category } from '../../../data/categories'
 import { useAccountStore } from '../../../stores/account'
 import db from '../../../database'
-import { expenseCategories } from '../../../data/categories'
-import { createDebitTransaction } from '../../../services/account/accountService'
+import { incomeCategories } from '../../../data/categories'
+import { createCreditTransaction } from '../../../services/account/accountService'
 import { getCurrentISOString, formatForDB } from '../../../utils/timezone'
 
 const emit = defineEmits(['navigate'])
@@ -145,21 +145,13 @@ const selectedCategory = computed(() => {
   return categories.value.find(c => c.id === selectedCategoryId.value)
 })
 
-// 从store获取账户列表（根据分类类型过滤）
-// 默认：信用卡 + 流动资金账户
-// 医疗类型：额外允许社保账户
+// 从store获取账户列表（收入只允许流入流动储蓄账户和信用卡）
 const accounts = computed(() => {
-  console.log("账户列表：", JSON.stringify(accountStore.accounts))
-  const isMedicalCategory = selectedCategory.value?.name === '医疗' || selectedCategory.value?.id === 'medical'
-  
   return accountStore.accounts.filter(account => {
-    console.log("账户：", JSON.stringify(account))
-    // 信用卡始终允许
-    if (account.type === '信用卡') return true
-    // 流动资金账户始终允许
+    // 流动资金账户始终允许（收入流入）
     if (account.is_liquid) return true
-    // 医疗类型额外允许社保账户
-    if (isMedicalCategory && account.type === '社保卡') return true
+    // 信用卡允许（还款）
+    if (account.type === '信用卡') return true
     
     return false
   })
@@ -221,8 +213,8 @@ const selectCategory = (id: string) => {
 // 加载分类数据
 const loadCategories = async () => {
   try {
-    // 获取支出分类
-    categories.value = expenseCategories
+    // 获取收入分类
+    categories.value = incomeCategories
   } catch (error) {
     console.error('Error loading categories:', error)
   }
@@ -377,14 +369,14 @@ const deleteNumber = () => {
   }
 }
 
-// 保存支出
-const saveExpense = async () => {
+// 保存收入
+const saveIncome = async () => {
   if (selectedAccount.value === '账户') {
     alert('请选择账户')
     return
   }
   if (!selectedCategoryId.value) {
-    alert('请选择支出类型')
+    alert('请选择收入类型')
     return
   }
   if (!amount.value) {
@@ -416,33 +408,33 @@ const saveExpense = async () => {
     const transactionId = Date.now().toString()
     const relatedId = transactionId
     
-    // 使用账户出账接口 - 自动处理余额检查和账户更新
-    const debitResult = await createDebitTransaction(
+    // 使用账户入账接口 - 自动处理余额更新
+    const creditResult = await createCreditTransaction(
       selectedAccountObj.id,
       amountNumber,
-      `支出：${selectedCategory.value?.name || ' '}${remark.value ? '：' + remark.value : ''}`, // 支出类型作为描述，如果不存在则使用空字符串
+      `收入：${selectedCategory.value?.name || ' '}${remark.value ? '：' + remark.value : ''}`,
       transactionId,
       new Date(selectedDateTime.value)
     )
     
     const statements = []
     
-    // 添加账户出账相关的SQL语句
-    statements.push(...debitResult.statements)
+    // 添加账户入账相关的SQL语句
+    statements.push(...creditResult.statements)
     
-    // 添加支出流水记录
+    // 添加收入流水记录
     const record = {
       statement: `INSERT INTO transactions 
          (id, type, sub_type, amount, account_id, related_id, balance_after, remark, created_at) 
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       values: [
           transactionId,
-          '账户支出',
+          '账户收入',
           selectedCategoryId.value,
           amountNumber,
           selectedAccountObj.id,
           relatedId,
-          debitResult.balanceAfter,
+          creditResult.balanceAfter,
           remark.value,
           formatForDB(selectedDateTime.value)
         ]
@@ -456,7 +448,7 @@ const saveExpense = async () => {
 
     // 执行到这里 = 事务已自动提交 
     await accountStore.loadAccounts()
-    console.log('保存支出成功（事务安全）')
+    console.log('保存收入成功（事务安全）')
 
   } catch (error: any) {
     // 执行到这里 = 事务已自动回滚 
@@ -475,17 +467,17 @@ const saveExpense = async () => {
   }
   amount.value = ''
 
-  emit('navigate', 'expense')
+  emit('navigate', 'income')
 }
 
 // 返回
 const goBack = () => {
-  emit('navigate', 'expense')
+  emit('navigate', 'income')
 }
 </script>
 
 <style scoped>
-.add-expense-page {
+.add-income-page {
   height: 100%;
   width: 100%;
   display: flex;
@@ -793,7 +785,7 @@ const goBack = () => {
   padding: 8px 16px;
   border: none;
   border-radius: 6px;
-  background-color: #4caf50;
+  background-color: #f56c6c;
   color: white;
   font-size: 14px;
   cursor: pointer;
@@ -801,7 +793,7 @@ const goBack = () => {
 }
 
 .confirm-btn:hover {
-  background-color: #45a049;
+  background-color: #e64c4c;
 }
 
 /* 响应式设计 */

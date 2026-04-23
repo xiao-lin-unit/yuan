@@ -1,19 +1,16 @@
 <template>
-  <div class="expense-page">
+  <div class="income-page">
     <!-- 顶部导航栏 -->
-    <TopNav stats-target="expenseStats" @dateChange="handleDateChange" @navigate="handleNavigate" />
+    <TopNav stats-target="incomeStats" @dateChange="handleDateChange" @navigate="handleNavigate" />
     
     <!-- 月统计 -->
     <MonthlyStats :year="selectedYear" :month="selectedMonth" />
+
+    <!-- 本周收入 -->
+    <WeeklyIncome v-if="isCurrentMonth" />
     
-    <!-- 预算 -->
-    <!-- <BudgetComponent :year="selectedYear" :month="selectedMonth" /> -->
-    
-    <!-- 本周支出 -->
-    <WeeklyExperse v-if="isCurrentMonth" />
-    
-    <!-- 支出记录 -->
-    <ExpenseRecords :year="selectedYear" :month="selectedMonth" />
+    <!-- 收入记录 -->
+    <IncomeRecords :year="selectedYear" :month="selectedMonth" />
     
     <!-- 浮动添加按钮 -->
     <FloatingActionMenu :buttons="actionButtons" />
@@ -25,8 +22,8 @@ import { ref, computed } from 'vue';
 import { Plus } from '@element-plus/icons-vue';
 import TopNav from '../../common/TopNav.vue';
 import MonthlyStats from './MonthlyStats.vue';
-import WeeklyExperse from './WeeklyExperse.vue';
-import ExpenseRecords from './ExpenseRecords.vue';
+import WeeklyIncome from './WeeklyIncome.vue';
+import IncomeRecords from './IncomeRecords.vue';
 import FloatingActionMenu from '../../common/FloatingActionMenu.vue';
 
 const emit = defineEmits(['navigate']);
@@ -48,17 +45,17 @@ const handleDateChange = (date: { year: number; month: number }) => {
   selectedMonth.value = date.month;
 };
 
-// 导航到新增支出页面
-const navigateToAddExpense = () => {
-  emit('navigate', 'addExpense');
+// 导航到新增收入页面
+const navigateToAddIncome = () => {
+  emit('navigate', 'addIncome');
 };
 
 // 定义按钮列表
 const actionButtons = [
   {
-    text: '新增支出',
+    text: '新增收入',
     icon: Plus,
-    action: navigateToAddExpense
+    action: navigateToAddIncome
   }
 ];
 
@@ -69,11 +66,9 @@ const handleNavigate = (key: string) => {
 </script>
 
 <style scoped>
-.expense-page {
+.income-page {
   min-height: 100vh;
   background-color: #f5f7fa;
   position: relative;
 }
-
-
 </style>

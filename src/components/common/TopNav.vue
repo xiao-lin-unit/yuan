@@ -56,6 +56,11 @@ const now = new Date();
 const selectedYear = ref(now.getFullYear());
 const selectedMonth = ref(now.getMonth() + 1);
 
+// 定义属性
+const props = defineProps<{
+  statsTarget?: string;
+}>();
+
 // 定义事件
 const emit = defineEmits(['dateChange', 'navigate']);
 
@@ -85,7 +90,8 @@ const selectMonth = (month: number) => {
 
 // 导航到统计页面
 const navigateToStats = () => {
-  emit('navigate', { key: 'expenseStats', param: { year: selectedYear.value, month: selectedMonth.value } });
+  const target = props.statsTarget || 'expenseStats';
+  emit('navigate', { key: target, param: { year: selectedYear.value, month: selectedMonth.value } });
 };
 </script>
 

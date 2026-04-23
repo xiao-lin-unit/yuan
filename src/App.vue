@@ -41,11 +41,14 @@ import FinancialSandbox from './components/mobile/financial/FinancialSandbox.vue
 import FinancialKnowledge from './components/mobile/financial/FinancialKnowledge.vue'
 import MoreFeatures from './components/mobile/more/MoreFeatures.vue'
 import ExpensePage from './components/mobile/expense/ExpensePage.vue'
+import IncomePage from './components/mobile/income/IncomePage.vue'
 import AddAccountPage from './components/mobile/account/AddAccountPage.vue'
 import AccountDetailPage from './components/mobile/account/AccountDetailPage.vue'
 import RepayCreditCardPage from './components/mobile/account/RepayCreditCardPage.vue'
 import AddExpensePage from './components/mobile/expense/AddExpensePage.vue'
+import AddIncomePage from './components/mobile/income/AddIncomePage.vue'
 import ExpenseStats from './components/mobile/expense/ExpenseStats.vue'
+import IncomeStats from './components/mobile/income/IncomeStats.vue'
 import DatabaseViewer from './components/mobile/DatabaseViewer.vue'
 import AddAssetPage from './components/mobile/asset/AddAssetPage.vue'
 import AddStockPage from './components/mobile/asset/AddStockPage.vue'
@@ -74,7 +77,9 @@ const navParams = ref<any>({});
       expense: ExpensePage, // 映射到支出页面组件
       addExpense: AddExpensePage, // 映射到新增支出页面组件
       expenseStats: ExpenseStats, // 映射到支出统计页面组件
-      income: MobileAccountManagement, // 暂时映射到账户管理组件，后续可创建专门的收入组件
+      incomeStats: IncomeStats, // 映射到收入统计页面组件
+      income: IncomePage, // 映射到收入页面组件
+      addIncome: AddIncomePage, // 映射到新增收入页面组件
       asset: AssetManagement, // 映射到资产页面组件
       addAsset: AddAssetPage, // 映射到新增通用资产页面组件
       addStock: AddStockPage, // 映射到新增股票交易页面组件
@@ -103,6 +108,12 @@ const componentProps = computed(() => {
   
   // 为支出相关组件传递年月参数
   if (activeMenu.value === 'expense' || activeMenu.value === 'expenseStats') {
+    props.year = navParams.value.year;
+    props.month = navParams.value.month;
+  }
+
+  // 为收入相关组件传递年月参数
+  if (activeMenu.value === 'income' || activeMenu.value === 'incomeStats') {
     props.year = navParams.value.year;
     props.month = navParams.value.month;
   }

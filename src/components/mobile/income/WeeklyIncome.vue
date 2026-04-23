@@ -1,0 +1,250 @@
+<template>
+  <div class="weekly-finance-section">
+    <div class="section-header">
+      <h3>本周收入</h3>
+    </div>
+    <div class="weekly-total">总计: ¥{{ totalIncome.toFixed(2) }}</div>
+    <div class="finance-chart">
+      <div class="chart-container">
+        <div v-for="(day, index) in weeklyData" :key="index" class="chart-bar">
+          <div class="bar-value">{{ formatAmount(day.amount) }}</div>
+          <div class="bar-container">
+            <div class="bar" :style="{ height: getBarHeight(day.amount) }"></div>
+          </div>
+          <div class="bar-label">{{ day.label }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, computed, onMounted } from 'vue';
+import db from '../../../database';
+
+interface DayData {
+  date: Date;
+  label: string;
+  amount: number;
+}
+
+const weeklyData = ref<DayData[]>([]);
+
+// 计算本周总收入
+const totalIncome = computed(() => {
+  return weeklyData.value.reduce((total, day) => total + day.amount, 0);
+});
+
+// 计算本周最大收入（用于图表高度）
+const maxIncome = computed(() => {
+  return Math.max(...weeklyData.value.map(day => day.amount), 1); // 确保至少为1，避免除以0
+});
+
+// 格式化金额
+const formatAmount = (amount: number): string => {
+  if (amount >= 1000) {
+    return (amount / 1000).toFixed(2) + 'K';
+  }
+  return amount.toFixed(1);
+};
+
+// 计算柱状图高度
+const getBarHeight = (amount: number): string => {
+  const height = (amount / maxIncome.value) * 90; // 最大高度为90%
+  return `${height}%`;
+};
+
+// 获取本周的开始和结束日期
+const getWeekRange = (): { start: Date; end: Date } => {
+  const now = new Date();
+  console.log('当前日期:', now.toISOString());
+  const dayOfWeek = now.getDay(); // 0-6，0表示周日
+  console.log('当前星期:', dayOfWeek);
+  
+  // 计算本周一的日期（如果今天是周日，则上周日为一周的开始）
+  const start = new Date(now);
+  start.setDate(now.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1)); // 调整为周一作为开始
+  start.setHours(0, 0, 0, 0);
+  console.log('本周开始日期:', start.toISOString());
+  
+  // 计算本周日的日期
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+  end.setHours(23, 59, 59, 999);
+  console.log('本周结束日期:', end.toISOString());
+  
+  return { start, end };
+};
+
+// 从流水记录中获取本周收入数据
+const loadWeeklyIncomes = async () => {
+  try {
+    console.log('开始加载本周收入数据');
+    
+    // 连接数据库
+    console.log('正在连接数据库...');
+    await db.connect();
+    console.log('数据库连接成功');
+    
+    // 获取本周的开始和结束日期
+    const { start, end } = getWeekRange();
+    console.log('本周日期范围:', start.toISOString(), '至', end.toISOString());
+    
+    // 从流水表中查询类型为账户收入的记录
+    console.log('正在查询流水记录...');
+    const transactions = await db.query(
+      'SELECT t.* FROM transactions t WHERE t.type = ? AND t.created_at BETWEEN ? AND ?',
+      ['账户收入', start.toISOString(), end.toISOString()]
+    );
+    
+    console.log('查询到的流水记录数量:', transactions.length);
+    console.log('查询到的流水记录:', transactions);
+    
+    // 按日期分组统计收入
+    const dailyIncomes = new Map<string, number>();
+    
+    transactions.forEach(transaction => {
+      console.log('处理流水记录:', transaction);
+      if (transaction.created_at) {
+        const date = new Date(transaction.created_at);
+        const dateStr = date.toISOString().split('T')[0]; // YYYY-MM-DD格式
+        
+        if (dailyIncomes.has(dateStr)) {
+          dailyIncomes.set(dateStr, dailyIncomes.get(dateStr)! + (transaction.amount || 0));
+        } else {
+          dailyIncomes.set(dateStr, transaction.amount || 0);
+        }
+      }
+    });
+    
+    console.log('按日期分组的收入:', Object.fromEntries(dailyIncomes));
+    
+    // 生成本周的日期数据
+    const days: DayData[] = [];
+    const dayLabels = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+    
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(start);
+      date.setDate(start.getDate() + i);
+      const dateStr = date.toISOString().split('T')[0];
+      
+      days.push({
+        date,
+        label: dayLabels[i],
+        amount: dailyIncomes.get(dateStr) || 0
+      });
+    }
+    
+    console.log('生成的周数据:', days);
+    weeklyData.value = days;
+  } catch (error) {
+    console.error('加载本周收入数据失败:', error);
+    // 出错时使用默认数据
+    weeklyData.value = [
+      { date: new Date(), label: '周一', amount: 0 },
+      { date: new Date(), label: '周二', amount: 0 },
+      { date: new Date(), label: '周三', amount: 0 },
+      { date: new Date(), label: '周四', amount: 0 },
+      { date: new Date(), label: '周五', amount: 0 },
+      { date: new Date(), label: '周六', amount: 0 },
+      { date: new Date(), label: '周日', amount: 0 }
+    ];
+  }
+};
+
+// 组件挂载时加载数据
+onMounted(() => {
+  loadWeeklyIncomes();
+});
+</script>
+
+<style scoped>
+.weekly-finance-section {
+  background-color: white;
+  border-radius: 12px;
+  padding: 15px;
+  margin: 0 0 20px 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.section-header h3 {
+  font-size: 16px;
+  margin: 0;
+  color: #303133;
+}
+
+.weekly-total {
+  font-size: 14px;
+  color: #606266;
+  margin-bottom: 15px;
+}
+
+.finance-chart {
+  margin-top: 20px;
+}
+
+.chart-container {
+  display: flex;
+  justify-content: space-around;
+  align-items: flex-end;
+  height: 180px;
+}
+
+.chart-bar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  width: 30px;
+  position: relative;
+  height: 100%;
+}
+
+.chart-bar .bar-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  width: 8px;
+}
+
+.chart-bar .bar {
+  width: 8px;
+  background-color: #f56c6c;
+  border-radius: 4px 4px 0 0;
+}
+
+.bar-value {
+  font-size: 10px;
+  color: #606266;
+  text-align: center;
+  margin-bottom: 5px;
+}
+
+.bar-label {
+  font-size: 10px;
+  color: #909399;
+  text-align: center;
+  margin-top: 5px;
+}
+
+/* 响应式调整 */
+@media (max-width: 375px) {
+  .chart-container {
+    height: 140px;
+  }
+}
+
+@media (max-width: 320px) {
+  .chart-container {
+    height: 120px;
+  }
+}
+</style>

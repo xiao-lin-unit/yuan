@@ -28,13 +28,13 @@
               rest: date.rest,
               active: currentDateObj.dateStr == date.dateStr, 
               toDay: date.dateStr == format(new Date(), 'yyyy-MM-dd'),
-              'has-expense': expenses[date.dateStr]
+              'has-amount': amount[date.dateStr]
             }"
             @click="selectDate(date)"
           >
             <div style="font-size: 14px; font-family: fangsong;">{{ date.day }}</div>
-            <div v-if="expenses[date.dateStr] && date.isCurrentMonth" class="expense-amount">
-                ¥{{ expenses[date.dateStr] }}
+            <div v-if="amount[date.dateStr] && date.isCurrentMonth" class="amount-class" :style="{ color: type == 'expense' ? '#67c23a' : '#f56c6c' }">
+                ¥{{ amount[date.dateStr] }}
             </div>
             <div v-else style="font-size: 8px; font-weight: 500; color: blank;">{{ date.lunar }}</div>
           </div>
@@ -76,7 +76,8 @@ const props = defineProps({
   height: { type: String, default: '600px' },
   year: { type: Number, default: new Date().getFullYear() },
   month: { type: Number, default: new Date().getMonth() + 1 },
-  expenses: { type: Object, default: () => ({}) },
+  amount: { type: Object, default: () => ({}) },
+  type: { type: String, default: 'expense' },
 });
 
 // 响应式判断屏幕宽度
@@ -453,14 +454,13 @@ watch(() => props.month, (newMonth) => {
             right: 1px;
             font-size: 7px;
         }
-        &.has-expense {
+        &.has-amount {
           background-color: #ecf5ff;
           border: 1px solid #d9ecff;
         }
       }
-      .expense-amount {
+      .amount-class {
         font-size: small;
-        color: #67c23a;
         font-weight: 500;
         // background-color: rgba(255, 255, 255, 0.8);
         // padding: 2px 8px;
