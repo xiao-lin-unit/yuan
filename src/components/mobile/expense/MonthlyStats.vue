@@ -24,6 +24,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
+import dayjs from 'dayjs';
 import db from '../../../database';
 
 // 接收年月参数
@@ -43,11 +44,8 @@ const balance = computed(() => {
 
 // 获取指定月份的开始和结束日期
 const getMonthRange = (year: number, month: number) => {
-  const start = new Date(year, month - 1, 1);
-  start.setHours(0, 0, 0, 0);
-  
-  const end = new Date(year, month, 0);
-  end.setHours(23, 59, 59, 999);
+  const start = dayjs().year(year).month(month - 1).startOf('month');
+  const end = dayjs().year(year).month(month - 1).endOf('month');
   
   return { start, end };
 };

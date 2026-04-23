@@ -3,6 +3,7 @@
  * Handles account CRUD and balance operations
  */
 
+import dayjs from 'dayjs'
 import db from '../../database/index.js'
 import type { Account, AccountTransaction, AccountInput, BalanceAdjustInput, TransferInput, RepayCreditCardInput } from '../../types/account/account.js'
 import { getCurrentISOString, dateNow } from '../../utils/timezone'
@@ -164,7 +165,7 @@ export async function createDebitTransaction(
   amount: number, 
   description: string,
   transactionId?: string,
-  transactionTime?: Date
+  transactionTime?: dayjs.Dayjs
 ): Promise<{ 
   statements: { statement: string; values: any[] }[]; 
   balanceAfter: number;
@@ -193,7 +194,7 @@ export async function createDebitTransaction(
   }
 
   const txId = transactionId || dateNow().toString()
-  const txTime = transactionTime || new Date(getCurrentISOString())
+  const txTime = transactionTime || dayjs(getCurrentISOString())
   let balanceAfter: number
   let accountUpdateStatement: { statement: string; values: any[] }
 
@@ -233,7 +234,7 @@ export async function createDebitTransaction(
       amount,
       balanceAfter,
       description,
-      txTime instanceof Date ? txTime.toISOString() : txTime
+      txTime.toISOString()
     ]
   }
 
@@ -260,7 +261,7 @@ export async function createCreditTransaction(
   amount: number,
   description: string,
   transactionId?: string,
-  transactionTime?: Date
+  transactionTime?: dayjs.Dayjs
 ): Promise<{ 
   statements: { statement: string; values: any[] }[]; 
   balanceAfter: number;
@@ -282,7 +283,7 @@ export async function createCreditTransaction(
 
   const isCreditCard = account.type === '信用卡'
   const txId = transactionId || dateNow().toString()
-  const txTime = transactionTime || new Date(getCurrentISOString())
+  const txTime = transactionTime || dayjs(getCurrentISOString())
   let balanceAfter: number
   let accountUpdateStatement: { statement: string; values: any[] }
 
@@ -315,7 +316,7 @@ export async function createCreditTransaction(
       amount,
       balanceAfter,
       description,
-      txTime instanceof Date ? txTime.toISOString() : txTime
+      txTime.toISOString()
     ]
   }
 
@@ -382,7 +383,7 @@ export async function transfer(input: TransferInput): Promise<void> {
   }
 
   const transactionId = dateNow().toString()
-  const transactionTime = new Date(getCurrentISOString())
+  const transactionTime = dayjs(getCurrentISOString())
 
   // 使用新的出账入账接口（现在已包含交易记录创建）
   const debitResult = await createDebitTransaction(
@@ -541,7 +542,7 @@ export async function repayCreditCard(input: RepayCreditCardInput): Promise<void
         amount,
         Math.max(0, usedLimit - amount),
         `还款来自：${fromAccount.name}${remark ? ' - ' + remark : ''}`,
-        transaction_time instanceof Date ? transaction_time.toISOString() : transaction_time
+        dayjs(transaction_time).toISOString()
       ]
     },
     // 4. 创建来源账户支出记录
@@ -555,7 +556,7 @@ export async function repayCreditCard(input: RepayCreditCardInput): Promise<void
         amount,
         fromAccount.balance - amount,
         `还款至：${creditCard.name}${remark ? ' - ' + remark : ''}`,
-        transaction_time instanceof Date ? transaction_time.toISOString() : transaction_time
+        dayjs(transaction_time).toISOString()
       ]
     }
   ]

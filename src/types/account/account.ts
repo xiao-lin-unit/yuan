@@ -1,3 +1,5 @@
+import type dayjs from 'dayjs'
+
 /**
  * Account type definitions
  */
@@ -13,8 +15,8 @@ export interface Account {
   is_liquid?: boolean | number
   status?: string
   remark?: string
-  created_at?: Date | string
-  updated_at?: Date | string
+  created_at?: dayjs.Dayjs | string
+  updated_at?: dayjs.Dayjs | string
 }
 
 // Account transaction record
@@ -25,8 +27,8 @@ export interface AccountTransaction {
   amount: number
   balance_after: number
   description?: string
-  transaction_time: Date | string
-  created_at?: Date | string
+  transaction_time: dayjs.Dayjs | string
+  created_at?: dayjs.Dayjs | string
 }
 
 // Input for adding a new account
@@ -61,6 +63,6 @@ export interface RepayCreditCardInput {
   credit_card_id: string
   from_account_id: string
   amount: number
-  transaction_time: Date
+  transaction_time: dayjs.Dayjs
   remark?: string
 }

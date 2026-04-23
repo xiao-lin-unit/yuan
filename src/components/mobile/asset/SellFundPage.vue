@@ -38,6 +38,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import dayjs from 'dayjs'
 import PageTemplate from '../../common/PageTemplate.vue'
 import { sellFund as sellFundService, getAvailableAccounts, getFundById } from '../../../services/asset/fundService'
 
@@ -61,7 +62,7 @@ const fundForm = ref({
   current_nav: 0,
   shares: 0,
   fee: 0,
-  transaction_time: new Date(),
+  transaction_time: dayjs(),
   account_id: ''
 })
 

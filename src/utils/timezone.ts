@@ -1,3 +1,5 @@
+import dayjs from 'dayjs'
+
 /**
  * Timezone utility - All times are in UTC+8 (China Standard Time)
  */
@@ -5,11 +7,8 @@
 /**
  * Get current date/time in UTC+8
  */
-export function getCurrentDate(): Date {
-  const now = new Date()
-  // Convert to UTC+8
-  const utc8Time = new Date(now.getTime() + (8 * 60 * 60 * 1000))
-  return utc8Time
+export function getCurrentDate(): dayjs.Dayjs {
+  return dayjs().add(8, 'hour')
 }
 
 /**
@@ -22,33 +21,29 @@ export function getCurrentISOString(): string {
 /**
  * Convert a date to UTC+8 ISO string
  */
-export function toUTC8ISOString(date: Date | string): string {
-  const d = typeof date === 'string' ? new Date(date) : date
-  const utc8Time = new Date(d.getTime() + (8 * 60 * 60 * 1000))
-  return utc8Time.toISOString()
+export function toUTC8ISOString(date: dayjs.Dayjs | string | Date): string {
+  return dayjs(date as any).add(8, 'hour').toISOString()
 }
 
 /**
  * Get current timestamp in milliseconds (UTC+8)
  */
 export function getCurrentTimestamp(): number {
-  return Date.now() + (8 * 60 * 60 * 1000)
+  return dayjs().valueOf() + (8 * 60 * 60 * 1000)
 }
 
 /**
  * Format date for database storage (UTC+8)
  */
-export function formatForDB(date: Date | string = new Date()): string {
-  const d = typeof date === 'string' ? new Date(date) : date
-  const utc8Time = new Date(d.getTime() + (8 * 60 * 60 * 1000))
-  return utc8Time.toISOString()
+export function formatForDB(date: dayjs.Dayjs | string | Date = dayjs()): string {
+  return dayjs(date as any).add(8, 'hour').toISOString()
 }
 
 /**
- * Create a new Date object representing current UTC+8 time
+ * Create a new dayjs object representing current UTC+8 time
  * This is a drop-in replacement for new Date()
  */
-export function createDate(): Date {
+export function createDate(): dayjs.Dayjs {
   return getCurrentDate()
 }
 

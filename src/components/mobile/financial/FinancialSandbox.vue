@@ -123,6 +123,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, watch, nextTick } from 'vue'
+import dayjs from 'dayjs'
 import * as echarts from 'echarts'
 
 const sandboxes = ref([])
@@ -183,9 +184,9 @@ const openCreateSandboxDialog = () => {
 const createSandbox = () => {
   // 模拟创建沙盘
   const newSandbox = {
-    id: Date.now().toString(),
+    id: dayjs().valueOf().toString(),
     name: sandboxForm.value.name,
-    created_at: new Date().toLocaleString()
+    created_at: dayjs().format('YYYY/MM/DD HH:mm:ss')
   }
   sandboxes.value.push(newSandbox)
   dialogVisible.value.createSandbox = false

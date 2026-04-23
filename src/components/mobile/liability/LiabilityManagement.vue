@@ -176,6 +176,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import dayjs from 'dayjs'
 import { useAccountStore } from '../../../stores/account'
 import { liabilityTypes, repaymentMethods, liabilityStatuses, repaymentTypes } from '../../../utils/dictionaries'
 
@@ -197,7 +198,7 @@ const liabilityForm = ref({
   remaining_principal: 0,
   is_interest: true,
   interest_rate: 0,
-  start_date: new Date(),
+  start_date: dayjs(),
   repayment_method: '等额本息',
   repayment_day: 1,
   period: 12,
@@ -230,7 +231,7 @@ const loadLiabilities = async () => {
       remaining_principal: 950000,
       is_interest: true,
       interest_rate: 0.049,
-      start_date: new Date('2024-01-01'),
+      start_date: dayjs('2024-01-01'),
       repayment_method: '等额本息',
       repayment_day: 1,
       period: 360,
@@ -246,7 +247,7 @@ const loadLiabilities = async () => {
       remaining_principal: 50000,
       is_interest: false,
       interest_rate: 0,
-      start_date: new Date('2024-03-01'),
+      start_date: dayjs('2024-03-01'),
       repayment_method: '随借随还',
       account_id: '2',
       remark: '临时周转',
@@ -264,7 +265,7 @@ const openAddLiabilityDialog = () => {
     remaining_principal: 0,
     is_interest: true,
     interest_rate: 0,
-    start_date: new Date(),
+    start_date: dayjs(),
     repayment_method: '等额本息',
     repayment_day: 1,
     period: 12,
@@ -293,7 +294,7 @@ const openRepaymentDialog = (liability: any) => {
 const addLiability = () => {
   // 模拟添加负债
   const newLiability = {
-    id: Date.now().toString(),
+    id: dayjs().valueOf().toString(),
     remaining_principal: liabilityForm.value.principal,
     ...liabilityForm.value
   }

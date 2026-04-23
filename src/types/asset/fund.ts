@@ -1,3 +1,5 @@
+import type dayjs from 'dayjs'
+
 /**
  * Fund type definitions
  */
@@ -11,13 +13,13 @@ export interface Fund {
   current_nav: number
   cost_nav: number
   total_fee: number
-  first_buy_date: Date | string
+  first_buy_date: dayjs.Dayjs | string
   has_lock: boolean
   lock_period: number
   account_id: string
   ended: number
-  created_at?: Date | string
-  updated_at?: Date | string
+  created_at?: dayjs.Dayjs | string
+  updated_at?: dayjs.Dayjs | string
 }
 
 // Fund holding record
@@ -29,8 +31,8 @@ export interface FundHolding {
   remaining_shares: number
   fee: number
   lock_period: number
-  lock_end_date: Date | string | null
-  transaction_time: Date | string
+  lock_end_date: dayjs.Dayjs | string | null
+  transaction_time: dayjs.Dayjs | string
   account_id: string
   sell_status?: string
 }
@@ -44,7 +46,7 @@ export interface FundTransaction {
   type: '买入' | '卖出'
   hold_ids?: string
   fee: number
-  transaction_time: Date | string
+  transaction_time: dayjs.Dayjs | string
   account_id: string
 }
 
@@ -57,7 +59,7 @@ export interface FundInput {
   fee: number
   has_lock: boolean
   lock_period: number
-  transaction_time: Date
+  transaction_time: dayjs.Dayjs
   account_id: string
 }
 
@@ -68,7 +70,7 @@ export interface FundBuyInput {
   fee: number
   has_lock: boolean
   lock_period: number
-  transaction_time: Date
+  transaction_time: dayjs.Dayjs
   account_id: string
 }
 
@@ -77,7 +79,7 @@ export interface FundSellInput {
   nav: number
   shares: number
   fee: number
-  transaction_time: Date
+  transaction_time: dayjs.Dayjs
   account_id: string
 }
 

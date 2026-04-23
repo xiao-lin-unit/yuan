@@ -85,6 +85,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue';
+import dayjs from 'dayjs';
 import { Setting, Plus, More, Goods, TrendCharts, DataAnalysis, Switch } from '@element-plus/icons-vue';
 import AssetCard from './AssetCard.vue';
 import { getAllStocks } from '../../../services/asset/stockService';
@@ -168,7 +169,7 @@ const stockForm = ref({
   price: 0,
   quantity: 0,
   fee: 0,
-  transaction_time: new Date(),
+  transaction_time: dayjs(),
   type: '买入',
   account_id: ''
 });
@@ -181,7 +182,7 @@ const fundForm = ref({
   shares: 0,
   fee: 0,
   has_lock: false,
-  transaction_time: new Date(),
+  transaction_time: dayjs(),
   type: '买入',
   account_id: ''
 });

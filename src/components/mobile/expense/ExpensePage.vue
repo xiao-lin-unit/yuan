@@ -23,6 +23,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { Plus } from '@element-plus/icons-vue';
+import dayjs from 'dayjs';
 import TopNav from '../../common/TopNav.vue';
 import MonthlyStats from './MonthlyStats.vue';
 import WeeklyExperse from './WeeklyExperse.vue';
@@ -32,14 +33,14 @@ import FloatingActionMenu from '../../common/FloatingActionMenu.vue';
 const emit = defineEmits(['navigate']);
 
 // 日期选择状态 - 默认为当前年月
-const now = new Date();
-const selectedYear = ref(now.getFullYear());
-const selectedMonth = ref(now.getMonth() + 1);
+const now = dayjs();
+const selectedYear = ref(now.year());
+const selectedMonth = ref(now.month() + 1);
 
 // 计算是否是当前月份
 const isCurrentMonth = computed(() => {
-  const now = new Date();
-  return selectedYear.value === now.getFullYear() && selectedMonth.value === now.getMonth() + 1;
+  const now = dayjs();
+  return selectedYear.value === now.year() && selectedMonth.value === now.month() + 1;
 });
 
 // 处理日期变化

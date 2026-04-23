@@ -1,6 +1,7 @@
 /**
  * Financial goal type definitions
  */
+import type dayjs from 'dayjs'
 
 // Base financial goal interface
 export interface FinancialGoal {
@@ -12,8 +13,8 @@ export interface FinancialGoal {
   period: number
   account_id: string
   status: '未开始' | '进行中' | '已完成' | '已终止'
-  created_at?: Date | string
-  updated_at?: Date | string
+  created_at?: dayjs.Dayjs | string
+  updated_at?: dayjs.Dayjs | string
 }
 
 // Goal investment record
@@ -21,9 +22,9 @@ export interface GoalInvestment {
   id: string
   goal_id: string
   amount: number
-  invest_date: Date | string
+  invest_date: dayjs.Dayjs | string
   remark?: string
-  created_at?: Date | string
+  created_at?: dayjs.Dayjs | string
 }
 
 // Input for adding a new goal
@@ -40,6 +41,6 @@ export interface GoalInput {
 export interface GoalInvestInput {
   goalId: string
   amount: number
-  date: Date
+  date: dayjs.Dayjs
   remark?: string
 }

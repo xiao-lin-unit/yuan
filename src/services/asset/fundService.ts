@@ -3,6 +3,7 @@
  * Handles all fund-related business logic and database operations
  */
 
+import dayjs from 'dayjs'
 import db from '../../database/index.js'
 import type {
   Fund,
@@ -66,18 +67,16 @@ export async function checkAccountBalance(accountId: string, requiredAmount: num
 /**
  * Calculate lock end date based on lock period
  */
-export function calculateLockEndDate(transactionTime: Date, lockPeriod: number): Date | null {
+export function calculateLockEndDate(transactionTime: dayjs.Dayjs | string | Date, lockPeriod: number): dayjs.Dayjs | null {
   if (!lockPeriod || lockPeriod <= 0) return null
-  const lockEndDate = new Date(transactionTime)
-  lockEndDate.setMonth(lockEndDate.getMonth() + lockPeriod)
-  return lockEndDate
+  return dayjs(transactionTime as any).add(lockPeriod, 'month')
 }
 
 /**
  * Add a new fund with initial buy transaction
  */
 export async function addFund(fundData: FundInput): Promise<void> {
-  const fundId = Date.now().toString()
+  const fundId = dayjs().valueOf().toString()
   const totalCost = calculateTotalCost(fundData.cost_nav, fundData.shares, fundData.fee)
 
   // 使用新的出账接口
@@ -107,8 +106,8 @@ export async function addFund(fundData: FundInput): Promise<void> {
     ]
   })
 
-  const holdingId = Date.now().toString() + '_hold'
-  const transactionId = Date.now().toString()
+  const holdingId = dayjs().valueOf().toString() + '_hold'
+  const transactionId = dayjs().valueOf().toString()
 
   // Create fund holding record
   statements.push({
@@ -122,7 +121,7 @@ export async function addFund(fundData: FundInput): Promise<void> {
       fundData.shares,
       fundData.fee,
       fundData.lock_period,
-      lockEndDate,
+      lockEndDate ? lockEndDate.toISOString() : null,
       fundData.transaction_time,
       fundData.account_id
     ]
@@ -176,9 +175,9 @@ export async function buyFund(fundId: string, buyData: FundBuyInput): Promise<vo
   // Calculate lock end date
   const lockEndDate = calculateLockEndDate(buyData.transaction_time, buyData.lock_period)
 
-  const holdingId = Date.now().toString() + '_hold'
-  const transactionId = Date.now().toString()
-  const accountTransactionId = Date.now().toString() + '_acc'
+  const holdingId = dayjs().valueOf().toString() + '_hold'
+  const transactionId = dayjs().valueOf().toString()
+  const accountTransactionId = dayjs().valueOf().toString() + '_acc'
 
   const statements = [
     // Create fund holding record
@@ -193,7 +192,7 @@ export async function buyFund(fundId: string, buyData: FundBuyInput): Promise<vo
         buyData.shares,
         buyData.fee,
         buyData.lock_period,
-        lockEndDate,
+        lockEndDate ? lockEndDate.toISOString() : null,
         buyData.transaction_time,
         buyData.account_id
       ]
@@ -242,7 +241,7 @@ export async function sellFund(fundId: string, sellData: FundSellInput): Promise
   }
 
   // Query available holdings (not fully sold and lock period expired)
-  const currentDate = new Date().toISOString()
+  const currentDate = dayjs().toISOString()
   const holdings = await db.query(
     'SELECT * FROM fund_holdings WHERE fund_id = ? AND sell_status != ? AND (lock_end_date IS NULL OR lock_end_date <= ?) ORDER BY transaction_time ASC',
     [fundId, '已卖出', currentDate]
@@ -290,7 +289,7 @@ export async function sellFund(fundId: string, sellData: FundSellInput): Promise
   }
 
   // Create fund transaction record (sell)
-  const transactionId = Date.now().toString()
+  const transactionId = dayjs().valueOf().toString()
   statements.push({
     statement: `INSERT INTO fund_transactions (id, fund_id, transaction_nav, shares, type, hold_ids, fee, transaction_time, account_id) 
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,

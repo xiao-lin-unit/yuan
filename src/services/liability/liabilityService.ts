@@ -3,6 +3,7 @@
  * Handles liability and repayment operations
  */
 
+import dayjs from 'dayjs'
 import db from '../../database/index.js'
 import type { Liability, Repayment, LiabilityInput, RepaymentInput } from '../../types/liability/liability.js'
 
@@ -10,7 +11,7 @@ import type { Liability, Repayment, LiabilityInput, RepaymentInput } from '../..
  * Add a new liability
  */
 export async function addLiability(liabilityData: LiabilityInput): Promise<void> {
-  const id = Date.now().toString()
+  const id = dayjs().valueOf().toString()
   await db.run(
     `INSERT INTO liabilities (id, name, type, principal, remaining_principal, is_interest, interest_rate, 
       start_date, repayment_method, repayment_day, period, account_id, remark, status) 
@@ -144,7 +145,7 @@ export async function makeRepayment(input: RepaymentInput): Promise<void> {
   const isSettled = newRemainingPrincipal === 0
   const newStatus = isSettled ? '已结清' : '未结清'
 
-  const repaymentId = Date.now().toString()
+  const repaymentId = dayjs().valueOf().toString()
 
   const statements = [
     // Update liability
@@ -162,7 +163,7 @@ export async function makeRepayment(input: RepaymentInput): Promise<void> {
         input.amount,
         input.type,
         input.remark || '',
-        new Date()
+        dayjs().toISOString()
       ]
     }
   ]

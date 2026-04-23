@@ -13,6 +13,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue';
+import dayjs from 'dayjs';
 import DailyExpense from './DailyExpense.vue';
 
 // 接收年月参数
@@ -31,16 +32,16 @@ const generateDays = () => {
   const monthVal = month.value - 1; // 转换为0-11的月份格式
 
   // 获取当月最后一天
-  let lastDay = new Date(yearVal, monthVal + 1, 0);
-  const now = new Date();
+  let lastDay = dayjs().year(yearVal).month(monthVal).endOf('month');
+  const now = dayjs();
   // 如果当前年份大于展示年份，则展示到月份的最后一天
-  if (now.getFullYear() > yearVal) {
+  if (now.year() > yearVal) {
 
     // 如果年份相同，当前月份大于展示月份，则展示到月份的最后一天
-  } else if (now.getFullYear() === yearVal && now.getMonth() > monthVal) {
+  } else if (now.year() === yearVal && now.month() > monthVal) {
     
     // 如果年份相同，当前月份等于展示月份，则展示到今天
-  } else if (now.getFullYear() === yearVal && now.getMonth() === monthVal) {
+  } else if (now.year() === yearVal && now.month() === monthVal) {
     lastDay = now;
     // 如果当前年份小于展示年份，或者当前年份等于展示年份但当前月份小于展示月份，则不展示内容
   } else {
@@ -48,7 +49,7 @@ const generateDays = () => {
     return;
   }
   // 获取当月天数
-  const daysInMonth = lastDay.getDate();
+  const daysInMonth = lastDay.date();
   
   const daysArray = [];
   
@@ -58,14 +59,12 @@ const generateDays = () => {
     
     // 标记今天、昨天、前天
     let displayDate = dateStr;
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-    const dayBeforeYesterday = new Date(today);
-    dayBeforeYesterday.setDate(dayBeforeYesterday.getDate() - 2);
+    const today = dayjs();
+    const yesterday = today.subtract(1, 'day');
+    const dayBeforeYesterday = today.subtract(2, 'day');
     
-    const formatDate = (d) => {
-      return `${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
+    const formatDate = (d: dayjs.Dayjs) => {
+      return `${String(d.month() + 1).padStart(2, '0')}.${String(d.date()).padStart(2, '0')}`;
     };
     
     const todayStr = formatDate(today);
@@ -88,9 +87,9 @@ const generateDays = () => {
   
   // 按日期倒序排序
   daysArray.sort((a, b) => {
-    const dateA = new Date(`${year.value}-${a.dateStr.replace('.', '-')}`);
-    const dateB = new Date(`${year.value}-${b.dateStr.replace('.', '-')}`);
-    return dateB.getTime() - dateA.getTime();
+    const dateA = dayjs(`${year.value}-${a.dateStr.replace('.', '-')}`);
+    const dateB = dayjs(`${year.value}-${b.dateStr.replace('.', '-')}`);
+    return dateB.valueOf() - dateA.valueOf();
   });
   
   days.value = daysArray;

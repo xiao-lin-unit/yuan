@@ -3,6 +3,15 @@ import { createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
 import App from './App.vue'
+import dayjs from 'dayjs'
+import utc from 'dayjs/plugin/utc'
+import timezone from 'dayjs/plugin/timezone'
+
+dayjs.extend(utc)
+dayjs.extend(timezone)
+
+// 设置全局默认东八区
+dayjs.tz.setDefault('Asia/Shanghai')
 
 // 导入功能组件
 import MobileAccountManagement from './components/mobile/account/AccountManagement.vue'

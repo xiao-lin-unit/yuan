@@ -78,6 +78,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
+import dayjs from 'dayjs';
 import { ArrowLeft, SwitchButton } from '@element-plus/icons-vue';
 import { ElMessageBox, ElMessage } from 'element-plus';
 import FloatingActionMenu from '../../../components/common/FloatingActionMenu.vue';
@@ -88,7 +89,7 @@ interface AssetIncomeRecord {
   id: string
   asset_id: string
   income_amount: number
-  record_time: Date | string
+  record_time: dayjs.Dayjs | string
   remark?: string
 }
 
@@ -122,16 +123,9 @@ const goBack = () => {
   emit('navigate', 'asset');
 };
 
-const formatDate = (dateString: string | Date | undefined) => {
+const formatDate = (dateString: string | dayjs.Dayjs | undefined) => {
   if (!dateString) return '-';
-  const date = new Date(dateString);
-  return date.toLocaleString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
+  return dayjs(dateString).format('YYYY/MM/DD HH:mm');
 };
 
 const handleEndAsset = async () => {

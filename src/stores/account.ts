@@ -3,6 +3,7 @@
  * 负责账户的增删改查、余额调整和内部转账操作
  */
 import { defineStore } from 'pinia'
+import dayjs from 'dayjs'
 import db from '../database'
 
 /**
@@ -64,7 +65,7 @@ export const useAccountStore = defineStore('account', {
         console.log('Database connected')
         
         // 生成账户ID
-        const id = Date.now().toString()
+        const id = dayjs().valueOf().toString()
         console.log('Generated account ID:', id)
         
         // 准备账户数据
@@ -159,7 +160,7 @@ export const useAccountStore = defineStore('account', {
         }
 
         // 准备事务语句
-        const transactionId = Date.now().toString()
+        const transactionId = dayjs().valueOf().toString()
         const statements = [
           // 更新账户余额
           {
@@ -227,14 +228,14 @@ export const useAccountStore = defineStore('account', {
           await db.run('UPDATE accounts SET balance = ? WHERE id = ?', [newToBalance, data.toAccountId])
 
           // 记录转出流水
-          const transactionId1 = Date.now().toString() + '1'
+          const transactionId1 = dayjs().valueOf().toString() + '1'
           await db.run(
             'INSERT INTO transactions (id, type, amount, account_id, balance_after, remark) VALUES (?, ?, ?, ?, ?, ?)',
             [transactionId1, '转账支出', -data.amount, data.fromAccountId, newFromBalance, data.remark]
           )
 
           // 记录转入流水
-          const transactionId2 = Date.now().toString() + '2'
+          const transactionId2 = dayjs().valueOf().toString() + '2'
           await db.run(
             'INSERT INTO transactions (id, type, amount, account_id, balance_after, remark) VALUES (?, ?, ?, ?, ?, ?)',
             [transactionId2, '转账收入', data.amount, data.toAccountId, newToBalance, data.remark]

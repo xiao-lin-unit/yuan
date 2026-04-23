@@ -3,6 +3,7 @@
  * Handles general asset operations
  */
 
+import dayjs from 'dayjs'
 import db from '../../database/index.js'
 import type { Asset, AssetInput } from '../../types/asset/asset.js'
 
@@ -12,31 +13,31 @@ import type { Asset, AssetInput } from '../../types/asset/asset.js'
 function calculateNextIncomeDate(period: string, incomeDate: string): string {
   if (!period || !incomeDate) return ''
 
-  const now = new Date()
+  const now = dayjs()
   const incomeParts = incomeDate.split('-')
 
   if (period === '年') {
     // 每年：income_date format is MM-DD, next income date is this year or next year
     const [month, day] = incomeParts
-    let nextDate = new Date(now.getFullYear(), parseInt(month) - 1, parseInt(day))
-    
+    let nextDate = dayjs().year(now.year()).month(parseInt(month) - 1).date(parseInt(day))
+
     // If this year's income date has passed, next year
-    if (nextDate <= now) {
-      nextDate = new Date(now.getFullYear() + 1, parseInt(month) - 1, parseInt(day))
+    if (nextDate.isBefore(now) || nextDate.isSame(now, 'day')) {
+      nextDate = nextDate.add(1, 'year')
     }
-    
-    return nextDate.toISOString().split('T')[0]
+
+    return nextDate.format('YYYY-MM-DD')
   } else if (period === '月') {
     // 每月：income_date format is DD, next income date is this month or next month
     const [day] = incomeParts
-    let nextDate = new Date(now.getFullYear(), now.getMonth(), parseInt(day))
-    
+    let nextDate = dayjs().year(now.year()).month(now.month()).date(parseInt(day))
+
     // If this month's income date has passed, next month
-    if (nextDate <= now) {
-      nextDate = new Date(now.getFullYear(), now.getMonth() + 1, parseInt(day))
+    if (nextDate.isBefore(now) || nextDate.isSame(now, 'day')) {
+      nextDate = nextDate.add(1, 'month')
     }
-    
-    return nextDate.toISOString().split('T')[0]
+
+    return nextDate.format('YYYY-MM-DD')
   }
 
   return ''
@@ -46,7 +47,7 @@ function calculateNextIncomeDate(period: string, incomeDate: string): string {
  * Add a new general asset
  */
 export async function addAsset(assetData: AssetInput): Promise<void> {
-  const id = Date.now().toString()
+  const id = dayjs().valueOf().toString()
   
   // Calculate next income date
   let nextIncomeDate = ''

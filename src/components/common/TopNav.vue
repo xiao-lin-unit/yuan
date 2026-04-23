@@ -49,12 +49,13 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { DataAnalysis, ArrowDown } from '@element-plus/icons-vue';
+import dayjs from 'dayjs';
 
 // 日期选择状态 - 默认为当前年月
 const showDatePicker = ref(false);
-const now = new Date();
-const selectedYear = ref(now.getFullYear());
-const selectedMonth = ref(now.getMonth() + 1);
+const now = dayjs();
+const selectedYear = ref(now.year());
+const selectedMonth = ref(now.month() + 1);
 
 // 定义属性
 const props = defineProps<{

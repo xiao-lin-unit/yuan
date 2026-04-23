@@ -132,6 +132,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
+import dayjs from 'dayjs'
 import { useAccountStore } from '../../../stores/account'
 import { goalTypes, goalStatuses } from '../../../utils/dictionaries'
 
@@ -159,7 +160,7 @@ const goalForm = ref({
 const investForm = ref({
   goalId: '',
   amount: 0,
-  date: new Date(),
+  date: dayjs(),
   remark: ''
 })
 
@@ -224,7 +225,7 @@ const openInvestDialog = (goal: any) => {
   investForm.value = {
     goalId: goal.id,
     amount: 0,
-    date: new Date(),
+    date: dayjs(),
     remark: ''
   }
   dialogVisible.value.invest = true
@@ -233,7 +234,7 @@ const openInvestDialog = (goal: any) => {
 const addGoal = () => {
   // 模拟添加目标
   const newGoal = {
-    id: Date.now().toString(),
+    id: dayjs().valueOf().toString(),
     ...goalForm.value
   }
   goals.value.push(newGoal)

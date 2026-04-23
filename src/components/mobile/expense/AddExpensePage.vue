@@ -107,6 +107,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onActivated, computed } from 'vue'
+import dayjs from 'dayjs'
 import { Close } from '@element-plus/icons-vue'
 import PageHeader from '../../common/PageHeader.vue'
 import NumberKeypad from '../../common/NumberKeypad.vue'
@@ -190,14 +191,14 @@ const initDateTime = () => {
 
 // 更新日期时间格式
 const updateDateTime = () => {
-  const date = new Date(selectedDateTime.value)
-  const now = new Date(getCurrentISOString())
-  const isToday = date.toDateString() === now.toDateString()
-  
+  const date = dayjs(selectedDateTime.value)
+  const now = dayjs(getCurrentISOString())
+  const isToday = date.isSame(now, 'day')
+
   if (isToday) {
-    formattedDateTime.value = `今天 ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`
+    formattedDateTime.value = `今天 ${date.hour().toString().padStart(2, '0')}:${date.minute().toString().padStart(2, '0')}`
   } else {
-    formattedDateTime.value = `${date.getMonth() + 1}月${date.getDate()}日 ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`
+    formattedDateTime.value = `${date.month() + 1}月${date.date()}日 ${date.hour().toString().padStart(2, '0')}:${date.minute().toString().padStart(2, '0')}`
   }
 }
 
@@ -413,7 +414,7 @@ const saveExpense = async () => {
   try {
     await db.connect()
 
-    const transactionId = Date.now().toString()
+    const transactionId = dayjs().valueOf().toString()
     const relatedId = transactionId
     
     // 使用账户出账接口 - 自动处理余额检查和账户更新
@@ -422,7 +423,7 @@ const saveExpense = async () => {
       amountNumber,
       `支出：${selectedCategory.value?.name || ' '}${remark.value ? '：' + remark.value : ''}`, // 支出类型作为描述，如果不存在则使用空字符串
       transactionId,
-      new Date(selectedDateTime.value)
+      dayjs(selectedDateTime.value).toDate()
     )
     
     const statements = []

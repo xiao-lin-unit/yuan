@@ -38,6 +38,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import dayjs from 'dayjs'
 import PageTemplate from '../../common/PageTemplate.vue'
 import { buyFund as buyFundService, getAvailableAccounts, getFundById } from '../../../services/asset/fundService'
 
@@ -63,7 +64,7 @@ const fundForm = ref({
   fee: 0,
   has_lock: false,
   lock_period: 0,
-  transaction_time: new Date(),
+  transaction_time: dayjs(),
   account_id: ''
 })
 

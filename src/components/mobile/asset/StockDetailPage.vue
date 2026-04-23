@@ -171,6 +171,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
+import dayjs from 'dayjs';
 import { ArrowLeft, Plus, Minus, Edit } from '@element-plus/icons-vue';
 import { ElMessageBox, ElMessage } from 'element-plus';
 import FloatingActionMenu from '../../../components/common/FloatingActionMenu.vue';
@@ -285,15 +286,8 @@ const goBack = () => {
 };
 
 // 格式化日期函数
-const formatDate = (dateString: string | Date) => {
-  const date = new Date(dateString);
-  return date.toLocaleString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
+const formatDate = (dateString: string | dayjs.Dayjs) => {
+  return dayjs(dateString).format('YYYY/MM/DD HH:mm');
 };
 
 // 加载股票详情数据

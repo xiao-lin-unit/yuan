@@ -38,6 +38,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
+import dayjs from 'dayjs'
 import PageTemplate from '../../common/PageTemplate.vue'
 import { getAccountById, getNonCreditCardAccounts, repayCreditCard as repayCreditCardService } from '../../../services/account/accountService'
 import type { Account } from '../../../types/account/account'
@@ -67,7 +68,7 @@ const repayForm = ref({
   account_type: '',
   current_used_limit: '',
   amount: 0,
-  transaction_time: new Date(),
+  transaction_time: dayjs(),
   from_account_id: '',
   remark: ''
 })

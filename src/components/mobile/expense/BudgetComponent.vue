@@ -19,6 +19,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
+import dayjs from 'dayjs';
 import { More } from '@element-plus/icons-vue';
 import db from '../../../database';
 
@@ -47,8 +48,8 @@ const loadBudget = async () => {
     
     // 计算剩余预算（总预算 - 已支出）
     // 这里应该从流水表中查询指定月份的总支出
-    const startDate = new Date(props.year, props.month - 1, 1).toISOString();
-    const endDate = new Date(props.year, props.month, 0, 23, 59, 59).toISOString();
+    const startDate = dayjs().year(props.year).month(props.month - 1).startOf('month').toISOString();
+    const endDate = dayjs().year(props.year).month(props.month - 1).endOf('month').toISOString();
     
     const expenseTransactions = await db.query(
       'SELECT SUM(amount) as total FROM transactions WHERE type = ? AND created_at BETWEEN ? AND ?',

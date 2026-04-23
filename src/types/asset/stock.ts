@@ -1,3 +1,5 @@
+import type dayjs from 'dayjs'
+
 /**
  * Stock type definitions
  */
@@ -11,11 +13,11 @@ export interface Stock {
   current_price: number
   cost_price: number
   confirmed_profit: number
-  first_buy_date: Date | string
+  first_buy_date: dayjs.Dayjs | string
   account_id: string
   ended: number
-  created_at?: Date | string
-  updated_at?: Date | string
+  created_at?: dayjs.Dayjs | string
+  updated_at?: dayjs.Dayjs | string
 }
 
 // Stock holding record
@@ -26,7 +28,7 @@ export interface StockHolding {
   quantity: number
   remaining_quantity: number
   fee: number
-  transaction_time: Date | string
+  transaction_time: dayjs.Dayjs | string
   account_id: string
   sell_status?: string
 }
@@ -40,7 +42,7 @@ export interface StockTransaction {
   type: '买入' | '卖出'
   hold_ids?: string
   fee: number
-  transaction_time: Date | string
+  transaction_time: dayjs.Dayjs | string
   account_id: string
 }
 
@@ -51,7 +53,7 @@ export interface StockInput {
   price: number
   quantity: number
   fee: number
-  transaction_time: Date
+  transaction_time: dayjs.Dayjs
   account_id: string
 }
 
@@ -60,7 +62,7 @@ export interface StockBuyInput {
   price: number
   quantity: number
   fee: number
-  transaction_time: Date
+  transaction_time: dayjs.Dayjs
   account_id: string
 }
 
@@ -69,7 +71,7 @@ export interface StockSellInput {
   price: number
   quantity: number
   fee: number
-  transaction_time: Date
+  transaction_time: dayjs.Dayjs
   account_id: string
 }
 

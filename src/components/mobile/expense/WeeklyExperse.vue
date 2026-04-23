@@ -20,10 +20,11 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
+import dayjs from 'dayjs';
 import db from '../../../database';
 
 interface DayData {
-  date: Date;
+  date: dayjs.Dayjs;
   label: string;
   amount: number;
 }
@@ -55,24 +56,20 @@ const getBarHeight = (amount: number): string => {
 };
 
 // 获取本周的开始和结束日期
-const getWeekRange = (): { start: Date; end: Date } => {
-  const now = new Date();
+const getWeekRange = (): { start: dayjs.Dayjs; end: dayjs.Dayjs } => {
+  const now = dayjs();
   console.log('当前日期:', now.toISOString());
-  const dayOfWeek = now.getDay(); // 0-6，0表示周日
+  const dayOfWeek = now.day(); // 0-6，0表示周日
   console.log('当前星期:', dayOfWeek);
-  
+
   // 计算本周一的日期（如果今天是周日，则上周日为一周的开始）
-  const start = new Date(now);
-  start.setDate(now.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1)); // 调整为周一作为开始
-  start.setHours(0, 0, 0, 0);
+  const start = now.subtract(dayOfWeek === 0 ? 6 : dayOfWeek - 1, 'day').startOf('day');
   console.log('本周开始日期:', start.toISOString());
-  
+
   // 计算本周日的日期
-  const end = new Date(start);
-  end.setDate(start.getDate() + 6);
-  end.setHours(23, 59, 59, 999);
+  const end = start.add(6, 'day').endOf('day');
   console.log('本周结束日期:', end.toISOString());
-  
+
   return { start, end };
 };
 
@@ -106,8 +103,8 @@ const loadWeeklyExpenses = async () => {
     transactions.forEach(transaction => {
       console.log('处理流水记录:', transaction);
       if (transaction.created_at) {
-        const date = new Date(transaction.created_at);
-        const dateStr = date.toISOString().split('T')[0]; // YYYY-MM-DD格式
+        const date = dayjs(transaction.created_at);
+        const dateStr = date.format('YYYY-MM-DD'); // YYYY-MM-DD格式
         
         if (dailyExpenses.has(dateStr)) {
           dailyExpenses.set(dateStr, dailyExpenses.get(dateStr)! + (transaction.amount || 0));
@@ -124,10 +121,9 @@ const loadWeeklyExpenses = async () => {
     const dayLabels = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
     
     for (let i = 0; i < 7; i++) {
-      const date = new Date(start);
-      date.setDate(start.getDate() + i);
-      const dateStr = date.toISOString().split('T')[0];
-      
+      const date = start.add(i, 'day');
+      const dateStr = date.format('YYYY-MM-DD');
+
       days.push({
         date,
         label: dayLabels[i],
@@ -141,13 +137,13 @@ const loadWeeklyExpenses = async () => {
     console.error('加载本周支出数据失败:', error);
     // 出错时使用默认数据
     weeklyData.value = [
-      { date: new Date(), label: '周一', amount: 0 },
-      { date: new Date(), label: '周二', amount: 0 },
-      { date: new Date(), label: '周三', amount: 0 },
-      { date: new Date(), label: '周四', amount: 0 },
-      { date: new Date(), label: '周五', amount: 0 },
-      { date: new Date(), label: '周六', amount: 0 },
-      { date: new Date(), label: '周日', amount: 0 }
+      { date: dayjs(), label: '周一', amount: 0 },
+      { date: dayjs(), label: '周二', amount: 0 },
+      { date: dayjs(), label: '周三', amount: 0 },
+      { date: dayjs(), label: '周四', amount: 0 },
+      { date: dayjs(), label: '周五', amount: 0 },
+      { date: dayjs(), label: '周六', amount: 0 },
+      { date: dayjs(), label: '周日', amount: 0 }
     ];
   }
 };
