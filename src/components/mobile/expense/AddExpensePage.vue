@@ -111,10 +111,10 @@ import { Close } from '@element-plus/icons-vue'
 import PageHeader from '../../common/PageHeader.vue'
 import NumberKeypad from './NumberKeypad.vue'
 import CategoryItem from './CategoryItem.vue'
-import { CategoryService } from '../../../services/categoryService'
 import type { Category } from '../../../data/categories'
 import { useAccountStore } from '../../../stores/account'
 import db from '../../../database'
+import { expenseCategories } from '../../../data/categories'
 import { createDebitTransaction } from '../../../services/account/accountService'
 import { getCurrentISOString, formatForDB } from '../../../utils/timezone'
 
@@ -221,10 +221,7 @@ const selectCategory = (id: string) => {
 // 加载分类数据
 const loadCategories = async () => {
   try {
-    // 初始化默认分类（如果需要）
-    await CategoryService.initializeDefaultCategories()
     // 获取支出分类
-    const expenseCategories = await CategoryService.getCategories('expense')
     categories.value = expenseCategories
   } catch (error) {
     console.error('Error loading categories:', error)

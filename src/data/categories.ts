@@ -29,8 +29,8 @@ export const expenseCategories: Category[] = [
   { id: 'cat_18', name: '请客送礼', icon: 'gift-icon', iconText: '🎁', type: 'expense' },
   { id: 'cat_19', name: '电器数码', icon: 'digital-icon', iconText: '📱', type: 'expense' },
   { id: 'cat_20', name: '运动', icon: 'sport-icon', iconText: '🏃', type: 'expense' },
-  { id: 'cat_21', name: '其它', icon: 'other-icon', iconText: '📦', type: 'expense' },
-  { id: 'cat_22', name: '水电煤', icon: 'utility-icon', iconText: '💧', type: 'expense' }
+  { id: 'cat_22', name: '水电煤', icon: 'utility-icon', iconText: '💧', type: 'expense' },
+  { id: 'cat_21', name: '其它', icon: 'other-icon', iconText: '📦', type: 'expense' }
 ]
 
 // 收入分类数据，仅用于初始化

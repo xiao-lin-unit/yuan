@@ -229,8 +229,8 @@ export class CategoryService {
         { id: 'cat_18', name: '请客送礼', icon: 'gift-icon', iconText: '🎁', type: 'expense' },
         { id: 'cat_19', name: '电器数码', icon: 'digital-icon', iconText: '📱', type: 'expense' },
         { id: 'cat_20', name: '运动', icon: 'sport-icon', iconText: '🏃', type: 'expense' },
-        { id: 'cat_21', name: '其它', icon: 'other-icon', iconText: '📦', type: 'expense' },
         { id: 'cat_22', name: '水电煤', icon: 'utility-icon', iconText: '💧', type: 'expense' }
+        { id: 'cat_21', name: '其它', icon: 'other-icon', iconText: '📦', type: 'expense' },
       ]
       
       // 默认收入分类

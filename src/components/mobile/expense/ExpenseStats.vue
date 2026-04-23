@@ -313,7 +313,7 @@ const renderCategoryChart = async (labels: string[], data: number[]) => {
     series: [
       {
         type: 'pie',
-        radius: ['50%', '70%'],
+        radius: ['30%', '70%'],
         avoidLabelOverlap: false, // 必须设为false，防止中心label被挪位
         itemStyle: {
           borderRadius: 3,
