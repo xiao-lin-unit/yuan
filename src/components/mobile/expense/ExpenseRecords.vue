@@ -29,11 +29,24 @@ const month = ref(props.month);
 const generateDays = () => {
   const yearVal = year.value;
   const monthVal = month.value - 1; // 转换为0-11的月份格式
-  
-  // 获取当月第一天
-  const firstDay = new Date(yearVal, monthVal, 1);
+
   // 获取当月最后一天
-  const lastDay = new Date(yearVal, monthVal + 1, 0);
+  let lastDay = new Date(yearVal, monthVal + 1, 0);
+  const now = new Date();
+  // 如果当前年份大于展示年份，则展示到月份的最后一天
+  if (now.getFullYear() > yearVal) {
+
+    // 如果年份相同，当前月份大于展示月份，则展示到月份的最后一天
+  } else if (now.getFullYear() === yearVal && now.getMonth() > monthVal) {
+    
+    // 如果年份相同，当前月份等于展示月份，则展示到今天
+  } else if (now.getFullYear() === yearVal && now.getMonth() === monthVal) {
+    lastDay = now;
+    // 如果当前年份小于展示年份，或者当前年份等于展示年份但当前月份小于展示月份，则不展示内容
+  } else {
+    days.value = [];
+    return;
+  }
   // 获取当月天数
   const daysInMonth = lastDay.getDate();
   
@@ -41,7 +54,6 @@ const generateDays = () => {
   
   // 生成当月的每一天
   for (let day = 1; day <= daysInMonth; day++) {
-    const date = new Date(yearVal, monthVal, day);
     const dateStr = `${String(monthVal + 1).padStart(2, '0')}.${String(day).padStart(2, '0')}`;
     
     // 标记今天、昨天、前天

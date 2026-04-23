@@ -41,6 +41,12 @@ defineEmits<{
   box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.1);
   z-index: 100;
   flex-shrink: 0;
+  /* 确保底部导航栏始终可见 */
+  position: relative;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
 }
 
 .nav-item {

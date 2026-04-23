@@ -11,7 +11,7 @@
           <div v-if="expense.remark" class="expense-note">{{ expense.remark }}</div>
         </div>
         <div class="expense-details">
-          <span class="expense-amount">-¥{{ expense.amount.toFixed(2) }}</span>
+          <span class="expense-amount">¥{{ expense.amount.toFixed(2) }}</span>
           <span class="expense-method">{{ expense.account_name }}</span>
         </div>
       </div>
@@ -76,13 +76,13 @@ const loadDailyExpenses = async () => {
     transactions.forEach(transaction => {
       console.log("流水信息", JSON.stringify(transaction))
       // 根据subType查找对应的分类名称
-      const category = expenseCategories.find(cat => cat.id === transaction.subType);
-      const categoryName = category ? category.name : transaction.subType;
+      const category = expenseCategories.find(cat => cat.id === transaction.sub_type);
+      const categoryName = category ? category.name : transaction.sub_type;
       
       expenseList.push({
         category: categoryName,
         amount: transaction.amount,
-        account_name: transaction.accountName,
+        account_name: transaction.account_name,
         remark: transaction.remark
       });
       total += transaction.amount;

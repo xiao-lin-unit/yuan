@@ -45,6 +45,8 @@
       <div class="calendar-container">
         <Calendar 
           width="100%"
+          :year="selectedYear"
+          :month="selectedMonth"
           :expenses="Object.fromEntries(dailyExpenses)"
           @click="handleDateClick"
         />
@@ -72,7 +74,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, watch, onActivated } from 'vue';
 import { ArrowLeft, ArrowDown, House, Grid } from '@element-plus/icons-vue';
 import { use } from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
@@ -80,23 +82,24 @@ import { LineChart, PieChart } from 'echarts/charts';
 import { GridComponent, TooltipComponent, LegendComponent, TitleComponent } from 'echarts/components';
 import VChart from 'vue-echarts';
 import db from '../../../database';
-import Calendar from '../../common/Calendar.vue';
+import Calendar from '../../common/calendar/Calendar.vue';
 import { CategoryService } from '../../../services/categoryService';
 
 // 注册 ECharts 组件
 use([CanvasRenderer, LineChart, PieChart, GridComponent, TooltipComponent, LegendComponent, TitleComponent]);
 
-// 接收年月参数
+// 接收年月参数（可选，默认为当前日期）
 const props = defineProps<{
-  year: number;
-  month: number;
+  year?: number;
+  month?: number;
 }>();
 
 const emit = defineEmits(['navigate']);
 
-// 日期选择状态
-const selectedYear = ref(props.year);
-const selectedMonth = ref(props.month);
+// 日期选择状态 - 使用传入值或当前年月
+const now = new Date();
+const selectedYear = ref(props.year ?? now.getFullYear());
+const selectedMonth = ref(props.month ?? now.getMonth() + 1);
 const showDatePicker = ref(false);
 
 // 生成年份列表
@@ -420,6 +423,27 @@ const goBack = () => {
 
 // 组件挂载时加载数据
 onMounted(() => {
+  loadDailyExpenses();
+  loadCategoryExpenses();
+  loadDailyChartData();
+});
+
+// 组件被激活时重新加载数据
+onActivated(() => {
+  loadDailyExpenses();
+  loadCategoryExpenses();
+  loadDailyChartData();
+});
+
+// 监听年份变化，重新加载数据
+watch(selectedYear, () => {
+  loadDailyExpenses();
+  loadCategoryExpenses();
+  loadDailyChartData();
+});
+
+// 监听月份变化，重新加载数据
+watch(selectedMonth, () => {
   loadDailyExpenses();
   loadCategoryExpenses();
   loadDailyChartData();

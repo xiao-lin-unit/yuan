@@ -65,15 +65,17 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed, onBeforeUnmount } from 'vue';
+import { ref, onMounted, onUnmounted, computed, onBeforeUnmount, watch } from 'vue';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addDays } from 'date-fns';
 // https://6tail.cn/calendar/api.html  农历信息
 import { Solar, Lunar, HolidayUtil } from 'lunar-javascript';
 import { Clock } from '@element-plus/icons-vue';
 
-defineProps({
+const props = defineProps({
   width: { type: String, default: '500px' },
   height: { type: String, default: '600px' },
+  year: { type: Number, default: new Date().getFullYear() },
+  month: { type: Number, default: new Date().getMonth() + 1 },
   expenses: { type: Object, default: () => ({}) },
 });
 
@@ -232,7 +234,7 @@ const changeMonth = m => {
 
 // 回调 当拖动变化的时候
 const emits = defineEmits(['click']);
-// 选择日期出发
+// 选择日期触发事件
 const selectDate = (date) => {
   if (date) {
     currentDateObj.value = date;
@@ -252,7 +254,7 @@ const toNowEvent = () => {
 
 let intervalId;
 onMounted(() => {
-  daysUntilNextYear = daysUntilNextYearJanuaryFirst();
+  // daysUntilNextYear = daysUntilNextYearJanuaryFirst();
   // 当组件加载时执行的操作
   toNowEvent();
   // 时间定时器
@@ -263,12 +265,27 @@ onUnmounted(() => {
   clearInterval(intervalId);
 });
 
+// 监听 props.year 和 props.month 的变化
+watch(() => props.year, (newYear) => {
+  if (newYear !== null && newYear !== undefined) {
+    formDay.value.year = newYear + '';
+    calendarPage.value = getCalendarDates(Number(formDay.value.year), Number(formDay.value.month) - 1);
+  }
+});
+
+watch(() => props.month, (newMonth) => {
+  if (newMonth !== null && newMonth !== undefined) {
+    formDay.value.month = newMonth + '';
+    calendarPage.value = getCalendarDates(Number(formDay.value.year), Number(formDay.value.month) - 1);
+  }
+});
+
 // 假日更新
 // https://6tail.cn/calendar/api.html#holiday-util.fix.html  节假日补充
 // 2024 年： 202312300120240101202312310120240101202401010120240101202402041020240210202402101120240210202402111120240210202402121120240210202402131120240210202402141120240210202402151120240210202402161120240210202402171120240210202402181020240210202404042120240404202404052120240404202404062120240404202404072020240404202404283020240501202405013120240501202405023120240501202405033120240501202405043120240501202405053120240501202405113020240501202406084120240610202406094120240610202406104120240610202409145020240917202409155120240917202409165120240917202409175120240917202409296020241001202410016120241001202410026120241001202410036120241001202410046120241001202410056120241001202410066120241001202410076120241001202410126020241001
 // HolidayUtil.fix('xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx')
 // 格式：当天年月日YYYYMMDD(8位)+节假日名称下标(1位)+调休标识(1位)+节假日当天YYYYMMDD(8位)  一共18位
-// 0(元旦节)  1(春节)  2(清明节)  3(劳动节)  4(端午节)  5(中秋节)  6(国庆节) 7(国庆中秋) 8(抗战胜利日)
+// 0(元旦节)  1(春节)  2(清明节)  3(劳动节)  4(端午节)  5(中秋节)  6(国庆节) 7(国庆中秋)  8(抗战胜利日)
 </script>
 
 <style scoped lang="scss">

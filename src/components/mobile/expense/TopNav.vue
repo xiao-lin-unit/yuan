@@ -48,12 +48,13 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import { Calendar, DataAnalysis, ArrowDown } from '@element-plus/icons-vue';
+import { DataAnalysis, ArrowDown } from '@element-plus/icons-vue';
 
-// 日期选择状态
+// 日期选择状态 - 默认为当前年月
 const showDatePicker = ref(false);
-const selectedYear = ref(2026);
-const selectedMonth = ref(3);
+const now = new Date();
+const selectedYear = ref(now.getFullYear());
+const selectedMonth = ref(now.getMonth() + 1);
 
 // 定义事件
 const emit = defineEmits(['dateChange', 'navigate']);
@@ -84,7 +85,7 @@ const selectMonth = (month: number) => {
 
 // 导航到统计页面
 const navigateToStats = () => {
-  emit('navigate', 'expenseStats');
+  emit('navigate', { key: 'expenseStats', param: { year: selectedYear.value, month: selectedMonth.value } });
 };
 </script>
 

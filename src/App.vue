@@ -4,15 +4,14 @@
     <AppHeader @toggle-menu="toggleMenu" />
     
     <!-- 中间内容区域 -->
-    <AppContent 
+    <AppContent class="content-wrapper"
       :currentComponent="currentComponent" 
       @navigate="navigateTo"
-      @dateChange="handleDateChange"
       :componentProps="componentProps"
     />
     
     <!-- 底部功能导航 -->
-    <AppFooter @navigate="navigateTo" />
+    <AppFooter class="footer" @navigate="navigateTo" />
     
     <!-- 侧边菜单 -->
     <SideMenu :visible="menuVisible" @close="closeMenu" @navigate="navigateTo" />
@@ -23,6 +22,8 @@
 import { ref, computed, onMounted } from 'vue'
 import { Capacitor } from '@capacitor/core'
 import { Keyboard } from '@capacitor/keyboard'
+import { appNavigateTo, appCurrentComponent, appComponentProps } from './main.ts'
+
 
 // 导入组件
 import AppHeader from './components/common/AppHeader.vue'
@@ -63,10 +64,6 @@ const menuVisible = ref<boolean>(false)
 // 导航参数
 const navParams = ref<any>({});
 
-// 日期选择状态
-const selectedYear = ref(2026);
-const selectedMonth = ref(3);
-
 // 组件映射
   const currentComponent = computed(() => {
     const componentMap: Record<string, any> = {
@@ -106,8 +103,8 @@ const componentProps = computed(() => {
   
   // 为支出相关组件传递年月参数
   if (activeMenu.value === 'expense' || activeMenu.value === 'expenseStats') {
-    props.year = selectedYear.value;
-    props.month = selectedMonth.value;
+    props.year = navParams.value.year;
+    props.month = navParams.value.month;
   }
   
   // 为基金详情页面传递fundId参数
@@ -159,30 +156,13 @@ const componentProps = computed(() => {
 });
 
 const navigateTo = (key: string | { key: string, params?: any }, params?: any) => {
-  let navKey: string;
-  let navParamsObj: any = {};
-  
-  if (typeof key === 'object' && key.key) {
-    // 新格式：{ key: 'fundDetail', params: { fundId } }
-    navKey = key.key;
-    navParamsObj = key.params || {};
-  } else {
-    // 旧格式：'addAsset', params
-    navKey = key as string;
-    navParamsObj = params || {};
-  }
-  
-  activeMenu.value = navKey;
+  const menu = appNavigateTo(key, params)
+  console.log('Navigate to:', menu.key, 'with params:', menu.params);
+  activeMenu.value = menu.key;
   // 存储导航参数
-  navParams.value = navParamsObj;
-  console.log('Navigate to:', navKey, 'with params:', navParamsObj);
+  navParams.value = menu.params;
+  console.log('Navigate to:', activeMenu.value, 'with params:', navParams.value);
 }
-
-// 处理日期变化
-const handleDateChange = (date: { year: number; month: number }) => {
-  selectedYear.value = date.year;
-  selectedMonth.value = date.month;
-};
 
 // 切换菜单显示/隐藏
 const toggleMenu = () => {
@@ -197,25 +177,34 @@ const closeMenu = () => {
 // 初始化Keyboard插件
 onMounted(() => {
   if (Capacitor.isNativePlatform()) {
-    // 设置键盘配置
+    // 设置键盘配置 - 使用 none 模式防止页面上移
+    // 这是关键设置，防止键盘弹出时页面被压缩
     Keyboard.setResizeMode({
-      mode: 'none'
+      mode: 'none' as any
     })
     
-    // 监听键盘事件
+    // 仅监听键盘事件用于日志记录，不操作DOM避免影响输入焦点
     Keyboard.addListener('keyboardWillShow', (info) => {
       console.log('键盘将显示，高度:', info.keyboardHeight)
     })
     
+    Keyboard.addListener('keyboardDidShow', () => {
+      console.log('键盘已显示')
+    })
+    
     Keyboard.addListener('keyboardWillHide', () => {
       console.log('键盘将隐藏')
+    })
+    
+    Keyboard.addListener('keyboardDidHide', () => {
+      console.log('键盘已隐藏')
     })
   }
 })
 </script>
 
 <style scoped>
-/* 全局样式，防止body和html出现滚动条 */
+/* 关键：固定整个容器，键盘永远无法顶起页面 */
 :global(body),
 :global(html) {
   margin: 0;
@@ -233,5 +222,16 @@ onMounted(() => {
   background-color: #f5f7fa;
   overflow: hidden;
   box-sizing: border-box;
+}
+
+/* 键盘打开时的样式 - 使用 fixed 定位防止页面上移 */
+:global(body.keyboard-open) .app {
+  /* 保持固定高度，不受键盘影响 */
+  height: 100vh;
+}
+
+/* 确保底部导航栏始终显示 */
+.footer {
+  display: flex;
 }
 </style>

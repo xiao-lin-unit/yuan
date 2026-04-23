@@ -79,7 +79,7 @@
       <!-- 备注和金额行 -->
       <div class="remark-amount-row">
         <div class="remark-section">
-          <div class="remark-input" contenteditable="true" placeholder="请输入备注"></div>
+          <input class="remark-input" contenteditable="true" placeholder="请输入备注" v-model="remark" />
         </div>
         <div class="amount-section">
           <input 
@@ -115,11 +115,14 @@ import { CategoryService } from '../../../services/categoryService'
 import type { Category } from '../../../data/categories'
 import { useAccountStore } from '../../../stores/account'
 import db from '../../../database'
+import { createDebitTransaction } from '../../../services/account/accountService'
+import { getCurrentISOString, formatForDB } from '../../../utils/timezone'
 
 const emit = defineEmits(['navigate'])
 
 // 金额
 const amount = ref('')
+const remark = ref('')
 
 // 计算器状态
 const calculator = ref({
@@ -137,12 +140,28 @@ const selectedAccount = ref('账户')
 // 账户store
 const accountStore = useAccountStore()
 
-// 从store获取账户列表（只显示流动资金账户和信用卡账户）
+// 获取选中的分类信息
+const selectedCategory = computed(() => {
+  return categories.value.find(c => c.id === selectedCategoryId.value)
+})
+
+// 从store获取账户列表（根据分类类型过滤）
+// 默认：信用卡 + 流动资金账户
+// 医疗类型：额外允许社保账户
 const accounts = computed(() => {
   console.log("账户列表：", JSON.stringify(accountStore.accounts))
+  const isMedicalCategory = selectedCategory.value?.name === '医疗' || selectedCategory.value?.id === 'medical'
+  
   return accountStore.accounts.filter(account => {
     console.log("账户：", JSON.stringify(account))
-    return account.is_liquid || account.type === '信用卡'
+    // 信用卡始终允许
+    if (account.type === '信用卡') return true
+    // 流动资金账户始终允许
+    if (account.is_liquid) return true
+    // 医疗类型额外允许社保账户
+    if (isMedicalCategory && account.type === '社保卡') return true
+    
+    return false
   })
 })
 
@@ -161,7 +180,7 @@ const selectAccount = (account: { name: string }) => {
 
 // 日期时间选择
 const showDateTimeSelector = ref(false)
-const selectedDateTime = ref(new Date().toISOString().slice(0, 16)) // 默认当前时间
+const selectedDateTime = ref(getCurrentISOString().slice(0, 16)) // 默认当前时间(UTC+8)
 const formattedDateTime = ref('')
 
 // 初始化日期时间格式
@@ -172,7 +191,7 @@ const initDateTime = () => {
 // 更新日期时间格式
 const updateDateTime = () => {
   const date = new Date(selectedDateTime.value)
-  const now = new Date()
+  const now = new Date(getCurrentISOString())
   const isToday = date.toDateString() === now.toDateString()
   
   if (isToday) {
@@ -394,34 +413,27 @@ const saveExpense = async () => {
     return
   }
 
-  if (selectedAccountObj.is_liquid) {
-    if (selectedAccountObj.balance < amountNumber) {
-      alert(`账户余额不足，当前余额: ¥${selectedAccountObj.balance}`)
-      return
-    }
-  } else if (selectedAccountObj.type === '信用卡') {
-    const availableLimit = selectedAccountObj.total_limit - selectedAccountObj.used_limit
-    if (availableLimit < amountNumber) {
-      alert(`信用卡可用额度不足，当前可用额度: ¥${availableLimit}`)
-      return
-    }
-  }
-
-  let newBalance = selectedAccountObj.balance
-  let newUsedLimit = selectedAccountObj.used_limit
-
-  if (selectedAccountObj.is_liquid) {
-    newBalance = selectedAccountObj.balance - amountNumber
-  } else if (selectedAccountObj.type === '信用卡') {
-    newUsedLimit = selectedAccountObj.used_limit + amountNumber
-  }
-
   try {
     await db.connect()
 
     const transactionId = Date.now().toString()
     const relatedId = transactionId
+    
+    // 使用账户出账接口 - 自动处理余额检查和账户更新
+    const debitResult = await createDebitTransaction(
+      selectedAccountObj.id,
+      amountNumber,
+      `支出：${selectedCategory.value?.name || ' '}${remark.value ? '：' + remark.value : ''}`, // 支出类型作为描述，如果不存在则使用空字符串
+      transactionId,
+      new Date(selectedDateTime.value)
+    )
+    
     const statements = []
+    
+    // 添加账户出账相关的SQL语句
+    statements.push(...debitResult.statements)
+    
+    // 添加支出流水记录
     const record = {
       statement: `INSERT INTO transactions 
          (id, type, sub_type, amount, account_id, related_id, balance_after, remark, created_at) 
@@ -433,24 +445,12 @@ const saveExpense = async () => {
           amountNumber,
           selectedAccountObj.id,
           relatedId,
-          newBalance,
-          '',
-          new Date(selectedDateTime.value).toISOString()
+          debitResult.balanceAfter,
+          remark.value,
+          formatForDB(selectedDateTime.value)
         ]
     }
-    const udpate = {
-      statement: '',
-      values: []
-    }
-    if (selectedAccountObj.is_liquid) {
-        udpate.statement = 'UPDATE accounts SET balance = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-        udpate.values = [newBalance, selectedAccountObj.id]
-    } else {
-        udpate.statement = 'UPDATE accounts SET used_limit = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-        udpate.values = [newUsedLimit, selectedAccountObj.id]
-    }
     statements.push(record)
-    statements.push(udpate)
 
     // ==============================================
     // 这里是 Capacitor SQLite 正确事务写法
@@ -461,10 +461,10 @@ const saveExpense = async () => {
     await accountStore.loadAccounts()
     console.log('保存支出成功（事务安全）')
 
-  } catch (error) {
+  } catch (error: any) {
     // 执行到这里 = 事务已自动回滚 
     console.error('保存失败，已自动回滚:', error)
-    alert('保存失败，请重试')
+    alert(error.message || '保存失败，请重试')
     return
   }
 
@@ -561,12 +561,18 @@ const goBack = () => {
   min-height: 20px;
   outline: none;
   padding: 4px 0;
+  border: none;
+
 }
 
 .remark-input[contenteditable]:empty:before {
   content: attr(placeholder);
-  color: #999999;
+  color: #aca7a7;
   pointer-events: none;
+}
+
+.remark-input::placeholder {
+  color: #aca7a7;
 }
 
 /* 金额显示 */

@@ -25,16 +25,16 @@ import { ref, computed } from 'vue';
 import { Plus } from '@element-plus/icons-vue';
 import TopNav from './TopNav.vue';
 import MonthlyStats from './MonthlyStats.vue';
-import BudgetComponent from './BudgetComponent.vue';
 import WeeklyFinance from './WeeklyFinance.vue';
 import ExpenseRecords from './ExpenseRecords.vue';
 import FloatingActionMenu from '../../common/FloatingActionMenu.vue';
 
 const emit = defineEmits(['navigate']);
 
-// 日期选择状态
-const selectedYear = ref(2026);
-const selectedMonth = ref(3);
+// 日期选择状态 - 默认为当前年月
+const now = new Date();
+const selectedYear = ref(now.getFullYear());
+const selectedMonth = ref(now.getMonth() + 1);
 
 // 计算是否是当前月份
 const isCurrentMonth = computed(() => {
@@ -46,15 +46,6 @@ const isCurrentMonth = computed(() => {
 const handleDateChange = (date: { year: number; month: number }) => {
   selectedYear.value = date.year;
   selectedMonth.value = date.month;
-};
-
-// 可以添加支出数据和相关方法
-const expenses = ref([]);
-const budget = ref({});
-
-// 可以添加获取支出数据的方法
-const loadExpenses = () => {
-  // 这里可以从API或本地存储获取支出数据
 };
 
 // 导航到新增支出页面

@@ -5,14 +5,15 @@
 
 import db from '../../database/index.js'
 import type { Account, AccountTransaction, AccountInput, BalanceAdjustInput, TransferInput, RepayCreditCardInput } from '../../types/account/account.js'
+import { getCurrentISOString, dateNow } from '../../utils/timezone'
 
 /**
  * Add a new account
  * 同时生成一条入账记录
  */
 export async function addAccount(accountData: AccountInput): Promise<void> {
-  const id = Date.now().toString()
-  const transactionId = (Date.now() + 1).toString()
+  const id = dateNow().toString()
+  const transactionId = (dateNow() + 1).toString()
 
   const statements = [
     // 1. 创建账户
@@ -44,7 +45,7 @@ export async function addAccount(accountData: AccountInput): Promise<void> {
         accountData.balance,
         accountData.balance,
         '账户初始入账',
-        new Date().toISOString()
+        getCurrentISOString()
       ]
     })
   }
@@ -62,7 +63,7 @@ export async function addAccount(accountData: AccountInput): Promise<void> {
         usedLimit,
         usedLimit,
         '信用卡初始借款',
-        new Date().toISOString()
+        getCurrentISOString()
       ]
     })
   }
@@ -191,8 +192,8 @@ export async function createDebitTransaction(
     throw new Error(`账户类型"${account.type}"不允许出账，仅流动储蓄账户和信用卡支持出账`)
   }
 
-  const txId = transactionId || Date.now().toString()
-  const txTime = transactionTime || new Date()
+  const txId = transactionId || dateNow().toString()
+  const txTime = transactionTime || new Date(getCurrentISOString())
   let balanceAfter: number
   let accountUpdateStatement: { statement: string; values: any[] }
 
@@ -280,8 +281,8 @@ export async function createCreditTransaction(
   }
 
   const isCreditCard = account.type === '信用卡'
-  const txId = transactionId || Date.now().toString()
-  const txTime = transactionTime || new Date()
+  const txId = transactionId || dateNow().toString()
+  const txTime = transactionTime || new Date(getCurrentISOString())
   let balanceAfter: number
   let accountUpdateStatement: { statement: string; values: any[] }
 
@@ -335,7 +336,7 @@ export async function adjustBalance(input: BalanceAdjustInput): Promise<void> {
   }
 
   const newBalance = account.balance + input.amount
-  const transactionId = Date.now().toString()
+  const transactionId = dateNow().toString()
 
   const statements = [
     // Update account balance
@@ -354,7 +355,7 @@ export async function adjustBalance(input: BalanceAdjustInput): Promise<void> {
         Math.abs(input.amount),
         newBalance,
         input.remark || `${input.type}：余额调整`,
-        new Date()
+        getCurrentISOString()
       ]
     }
   ]
@@ -380,8 +381,8 @@ export async function transfer(input: TransferInput): Promise<void> {
     throw new Error('转入账户不存在')
   }
 
-  const transactionId = Date.now().toString()
-  const transactionTime = new Date()
+  const transactionId = dateNow().toString()
+  const transactionTime = new Date(getCurrentISOString())
 
   // 使用新的出账入账接口（现在已包含交易记录创建）
   const debitResult = await createDebitTransaction(
@@ -516,7 +517,7 @@ export async function repayCreditCard(input: RepayCreditCardInput): Promise<void
     throw new Error(`还款来源账户余额不足，当前余额：¥${fromAccount.balance.toFixed(2)}`)
   }
 
-  const transactionId = Date.now().toString()
+  const transactionId = dateNow().toString()
 
   const statements = [
     // 1. 减少信用卡已用额度

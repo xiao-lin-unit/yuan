@@ -3,7 +3,6 @@
     <component 
       :is="currentComponent" 
       @navigate="$emit('navigate', $event)" 
-      @dateChange="$emit('dateChange', $event)"
       v-bind="componentProps"
     />
   </div>
@@ -17,7 +16,6 @@ defineProps<{
 
 defineEmits<{
   (e: 'navigate', key: string): void,
-  (e: 'dateChange', date: { year: number; month: number }): void
 }>();
 </script>
 
