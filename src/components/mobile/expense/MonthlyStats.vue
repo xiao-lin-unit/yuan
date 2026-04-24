@@ -1,7 +1,7 @@
 <template>
   <div class="monthly-stats">
     <div class="background-image">
-      <img src="https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=hot air balloons in Cappadocia landscape&image_size=landscape_16_9" alt="背景" />
+      <img src="@/assets/img/r1.jpg" alt="背景" />
       <div class="financial-overview">
         <div class="overview-item">
           <div class="overview-label">月支出</div>

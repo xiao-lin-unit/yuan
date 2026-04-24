@@ -3,7 +3,7 @@
     <div class="menu-overlay" @click="closeMenu"></div>
     <div class="menu-content">
       <div class="user-profile">
-        <img src="https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=user%20avatar%20icon%20minimalist%20design&image_size=square" alt="用户头像" />
+        <img src="@/assets/img/user_icon.png" alt="用户头像" />
         <div class="user-info">
           <h3>{{ userName }}</h3>
         </div>

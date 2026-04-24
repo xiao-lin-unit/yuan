@@ -49,7 +49,7 @@
   },
   "build": {
     "appId": "com.finance.app",
-    "productName": "财务APP",
+    "productName": "裕安",
     "directories": {
       "output": "dist/electron"
     },
