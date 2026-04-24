@@ -1,351 +1,311 @@
 <template>
-  <div class="liability-management">
-    <el-card>
-      <template #header>
-        <div class="card-header">
-          <span>负债管理</span>
-          <el-button type="primary" @click="openAddLiabilityDialog">新增负债</el-button>
-        </div>
+  <div class="liability-page">
+    <!-- 页面标题 -->
+    <div class="page-header">
+      <h2 class="page-title">{{ showSettled ? '历史负债' : '当前负债' }}</h2>
+    </div>
+
+    <!-- 负债统计概览 -->
+    <div class="liability-summary">
+      <div class="summary-card total">
+        <div class="summary-label">负债本金</div>
+        <div class="summary-value">¥{{ totalPrincipal.toFixed(2) }}</div>
+      </div>
+      <div class="summary-card remaining">
+        <div class="summary-label">剩余待还</div>
+        <div class="summary-value">¥{{ totalRemaining.toFixed(2) }}</div>
+      </div>
+      <div class="summary-card count">
+        <div class="summary-label">负债笔数</div>
+        <div class="summary-value">{{ displayLiabilities.length }}</div>
+      </div>
+    </div>
+
+    <!-- 负债卡片容器 -->
+    <div class="liability-cards-container">
+      <div v-if="displayLiabilities.length === 0" class="no-liabilities">
+        <el-empty :description="showSettled ? '暂无历史负债' : '暂无负债'" />
+      </div>
+      <template v-else>
+        <LiabilityCard
+          v-for="liability in displayLiabilities"
+          :key="liability.id"
+          :title="liability.name"
+          :type="liability.type"
+          :principal="liability.principal"
+          :remaining="liability.remaining_principal"
+          :remaining-interest="liability.remaining_total_interest"
+          :interest-rate="liability.interest_rate"
+          :repayment-method="liability.repayment_method"
+          :status="liability.status"
+          :color="getLiabilityColor(liability.type)"
+          :liability-id="liability.id"
+          @click="viewLiabilityDetail"
+        />
       </template>
-      
-      <el-table :data="liabilities" style="width: 100%">
-        <el-table-column prop="id" label="ID" width="80" />
-        <el-table-column prop="name" label="负债名称" />
-        <el-table-column prop="type" label="负债类型" />
-        <el-table-column prop="principal" label="本金" width="100">
-          <template #default="scope">
-            ¥{{ scope.row.principal.toFixed(2) }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="remaining_principal" label="剩余本金" width="120">
-          <template #default="scope">
-            ¥{{ scope.row.remaining_principal.toFixed(2) }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="interest_rate" label="年化利率" width="100">
-          <template #default="scope">
-            {{ (scope.row.interest_rate * 100).toFixed(2) }}%
-          </template>
-        </el-table-column>
-        <el-table-column prop="repayment_method" label="还款方式" width="100" />
-        <el-table-column prop="status" label="状态" width="80" />
-        <el-table-column label="操作" width="200">
-          <template #default="scope">
-            <el-button type="primary" size="small" @click="openEditLiabilityDialog(scope.row)">编辑</el-button>
-            <el-button size="small" @click="openRepaymentDialog(scope.row)">还款</el-button>
-            <el-button type="danger" size="small" @click="deleteLiability(scope.row.id)">删除</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-    </el-card>
-    
-    <!-- 新增负债对话框 -->
-    <el-dialog v-model="dialogVisible.addLiability" title="新增负债" width="600px">
-      <el-form :model="liabilityForm" label-width="120px">
-        <el-form-item label="负债名称">
-          <el-input v-model="liabilityForm.name" placeholder="请输入负债名称" />
-        </el-form-item>
-        <el-form-item label="负债类型">
-          <el-select v-model="liabilityForm.type" placeholder="请选择负债类型">
-            <el-option v-for="item in liabilityTypes" :key="item.value" :label="item.label" :value="item.value" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="本金">
-          <el-input v-model.number="liabilityForm.principal" placeholder="请输入本金" type="number" min="0" step="0.01" />
-        </el-form-item>
-        <el-form-item label="是否计息">
-          <el-switch v-model="liabilityForm.is_interest" />
-        </el-form-item>
-        <el-form-item label="年化利率" v-if="liabilityForm.is_interest">
-          <el-input v-model.number="liabilityForm.interest_rate" placeholder="请输入年化利率" type="number" min="0" step="0.0001" />
-        </el-form-item>
-        <el-form-item label="借款日期">
-          <el-date-picker v-model="liabilityForm.start_date" type="date" placeholder="请选择借款日期" style="width: 100%" />
-        </el-form-item>
-        <el-form-item label="还款方式">
-          <el-select v-model="liabilityForm.repayment_method" placeholder="请选择还款方式">
-            <el-option v-for="item in repaymentMethods" :key="item.value" :label="item.label" :value="item.value" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="还款日" v-if="liabilityForm.repayment_method !== '随借随还'">
-          <el-input v-model.number="liabilityForm.repayment_day" placeholder="请输入还款日" type="number" min="1" max="31" />
-        </el-form-item>
-        <el-form-item label="期数" v-if="liabilityForm.repayment_method !== '随借随还'">
-          <el-input v-model.number="liabilityForm.period" placeholder="请输入期数" type="number" min="1" />
-        </el-form-item>
-        <el-form-item label="绑定账户">
-          <el-select v-model="liabilityForm.account_id" placeholder="请选择绑定账户">
-            <el-option v-for="account in accounts" :key="account.id" :label="account.name" :value="account.id" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="备注">
-          <el-input v-model="liabilityForm.remark" placeholder="请输入备注" type="textarea" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <span class="dialog-footer">
-          <el-button @click="dialogVisible.addLiability = false">取消</el-button>
-          <el-button type="primary" @click="addLiability">确定</el-button>
-        </span>
-      </template>
-    </el-dialog>
-    
-    <!-- 编辑负债对话框 -->
-    <el-dialog v-model="dialogVisible.editLiability" title="编辑负债" width="600px">
-      <el-form :model="liabilityForm" label-width="120px">
-        <el-form-item label="负债名称">
-          <el-input v-model="liabilityForm.name" placeholder="请输入负债名称" />
-        </el-form-item>
-        <el-form-item label="负债类型">
-          <el-select v-model="liabilityForm.type" placeholder="请选择负债类型">
-            <el-option v-for="item in liabilityTypes" :key="item.value" :label="item.label" :value="item.value" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="本金">
-          <el-input v-model.number="liabilityForm.principal" placeholder="请输入本金" type="number" min="0" step="0.01" />
-        </el-form-item>
-        <el-form-item label="剩余本金">
-          <el-input v-model.number="liabilityForm.remaining_principal" placeholder="请输入剩余本金" type="number" min="0" step="0.01" />
-        </el-form-item>
-        <el-form-item label="是否计息">
-          <el-switch v-model="liabilityForm.is_interest" />
-        </el-form-item>
-        <el-form-item label="年化利率" v-if="liabilityForm.is_interest">
-          <el-input v-model.number="liabilityForm.interest_rate" placeholder="请输入年化利率" type="number" min="0" step="0.0001" />
-        </el-form-item>
-        <el-form-item label="借款日期">
-          <el-date-picker v-model="liabilityForm.start_date" type="date" placeholder="请选择借款日期" style="width: 100%" />
-        </el-form-item>
-        <el-form-item label="还款方式">
-          <el-select v-model="liabilityForm.repayment_method" placeholder="请选择还款方式">
-            <el-option v-for="item in repaymentMethods" :key="item.value" :label="item.label" :value="item.value" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="还款日" v-if="liabilityForm.repayment_method !== '随借随还'">
-          <el-input v-model.number="liabilityForm.repayment_day" placeholder="请输入还款日" type="number" min="1" max="31" />
-        </el-form-item>
-        <el-form-item label="期数" v-if="liabilityForm.repayment_method !== '随借随还'">
-          <el-input v-model.number="liabilityForm.period" placeholder="请输入期数" type="number" min="1" />
-        </el-form-item>
-        <el-form-item label="绑定账户">
-          <el-select v-model="liabilityForm.account_id" placeholder="请选择绑定账户">
-            <el-option v-for="account in accounts" :key="account.id" :label="account.name" :value="account.id" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="备注">
-          <el-input v-model="liabilityForm.remark" placeholder="请输入备注" type="textarea" />
-        </el-form-item>
-        <el-form-item label="状态">
-          <el-select v-model="liabilityForm.status" placeholder="请选择状态">
-            <el-option v-for="item in liabilityStatuses" :key="item.value" :label="item.label" :value="item.value" />
-          </el-select>
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <span class="dialog-footer">
-          <el-button @click="dialogVisible.editLiability = false">取消</el-button>
-          <el-button type="primary" @click="updateLiability">确定</el-button>
-        </span>
-      </template>
-    </el-dialog>
-    
-    <!-- 还款对话框 -->
-    <el-dialog v-model="dialogVisible.repayment" title="还款" width="500px">
-      <el-form :model="repaymentForm" label-width="80px">
-        <el-form-item label="还款金额">
-          <el-input v-model.number="repaymentForm.amount" placeholder="请输入还款金额" type="number" min="0" step="0.01" />
-        </el-form-item>
-        <el-form-item label="还款方式">
-          <el-select v-model="repaymentForm.type" placeholder="请选择还款方式">
-            <el-option v-for="item in repaymentTypes" :key="item.value" :label="item.label" :value="item.value" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="备注">
-          <el-input v-model="repaymentForm.remark" placeholder="请输入备注" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <span class="dialog-footer">
-          <el-button @click="dialogVisible.repayment = false">取消</el-button>
-          <el-button type="primary" @click="makeRepayment">确定</el-button>
-        </span>
-      </template>
-    </el-dialog>
+    </div>
+
+    <!-- 切换当前/历史负债按钮 -->
+    <div class="toggle-liabilities-button" @click="toggleLiabilitiesView">
+      <el-icon style="color: white;"><Switch /></el-icon>
+      <span class="toggle-text">{{ showSettled ? '当前负债' : '历史负债' }}</span>
+    </div>
+
+    <!-- 浮动操作按钮 -->
+    <!-- <div class="floating-action-button" v-if="!showSettled" @click="navigateToAddLiability">
+      <el-icon style="color: white;"><Plus /></el-icon>
+    </div> -->
+    <FloatingActionMenu :buttons="actionButtons" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import dayjs from 'dayjs'
-import { useAccountStore } from '../../../stores/account'
-import { liabilityTypes, repaymentMethods, liabilityStatuses, repaymentTypes } from '../../../utils/dictionaries'
+import { ref, onMounted, computed } from 'vue';
+import { Plus, Switch } from '@element-plus/icons-vue';
+import LiabilityCard from './LiabilityCard.vue';
+import { getLiabilities } from '../../../services/liability/liabilityService';
+import type { Liability } from '../../../types/liability/liability';
+import FloatingActionMenu from '../../../components/common/FloatingActionMenu.vue';
 
-const accountStore = useAccountStore()
-const accounts = ref([])
-const liabilities = ref([])
+const emit = defineEmits(['navigate']);
 
-const dialogVisible = ref({
-  addLiability: false,
-  editLiability: false,
-  repayment: false
-})
+const liabilities = ref<Liability[]>([]);
+const showSettled = ref(false);
 
-const liabilityForm = ref({
-  id: '',
-  name: '',
-  type: '',
-  principal: 0,
-  remaining_principal: 0,
-  is_interest: true,
-  interest_rate: 0,
-  start_date: dayjs(),
-  repayment_method: '等额本息',
-  repayment_day: 1,
-  period: 12,
-  account_id: '',
-  remark: '',
-  status: '未结清'
-})
+const displayLiabilities = computed(() => {
+  return liabilities.value.filter(liability => {
+    const isSettled = liability.status === '已结清';
+    return showSettled.value ? isSettled : !isSettled;
+  });
+});
 
-const repaymentForm = ref({
-  liabilityId: '',
-  amount: 0,
-  type: '正常还款',
-  remark: ''
-})
+const totalPrincipal = computed(() => {
+  return displayLiabilities.value.reduce((sum, l) => sum + l.principal, 0);
+});
 
-onMounted(async () => {
-  await accountStore.loadAccounts()
-  accounts.value = accountStore.accounts
-  await loadLiabilities()
-})
+const totalRemaining = computed(() => {
+  return displayLiabilities.value.reduce((sum, l) => sum + l.remaining_principal + l.remaining_total_interest, 0);
+});
 
-const loadLiabilities = async () => {
-  // 模拟数据
-  liabilities.value = [
+const actionButtons = computed(() => {
+  const buttons = [
     {
-      id: '1',
-      name: '招商银行房贷',
-      type: '房贷',
-      principal: 1000000,
-      remaining_principal: 950000,
-      is_interest: true,
-      interest_rate: 0.049,
-      start_date: dayjs('2024-01-01'),
-      repayment_method: '等额本息',
-      repayment_day: 1,
-      period: 360,
-      account_id: '1',
-      remark: '首套房贷款',
-      status: '未结清'
-    },
-    {
-      id: '2',
-      name: '亲友借款-张三',
-      type: '亲友借款',
-      principal: 50000,
-      remaining_principal: 50000,
-      is_interest: false,
-      interest_rate: 0,
-      start_date: dayjs('2024-03-01'),
-      repayment_method: '随借随还',
-      account_id: '2',
-      remark: '临时周转',
-      status: '未结清'
+      text: '新增',
+      icon: Plus,
+      action: navigateToAddLiability
     }
-  ]
-}
+  ];
+  return buttons;
+});
 
-const openAddLiabilityDialog = () => {
-  liabilityForm.value = {
-    id: '',
-    name: '',
-    type: '',
-    principal: 0,
-    remaining_principal: 0,
-    is_interest: true,
-    interest_rate: 0,
-    start_date: dayjs(),
-    repayment_method: '等额本息',
-    repayment_day: 1,
-    period: 12,
-    account_id: '',
-    remark: '',
-    status: '未结清'
+const liabilityColorMap: Record<string, string> = {
+  '房贷': '#ff6b6b',
+  '车贷': '#ff9f43',
+  '信用卡': '#ee5253',
+  '消费贷': '#ff6348',
+  '装修贷': '#e67e22',
+  '助学贷款': '#f39c12',
+  '网贷': '#e74c3c',
+  '电商分期': '#d35400',
+  '租金分期': '#e67e22',
+  '亲友借款': '#c0392b',
+  '经营贷': '#a0522d',
+  '其他负债': '#7f8c8d'
+};
+
+const getLiabilityColor = (type: string) => {
+  return liabilityColorMap[type] || '#ff6b6b';
+};
+
+const toggleLiabilitiesView = () => {
+  showSettled.value = !showSettled.value;
+};
+
+const navigateToAddLiability = () => {
+  emit('navigate', { key: 'addLiability' });
+};
+
+const viewLiabilityDetail = (liabilityId: string) => {
+  emit('navigate', { key: 'liabilityDetail', params: { liabilityId } });
+};
+
+const loadLiabilityData = async () => {
+  try {
+    liabilities.value = await getLiabilities();
+  } catch (error) {
+    console.error('加载负债数据失败:', error);
+    // 加载失败时使用模拟数据
+    liabilities.value = [
+      {
+        id: '1',
+        name: '招商银行房贷',
+        type: '房贷',
+        principal: 1000000,
+        remaining_principal: 950000,
+        remaining_total_interest: 85000,
+        is_interest: true,
+        interest_rate: 0.049,
+        start_date: '2024-01-01',
+        repayment_method: '等额本息',
+        repayment_day: 1,
+        period: 360,
+        account_id: '1',
+        remark: '首套房贷款',
+        status: '未结清'
+      },
+      {
+        id: '2',
+        name: '亲友借款-张三',
+        type: '亲友借款',
+        principal: 50000,
+        remaining_principal: 50000,
+        remaining_total_interest: 0,
+        is_interest: false,
+        interest_rate: 0,
+        start_date: '2024-03-01',
+        repayment_method: '随借随还',
+        account_id: '2',
+        remark: '临时周转',
+        status: '未结清'
+      }
+    ];
   }
-  dialogVisible.value.addLiability = true
-}
+};
 
-const openEditLiabilityDialog = (liability: any) => {
-  liabilityForm.value = { ...liability }
-  dialogVisible.value.editLiability = true
-}
-
-const openRepaymentDialog = (liability: any) => {
-  repaymentForm.value = {
-    liabilityId: liability.id,
-    amount: 0,
-    type: '正常还款',
-    remark: ''
-  }
-  dialogVisible.value.repayment = true
-}
-
-const addLiability = () => {
-  // 模拟添加负债
-  const newLiability = {
-    id: dayjs().valueOf().toString(),
-    remaining_principal: liabilityForm.value.principal,
-    ...liabilityForm.value
-  }
-  liabilities.value.push(newLiability)
-  dialogVisible.value.addLiability = false
-}
-
-const updateLiability = () => {
-  // 模拟更新负债
-  const index = liabilities.value.findIndex(l => l.id === liabilityForm.value.id)
-  if (index !== -1) {
-    liabilities.value[index] = { ...liabilityForm.value }
-  }
-  dialogVisible.value.editLiability = false
-}
-
-const deleteLiability = (id: string) => {
-  // 模拟删除负债
-  liabilities.value = liabilities.value.filter(l => l.id !== id)
-}
-
-const makeRepayment = () => {
-  // 模拟还款
-  const liability = liabilities.value.find(l => l.id === repaymentForm.value.liabilityId)
-  if (liability) {
-    const newRemainingPrincipal = liability.remaining_principal - repaymentForm.value.amount
-    if (newRemainingPrincipal <= 0) {
-      liability.remaining_principal = 0
-      liability.status = '已结清'
-    } else {
-      liability.remaining_principal = newRemainingPrincipal
-    }
-  }
-  dialogVisible.value.repayment = false
-}
+onMounted(() => {
+  loadLiabilityData();
+});
 </script>
 
 <style scoped>
-.liability-management {
+.liability-page {
   padding: 0;
+  background-color: #f5f7fa;
+  overflow-y: auto;
+  overflow-x: hidden;
+  height: 100%;
+  min-height: 100%;
 }
 
-.card-header {
+/* 页面标题 */
+.page-header {
+  padding: 16px;
+  background-color: white;
+  border-bottom: 1px solid #e0e0e0;
+  margin-bottom: 10px;
+}
+
+.page-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #333333;
+  text-align: center;
+}
+
+/* 负债统计概览 */
+.liability-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  padding: 0 16px;
+  margin-bottom: 10px;
+}
+
+.summary-card {
+  background-color: white;
+  border-radius: 12px;
+  padding: 12px 8px;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.summary-label {
+  font-size: 12px;
+  color: #666666;
+  margin-bottom: 6px;
+}
+
+.summary-value {
+  font-size: 15px;
+  font-weight: 700;
+  color: #333333;
+}
+
+.summary-card.remaining .summary-value {
+  color: #ff6b6b;
+}
+
+.summary-card.count .summary-value {
+  color: #409eff;
+}
+
+/* 隐藏滚动条但保留滚动功能 */
+.liability-page::-webkit-scrollbar {
+  display: none;
+}
+
+.liability-page {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.liability-cards-container {
+  padding: 0 16px 10px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.no-liabilities {
+  grid-column: 1 / -1;
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
+  min-height: 50vh;
+  background-color: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-.dialog-footer {
-  width: 100%;
+/* 切换负债按钮 */
+.toggle-liabilities-button {
+  position: fixed;
+  bottom: 80px;
+  left: 20px;
+  z-index: 1000;
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background-color: #67c23a;
+  border-radius: 24px;
+  box-shadow: 0 4px 12px rgba(103, 194, 58, 0.5);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.toggle-liabilities-button:hover {
+  transform: scale(1.05);
+  box-shadow: 0 6px 16px rgba(103, 194, 58, 0.5);
+}
+
+.toggle-text {
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* 响应式调整 */
+@media (min-width: 768px) {
+  .liability-cards-container {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .liability-cards-container {
+    grid-template-columns: repeat(3, 1fr);
+  }
 }
 </style>

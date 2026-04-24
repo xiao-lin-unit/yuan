@@ -633,6 +633,7 @@ class DatabaseManager {
               type TEXT NOT NULL,
               principal REAL NOT NULL,
               remaining_principal REAL NOT NULL,
+              remaining_total_interest REAL DEFAULT 0,
               is_interest BOOLEAN DEFAULT 1,
               interest_rate REAL DEFAULT 0,
               start_date DATE NOT NULL,
@@ -645,6 +646,42 @@ class DatabaseManager {
               created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
               updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
               FOREIGN KEY (account_id) REFERENCES accounts(id)
+            )
+          `
+        },
+        // 创建还款记录表
+        {
+          sql: `
+            CREATE TABLE IF NOT EXISTS repayments (
+              id TEXT PRIMARY KEY,
+              liability_id TEXT NOT NULL,
+              period_number INTEGER,
+              amount REAL NOT NULL,
+              principal_amount REAL DEFAULT 0,
+              interest_amount REAL DEFAULT 0,
+              type TEXT NOT NULL,
+              remark TEXT,
+              repayment_time TIMESTAMP NOT NULL,
+              created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+              FOREIGN KEY (liability_id) REFERENCES liabilities(id)
+            )
+          `
+        },
+        // 创建待还记录表
+        {
+          sql: `
+            CREATE TABLE IF NOT EXISTS pending_repayments (
+              id TEXT PRIMARY KEY,
+              liability_id TEXT NOT NULL,
+              period_number INTEGER NOT NULL,
+              due_date DATE NOT NULL,
+              principal_amount REAL NOT NULL,
+              interest_amount REAL NOT NULL,
+              total_amount REAL NOT NULL,
+              status TEXT DEFAULT '未还',
+              paid_date DATE,
+              created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+              FOREIGN KEY (liability_id) REFERENCES liabilities(id)
             )
           `
         },
@@ -707,6 +744,10 @@ class DatabaseManager {
         { sql: 'CREATE INDEX IF NOT EXISTS idx_funds_account_id ON funds(account_id)' },
         { sql: 'CREATE INDEX IF NOT EXISTS idx_liabilities_account_id ON liabilities(account_id)' },
         { sql: 'CREATE INDEX IF NOT EXISTS idx_liabilities_status ON liabilities(status)' },
+        { sql: 'CREATE INDEX IF NOT EXISTS idx_repayments_liability_id ON repayments(liability_id)' },
+        { sql: 'CREATE INDEX IF NOT EXISTS idx_repayments_repayment_time ON repayments(repayment_time)' },
+        { sql: 'CREATE INDEX IF NOT EXISTS idx_pending_repayments_liability_id ON pending_repayments(liability_id)' },
+        { sql: 'CREATE INDEX IF NOT EXISTS idx_pending_repayments_due_date ON pending_repayments(due_date)' },
         { sql: 'CREATE INDEX IF NOT EXISTS idx_financial_goals_account_id ON financial_goals(account_id)' },
         { sql: 'CREATE INDEX IF NOT EXISTS idx_financial_goals_status ON financial_goals(status)' },
         { sql: 'CREATE INDEX IF NOT EXISTS idx_categories_type ON categories(type)' }
@@ -714,6 +755,13 @@ class DatabaseManager {
 
       // 批量执行
       await this.batch(createStatements)
+
+      // Schema migration for existing databases
+      try {
+        await this.run('ALTER TABLE liabilities ADD COLUMN remaining_total_interest REAL DEFAULT 0')
+      } catch (e) {
+        // Column may already exist
+      }
 
       this.initialized = true
       if (PERFORMANCE_CONFIG.DEBUG) {
@@ -787,7 +835,7 @@ class DatabaseManager {
    * 清空所有数据（使用事务提高性能）
    */
   async clearAllData() {
-    const tables = ['accounts', 'transactions', 'assets', 'stocks', 'funds', 'liabilities', 'financial_goals', 'categories']
+    const tables = ['accounts', 'transactions', 'assets', 'stocks', 'funds', 'liabilities', 'repayments', 'pending_repayments', 'financial_goals', 'categories']
     
     try {
       // 事务状态

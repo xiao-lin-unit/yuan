@@ -77,6 +77,8 @@ const handleClick = () => {
   height: 100px;
   display: flex;
   flex-direction: column;
+  cursor: pointer;
+  transition: transform 0.2s ease;
 }
 
 .asset-card::before {

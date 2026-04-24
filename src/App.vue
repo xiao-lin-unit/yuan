@@ -35,6 +35,8 @@ import SideMenu from './components/common/SideMenu.vue'
 import MobileAccountManagement from './components/mobile/account/AccountManagement.vue'
 import AssetManagement from './components/mobile/asset/AssetManagement.vue'
 import LiabilityManagement from './components/mobile/liability/LiabilityManagement.vue'
+import AddLiabilityPage from './components/mobile/liability/AddLiabilityPage.vue'
+import LiabilityDetailPage from './components/mobile/liability/LiabilityDetailPage.vue'
 import FinancialDashboard from './components/mobile/financial/FinancialDashboard.vue'
 import FinancialGoal from './components/mobile/financial/FinancialGoal.vue'
 import FinancialSandbox from './components/mobile/financial/FinancialSandbox.vue'
@@ -92,6 +94,8 @@ const navParams = ref<any>({});
       sellStock: SellStockPage, // 映射到股票卖出页面组件
       assetDetail: AssetDetailPage, // 映射到通用资产详情页面组件
       liability: LiabilityManagement,
+      addLiability: AddLiabilityPage,
+      liabilityDetail: LiabilityDetailPage,
       dashboard: FinancialDashboard,
       goal: FinancialGoal,
       sandbox: FinancialSandbox,
@@ -162,7 +166,12 @@ const componentProps = computed(() => {
   if (activeMenu.value === 'repayCreditCard' && navParams.value.accountId) {
     props.accountId = navParams.value.accountId;
   }
-  
+
+  // 为负债详情页面传递liabilityId参数
+  if (activeMenu.value === 'liabilityDetail' && navParams.value.liabilityId) {
+    props.liabilityId = navParams.value.liabilityId;
+  }
+
   return props;
 });
 
