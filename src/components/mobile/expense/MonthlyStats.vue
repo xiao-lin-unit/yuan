@@ -1,31 +1,17 @@
 <template>
-  <div class="monthly-stats">
-    <div class="background-image">
-      <img src="@/assets/img/r1.jpg" alt="背景" />
-      <div class="financial-overview">
-        <div class="overview-item">
-          <div class="overview-label">月支出</div>
-          <div class="overview-amount expense">¥{{ expense.toFixed(2) }}</div>
-        </div>
-        <div class="overview-details">
-          <div class="detail-item">
-            <span class="detail-label">月收入</span>
-            <span class="detail-value income">¥{{ income.toFixed(2) }}</span>
-          </div>
-          <div class="detail-item">
-            <span class="detail-label">本月结余</span>
-            <span class="detail-value" :class="{ 'balance-negative': balance < 0, 'balance-positive': balance >= 0 }">¥{{ balance.toFixed(2) }}</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
+  <StatOverview
+    :background="image"
+    :main="[{ title: '月支出', value: '¥' + expense.toFixed(2), color: '#67c23a' }]"
+    :details="[{ title: '月收入', value: '¥' + income.toFixed(2), color: '#f56c6c' }, { title: '本月结余', value: '¥' + balance.toFixed(2), color: balance < 0 ? '#67c23a' : '#f56c6c' }]"
+  />
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
 import dayjs from 'dayjs';
 import db from '../../../database';
+import StatOverview from '../../../components/common/StatOverview.vue';
+import image from '@/assets/img/r2.jpg';
 
 // 接收年月参数
 const props = defineProps<{

@@ -1,10 +1,11 @@
 <template>
   <div class="asset-page">
-    <!-- 页面标题 -->
-    <div class="page-header">
-      <h2 class="page-title">{{ showEndedAssets ? '历史资产' : '当前资产' }}</h2>
-    </div>
-    
+    <StatOverview v-if="!showEndedAssets"
+      :background="image"
+      :main="[{title: '资产金额', value: '￥' + totalAssetAmount.toFixed(2), color: undefined}]"
+      :details="[{title: '资产数量', value: totalAssetCount, color: undefined}]"
+    />
+
     <!-- 资产卡片容器 -->
     <div class="asset-cards-container">
       <div v-if="displayGeneralAssets.length === 0 && displayStocks.length === 0 && displayFunds.length === 0" class="no-assets">
@@ -86,16 +87,15 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue';
 import dayjs from 'dayjs';
-import { Setting, Plus, More, Goods, TrendCharts, DataAnalysis, Switch } from '@element-plus/icons-vue';
+import { More, Goods, TrendCharts, DataAnalysis, Switch } from '@element-plus/icons-vue';
 import AssetCard from './AssetCard.vue';
+import StatOverview from '../../../components/common/StatOverview.vue';
 import { getAllStocks } from '../../../services/asset/stockService';
 import { getAllFunds } from '../../../services/asset/fundService';
 import { getAssets } from '../../../services/asset/assetService';
 import { getAccounts } from '../../../services/account/accountService';
-import type { Stock } from '../../../types/asset/stock';
-import type { Fund } from '../../../types/asset/fund';
-import type { Asset } from '../../../types/asset/asset';
 import type { Account } from '../../../types/account/account';
+import image from '@/assets/img/m2.jpg';
 
 const emit = defineEmits(['navigate']);
 
@@ -150,6 +150,17 @@ const displayFunds = computed(() => {
     const isEnded = fund.ended === 1;
     return showEndedAssets.value ? isEnded : !isEnded;
   });
+});
+
+const totalAssetAmount = computed(() => {
+  const generalTotal = displayGeneralAssets.value.reduce((sum, a) => sum + (a.amount || 0), 0);
+  const stockTotal = displayStocks.value.reduce((sum, s) => sum + (s.cost_price * s.quantity || 0), 0);
+  const fundTotal = displayFunds.value.reduce((sum, f) => sum + (f.cost_nav * f.shares || 0), 0);
+  return generalTotal + stockTotal + fundTotal;
+});
+
+const totalAssetCount = computed(() => {
+  return displayGeneralAssets.value.length + displayStocks.value.length + displayFunds.value.length;
 });
 
 // 表单数据

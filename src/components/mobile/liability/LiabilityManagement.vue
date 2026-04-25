@@ -1,25 +1,11 @@
 <template>
   <div class="liability-page">
-    <!-- 页面标题 -->
-    <div class="page-header">
-      <h2 class="page-title">{{ showSettled ? '历史负债' : '当前负债' }}</h2>
-    </div>
-
-    <!-- 负债统计概览 -->
-    <div class="liability-summary">
-      <div class="summary-card total">
-        <div class="summary-label">负债本金</div>
-        <div class="summary-value">¥{{ totalPrincipal.toFixed(2) }}</div>
-      </div>
-      <div class="summary-card remaining">
-        <div class="summary-label">剩余待还</div>
-        <div class="summary-value">¥{{ totalRemaining.toFixed(2) }}</div>
-      </div>
-      <div class="summary-card count">
-        <div class="summary-label">负债笔数</div>
-        <div class="summary-value">{{ displayLiabilities.length }}</div>
-      </div>
-    </div>
+    <StatOverview
+      v-if="!showSettled"
+      :background="image"
+      :main="[{title: '剩余待还', value: '￥' + totalRemaining.toFixed(2), color: undefined}]"
+      :details="[{title: '剩余本金', value: '￥' + totalPrincipal.toFixed(2), color: undefined}, {title: '负债笔数', value: displayLiabilities.length, color: undefined}]"
+    />
 
     <!-- 负债卡片容器 -->
     <div class="liability-cards-container">
@@ -66,6 +52,8 @@ import LiabilityCard from './LiabilityCard.vue';
 import { getLiabilities } from '../../../services/liability/liabilityService';
 import type { Liability } from '../../../types/liability/liability';
 import FloatingActionMenu from '../../../components/common/FloatingActionMenu.vue';
+import StatOverview from '../../../components/common/StatOverview.vue';
+import image from '@/assets/img/m1.jpg';
 
 const emit = defineEmits(['navigate']);
 
@@ -80,7 +68,7 @@ const displayLiabilities = computed(() => {
 });
 
 const totalPrincipal = computed(() => {
-  return displayLiabilities.value.reduce((sum, l) => sum + l.principal, 0);
+  return displayLiabilities.value.reduce((sum, l) => sum + l.remaining_principal, 0);
 });
 
 const totalRemaining = computed(() => {
