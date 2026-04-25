@@ -1,6 +1,6 @@
 <template>
   <PageTemplate 
-    title="新增通用资产"
+    title="新增普通资产"
     show-confirm-button
     confirm-text="确认添加"
     @back="goBack"

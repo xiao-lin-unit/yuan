@@ -34,6 +34,8 @@
           <div class="meta-label">年化利率</div>
           <div class="meta-value">{{ (liabilityInfo.interest_rate * 100).toFixed(2) }}%</div>
         </div>
+      </div>
+      <div class="liability-meta">
         <div class="meta-item">
           <div class="meta-label">还款方式</div>
           <div class="meta-value">{{ liabilityInfo.repayment_method }}</div>
@@ -46,6 +48,8 @@
           <div class="meta-label">期数</div>
           <div class="meta-value">{{ liabilityInfo.period }}期</div>
         </div>
+      </div>
+      <div class="liability-meta">
         <div class="meta-item" v-if="liabilityInfo.is_interest">
           <div class="meta-label">剩余利息</div>
           <div class="meta-value">¥{{ liabilityInfo.remaining_total_interest.toFixed(2) }}</div>
@@ -446,22 +450,20 @@ onMounted(() => {
 
 .liability-meta {
   display: flex;
-  flex-wrap: wrap;
+  justify-content: space-around;
   border-top: 1px solid #f0f0f0;
   padding-top: 15px;
-  gap: 0;
+  margin-bottom: 8px;
 }
 
 .meta-item {
-  flex: 1 1 33%;
   text-align: center;
-  padding: 8px 0;
 }
 
 .meta-label {
   font-size: 12px;
   color: #666666;
-  margin-bottom: 4px;
+  margin-bottom: 5px;
 }
 
 .meta-value {

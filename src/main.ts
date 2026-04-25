@@ -61,7 +61,7 @@ const componentMap: Record<string, any> = {
       expenseStats: ExpenseStats, // 映射到支出统计页面组件
       income: MobileAccountManagement, // 暂时映射到账户管理组件，后续可创建专门的收入组件
       asset: AssetManagement, // 映射到资产页面组件
-      addAsset: AddAssetPage, // 映射到新增通用资产页面组件
+      addAsset: AddAssetPage, // 映射到新增普通资产页面组件
       addStock: AddStockPage, // 映射到新增股票交易页面组件
       addFund: AddFundPage, // 映射到新增基金交易页面组件
       fundDetail: FundDetailPage, // 映射到基金详情页面组件
@@ -70,7 +70,7 @@ const componentMap: Record<string, any> = {
       stockDetail: StockDetailPage, // 映射到股票详情页面组件
       buyStock: BuyStockPage, // 映射到股票买入页面组件
       sellStock: SellStockPage, // 映射到股票卖出页面组件
-      assetDetail: AssetDetailPage, // 映射到通用资产详情页面组件
+      assetDetail: AssetDetailPage, // 映射到普通资产详情页面组件
       liability: LiabilityManagement,
       dashboard: FinancialDashboard,
       goal: FinancialGoal,
@@ -142,7 +142,7 @@ const appComponentProps = ({key, params}) => {
     props.stockId = params.stockId;
   }
 
-  // 为通用资产详情页面传递assetId参数
+  // 为普通资产详情页面传递assetId参数
   if (key && params.assetId) {
     props.assetId = params.assetId;
   }

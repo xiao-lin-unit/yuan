@@ -25,7 +25,7 @@ export const adjustmentTypes = [
 
 // ==================== 资产相关 ====================
 
-// 通用资产类型
+// 普通资产类型
 export const assetTypes = [
   { label: '工资', value: '工资' },
   { label: '租金', value: '租金' },

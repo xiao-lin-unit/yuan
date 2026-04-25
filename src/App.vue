@@ -83,7 +83,7 @@ const navParams = ref<any>({});
       income: IncomePage, // 映射到收入页面组件
       addIncome: AddIncomePage, // 映射到新增收入页面组件
       asset: AssetManagement, // 映射到资产页面组件
-      addAsset: AddAssetPage, // 映射到新增通用资产页面组件
+      addAsset: AddAssetPage, // 映射到新增普通资产页面组件
       addStock: AddStockPage, // 映射到新增股票交易页面组件
       addFund: AddFundPage, // 映射到新增基金交易页面组件
       fundDetail: FundDetailPage, // 映射到基金详情页面组件
@@ -92,7 +92,7 @@ const navParams = ref<any>({});
       stockDetail: StockDetailPage, // 映射到股票详情页面组件
       buyStock: BuyStockPage, // 映射到股票买入页面组件
       sellStock: SellStockPage, // 映射到股票卖出页面组件
-      assetDetail: AssetDetailPage, // 映射到通用资产详情页面组件
+      assetDetail: AssetDetailPage, // 映射到普通资产详情页面组件
       liability: LiabilityManagement,
       addLiability: AddLiabilityPage,
       liabilityDetail: LiabilityDetailPage,
@@ -152,7 +152,7 @@ const componentProps = computed(() => {
     props.stockId = navParams.value.stockId;
   }
 
-  // 为通用资产详情页面传递assetId参数
+  // 为普通资产详情页面传递assetId参数
   if (activeMenu.value === 'assetDetail' && navParams.value.assetId) {
     props.assetId = navParams.value.assetId;
   }

@@ -479,6 +479,7 @@ onMounted(() => {
 .return-value {
   font-size: 14px;
   font-weight: 600;
+  color: #333333;
 }
 
 .return-value.positive {

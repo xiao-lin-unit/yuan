@@ -14,7 +14,7 @@
         <el-empty :description="showEndedAssets ? '暂无历史资产' : '暂无资产'" />
       </div>
       <template v-else>
-        <!-- 通用资产 -->
+        <!-- 普通 -->
         <AssetCard 
           v-for="asset in displayGeneralAssets" 
           :key="asset.id"
@@ -78,6 +78,7 @@ import { getAssets } from '../../../services/asset/assetService';
 import { getAccounts } from '../../../services/account/accountService';
 import type { Account } from '../../../types/account/account';
 import image from '@/assets/img/m2.jpg';
+import FloatingActionMenu from '../../common/FloatingActionMenu.vue';
 
 const emit = defineEmits(['navigate']);
 
@@ -148,7 +149,7 @@ const totalAssetCount = computed(() => {
 const actionButtons = computed(() => {
   const buttons = [
     {
-      text: '新增通用资产',
+      text: '新增普通资产',
       icon: Goods,
       action: navigateToAddAsset
     },
@@ -215,7 +216,7 @@ const loadAssetData = async () => {
       getAccounts()
     ]);
 
-    // 处理通用资产数据
+    // 处理普通资产数据
     generalAssets.value = assets.map(asset => ({
       ...asset,
       icon: '💼',
@@ -309,7 +310,7 @@ const viewAssetDetail = (assetId: string) => {
     emit('navigate', { key: 'fundDetail', params: { fundId } });
   };
 
-// 导航到新增通用资产页面
+// 导航到新增普通资产页面
 const navigateToAddAsset = () => {
   emit('navigate', { key: 'addAsset' });
   isMoreMenuExpanded.value = false;

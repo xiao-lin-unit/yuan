@@ -21,19 +21,21 @@
         <div class="amount-value">¥{{ assetInfo.amount.toFixed(2) }}</div>
       </div>
       <div class="asset-meta">
-        <div class="meta-item" v-if="assetInfo.period">
+        <div class="meta-item">
           <div class="meta-label">周期</div>
           <div class="meta-value">{{ assetInfo.period }}</div>
         </div>
-        <div class="meta-item" v-if="assetInfo.period_count">
+        <div class="meta-item">
           <div class="meta-label">剩余期数</div>
           <div class="meta-value">{{ assetInfo.period_count }}</div>
         </div>
-        <div class="meta-item" v-if="assetInfo.income_date">
+        <div class="meta-item">
           <div class="meta-label">收益日</div>
           <div class="meta-value">{{ assetInfo.income_date }}</div>
         </div>
-        <div class="meta-item" v-if="assetInfo.next_income_date">
+      </div>
+      <div class="asset-meta">
+        <div class="meta-item">
           <div class="meta-label">下一收益日</div>
           <div class="meta-value">{{ formatDate(assetInfo.next_income_date) }}</div>
         </div>
@@ -313,22 +315,20 @@ onMounted(() => {
 
 .asset-meta {
   display: flex;
-  flex-wrap: wrap;
+  justify-content: space-around;
   border-top: 1px solid #f0f0f0;
   padding-top: 15px;
-  gap: 0;
+  margin-bottom: 8px;
 }
 
 .meta-item {
-  flex: 1 1 50%;
   text-align: center;
-  padding: 8px 0;
 }
 
 .meta-label {
   font-size: 12px;
   color: #666666;
-  margin-bottom: 4px;
+  margin-bottom: 5px;
 }
 
 .meta-value {
