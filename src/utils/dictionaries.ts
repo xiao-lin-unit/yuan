@@ -40,8 +40,15 @@ export const assetTypes = [
 
 // 收益周期类型
 export const periodTypes = [
-  { label: '每年', value: '年' },
-  { label: '每月', value: '月' }
+  { label: '每年', value: '年', num: 1 },
+  { label: '每月', value: '月', num: 12 },
+  { label: '每日', value: '日', num: 365 }
+]
+
+// 收益计算类型
+export const calculationTypes = [
+  { label: '按金额计算', value: '按金额计算' },
+  { label: '按年收益率计算', value: '按年收益率计算' }
 ]
 
 // ==================== 基金/股票交易相关 ====================

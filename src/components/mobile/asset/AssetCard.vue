@@ -7,14 +7,13 @@
         <span v-else>{{ icon }}</span>
       </div>
     </div>
-    
+    <div class="card-code">{{ code || '-' }}</div>
     <div class="card-content">
-      <div class="amount-section">
-        <div class="main-amount">¥{{ amount.toFixed(2) }}</div>
-        <div v-if="secondaryAmount" class="secondary-amount">¥{{ secondaryAmount.toFixed(2) }}</div>
+    <div class="amount-section">
+        <div class="overview-label">金额</div>
+        <div class="overview-value">¥{{ amount.toFixed(2) }}</div>
       </div>
-    </div>
-    
+    </div> 
   </div>
 </template>
 
@@ -30,10 +29,6 @@ const props = defineProps({
     type: Number,
     default: 0
   },
-  secondaryAmount: {
-    type: Number,
-    default: 0
-  },
   icon: {
     type: String,
     default: '💳'
@@ -45,7 +40,11 @@ const props = defineProps({
   assetId: {
     type: String,
     default: ''
-  }
+  },
+  code: {
+    type: String,
+    default: ''
+  },
 });
 
 const emit = defineEmits(['click']);
@@ -81,6 +80,10 @@ const handleClick = () => {
   transition: transform 0.2s ease;
 }
 
+.asset-card:active {
+  transform: scale(0.98);
+}
+
 .asset-card::before {
   content: '';
   position: absolute;
@@ -97,16 +100,15 @@ const handleClick = () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
+  margin-bottom: 4px;
   position: relative;
   z-index: 1;
 }
 
 .card-header h3 {
   margin: 0;
-  font-size: 14px;
-  font-weight: 500;
-  opacity: 0.9;
+  font-size: 15px;
+  font-weight: 600;
 }
 
 .card-icon {
@@ -120,6 +122,14 @@ const handleClick = () => {
   }
 }
 
+.card-code {
+  font-size: 12px;
+  opacity: 0.85;
+  margin-bottom: 12px;
+  position: relative;
+  z-index: 1;
+}
+
 .card-content {
   position: relative;
   z-index: 1;
@@ -127,56 +137,22 @@ const handleClick = () => {
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
+  margin-top: 10px;
 }
 
 .amount-section {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  margin-bottom: 10px;
+}
+.overview-label {
+  font-size: 12px;
+  opacity: 0.85;
+  margin-bottom: 2px;
 }
 
-.main-amount {
-  font-size: 16px;
+.overview-value {
+  font-size: 22px;
   font-weight: bold;
   line-height: 1.2;
 }
 
-.secondary-amount {
-  font-size: 12px;
-  opacity: 0.8;
-}
-
-.card-footer {
-  position: absolute;
-  bottom: 15px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  gap: 20px;
-  position: relative;
-  z-index: 1;
-}
-
-.footer-btn {
-  background: rgba(255, 255, 255, 0.2);
-  border: none;
-  border-radius: 50%;
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.footer-btn:hover {
-  background: rgba(255, 255, 255, 0.3);
-  transform: scale(1.1);
-}
-
-.footer-btn:active {
-  transform: scale(0.95);
-}
 </style>

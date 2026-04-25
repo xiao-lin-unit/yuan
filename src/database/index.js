@@ -496,6 +496,9 @@ class DatabaseManager {
               period_count INTEGER DEFAULT 0,
               income_date TEXT,
               next_income_date TEXT,
+              calculation_type TEXT,
+              income_amount REAL DEFAULT 0,
+              annual_yield_rate REAL DEFAULT 0,
               ended INTEGER DEFAULT 0,
               created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
               updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -759,6 +762,21 @@ class DatabaseManager {
       // Schema migration for existing databases
       try {
         await this.run('ALTER TABLE liabilities ADD COLUMN remaining_total_interest REAL DEFAULT 0')
+      } catch (e) {
+        // Column may already exist
+      }
+      try {
+        await this.run('ALTER TABLE assets ADD COLUMN calculation_type TEXT')
+      } catch (e) {
+        // Column may already exist
+      }
+      try {
+        await this.run('ALTER TABLE assets ADD COLUMN income_amount REAL DEFAULT 0')
+      } catch (e) {
+        // Column may already exist
+      }
+      try {
+        await this.run('ALTER TABLE assets ADD COLUMN annual_yield_rate REAL DEFAULT 0')
       } catch (e) {
         // Column may already exist
       }

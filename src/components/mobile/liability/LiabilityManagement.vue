@@ -175,59 +175,6 @@ onMounted(() => {
   min-height: 100%;
 }
 
-/* 页面标题 */
-.page-header {
-  padding: 16px;
-  background-color: white;
-  border-bottom: 1px solid #e0e0e0;
-  margin-bottom: 10px;
-}
-
-.page-title {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 600;
-  color: #333333;
-  text-align: center;
-}
-
-/* 负债统计概览 */
-.liability-summary {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-  padding: 0 16px;
-  margin-bottom: 10px;
-}
-
-.summary-card {
-  background-color: white;
-  border-radius: 12px;
-  padding: 12px 8px;
-  text-align: center;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-}
-
-.summary-label {
-  font-size: 12px;
-  color: #666666;
-  margin-bottom: 6px;
-}
-
-.summary-value {
-  font-size: 15px;
-  font-weight: 700;
-  color: #333333;
-}
-
-.summary-card.remaining .summary-value {
-  color: #ff6b6b;
-}
-
-.summary-card.count .summary-value {
-  color: #409eff;
-}
-
 /* 隐藏滚动条但保留滚动功能 */
 .liability-page::-webkit-scrollbar {
   display: none;

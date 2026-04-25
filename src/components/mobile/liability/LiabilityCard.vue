@@ -9,33 +9,8 @@
     <div class="card-content">
       <div class="amount-section">
         <div class="remaining-label">剩余待还</div>
-        <div class="remaining-amount">¥{{ totalRemaining.toFixed(2) }}</div>
+        <div class="remaining-value">¥{{ totalRemaining.toFixed(2) }}</div>
       </div>
-      <div class="card-meta">
-        <div class="meta-item">
-          <span class="meta-label">剩余本金</span>
-          <span class="meta-value">¥{{ remaining.toFixed(2) }}</span>
-        </div>
-        <div class="meta-item" v-if="remainingInterest > 0">
-          <span class="meta-label">剩余利息</span>
-          <span class="meta-value">¥{{ remainingInterest.toFixed(2) }}</span>
-        </div>
-        <div class="meta-item" v-if="interestRate > 0">
-          <span class="meta-label">年利率</span>
-          <span class="meta-value">{{ (interestRate * 100).toFixed(2) }}%</span>
-        </div>
-        <div class="meta-item">
-          <span class="meta-label">还款方式</span>
-          <span class="meta-value">{{ repaymentMethod }}</span>
-        </div>
-      </div>
-    </div>
-
-    <div class="progress-bar" v-if="principal > 0">
-      <div class="progress-fill" :style="{ width: progressPercent + '%' }"></div>
-    </div>
-    <div class="progress-label" v-if="principal > 0">
-      已还 {{ ((principal - remaining) / principal * 100).toFixed(1) }}%
     </div>
   </div>
 </template>
@@ -70,12 +45,6 @@ const statusClass = computed(() => {
 
 const totalRemaining = computed(() => {
   return props.remaining + props.remainingInterest;
-});
-
-const progressPercent = computed(() => {
-  if (props.principal <= 0) return 0;
-  const percent = ((props.principal - props.remaining) / props.principal) * 100;
-  return Math.min(100, Math.max(0, percent));
 });
 
 const handleClick = () => {
@@ -157,6 +126,10 @@ const handleClick = () => {
   position: relative;
   z-index: 1;
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  margin-top: 10px;
 }
 
 .amount-section {
@@ -169,7 +142,7 @@ const handleClick = () => {
   margin-bottom: 2px;
 }
 
-.remaining-amount {
+.remaining-value {
   font-size: 22px;
   font-weight: bold;
   line-height: 1.2;
