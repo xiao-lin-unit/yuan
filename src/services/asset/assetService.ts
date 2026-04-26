@@ -55,6 +55,7 @@ function calculateNextIncomeDate(period: string, incomeDate: string): string {
  */
 export function calculatePerAssetIncome(asset: Asset): number {
   if (!asset.calculation_type || !asset.period) return 0
+  if (asset.calculation_type === '无') return 0
 
   if (asset.calculation_type === '按金额计算') {
     // 按每期固定金额计算
@@ -183,6 +184,10 @@ export async function updateAsset(assetId: string, data: Partial<Asset>): Promis
     fields.push('income_date = ?')
     values.push(data.income_date)
   }
+  if (data.next_income_date !== undefined) {
+    fields.push('next_income_date = ?')
+    values.push(data.next_income_date || null)
+  }
   if (data.calculation_type !== undefined) {
     fields.push('calculation_type = ?')
     values.push(data.calculation_type)
@@ -225,5 +230,31 @@ export async function endAsset(assetId: string): Promise<void> {
   await db.run(
     'UPDATE assets SET ended = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
     [assetId]
+  )
+}
+
+/**
+ * Get income records for an asset
+ */
+export async function getAssetIncomeRecords(assetId: string): Promise<any[]> {
+  return await db.query(
+    'SELECT * FROM asset_income_records WHERE asset_id = ? ORDER BY record_time DESC',
+    [assetId]
+  )
+}
+
+/**
+ * Record an income for an asset
+ */
+export async function recordAssetIncome(
+  assetId: string,
+  incomeAmount: number,
+  recordTime: string,
+  remark?: string
+): Promise<void> {
+  const id = dayjs().valueOf().toString()
+  await db.run(
+    'INSERT INTO asset_income_records (id, asset_id, income_amount, record_time, remark) VALUES (?, ?, ?, ?, ?)',
+    [id, assetId, incomeAmount, recordTime, remark || '']
   )
 }

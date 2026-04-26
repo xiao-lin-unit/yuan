@@ -210,12 +210,6 @@ const navigateToBuyFund = () => {
   emit('navigate', { key: 'buyFund', params: { fundId: props.fundId } });
 };
 
-// 跳转到基金转换页面
-const navigateToConvertFund = () => {
-  // 这里可以实现基金转换的逻辑
-  console.log('转换基金');
-};
-
 // 跳转到基金卖出页面
 const navigateToSellFund = () => {
   emit('navigate', { key: 'sellFund', params: { fundId: props.fundId } });

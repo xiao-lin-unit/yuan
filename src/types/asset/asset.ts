@@ -15,7 +15,7 @@ export interface Asset {
   period_count?: number
   income_date?: string
   next_income_date?: string
-  calculation_type?: '按金额计算' | '按年收益率计算'
+  calculation_type?: '无' | '按金额计算' | '按年收益率计算'
   income_amount: number
   annual_yield_rate: number
   ended: number
@@ -32,7 +32,8 @@ export interface AssetInput {
   period?: string
   period_count?: number
   income_date?: string
-  calculation_type?: '按金额计算' | '按年收益率计算'
+  calculation_type?: '无' | '按金额计算' | '按年收益率计算'
   income_amount?: number
   annual_yield_rate?: number
+  next_income_date?: string
 }

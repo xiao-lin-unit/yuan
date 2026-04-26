@@ -43,22 +43,32 @@
         <el-form-item label="年收益率" required v-if="assetForm.calculation_type === '按年收益率计算'">
           <el-input v-model.number="assetForm.annual_yield_rate" placeholder="请输入年收益率（如0.05表示5%）" type="number" min="0" step="0.0001" />
         </el-form-item>
-        <el-form-item label="收益周期" required>
-          <el-select v-model="assetForm.period" placeholder="请选择周期">
-            <el-option v-for="item in periodTypes" :key="item.value" :label="item.label" :value="item.value" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="收益日" v-if="assetForm.period && assetForm.period !== '日'">
-          <div v-if="assetForm.period === '年'" class="income-date-year">
-            <el-select v-model="assetForm.income_month" placeholder="月" style="width: 45%; margin-right: 5px;">
-              <el-option
-                v-for="m in 12"
-                :key="m"
-                :label="`${m}月`"
-                :value="m"
-              />
+        <template v-if="assetForm.calculation_type && assetForm.calculation_type !== '无'">
+          <el-form-item label="收益周期" required>
+            <el-select v-model="assetForm.period" placeholder="请选择周期">
+              <el-option v-for="item in periodTypes" :key="item.value" :label="item.label" :value="item.value" />
             </el-select>
-            <el-select v-model="assetForm.income_day" placeholder="日" style="width: 45%;">
+          </el-form-item>
+          <el-form-item label="收益日" v-if="assetForm.period && assetForm.period !== '日'">
+            <div v-if="assetForm.period === '年'" class="income-date-year">
+              <el-select v-model="assetForm.income_month" placeholder="月" style="width: 45%; margin-right: 5px;">
+                <el-option
+                  v-for="m in 12"
+                  :key="m"
+                  :label="`${m}月`"
+                  :value="m"
+                />
+              </el-select>
+              <el-select v-model="assetForm.income_day" placeholder="日" style="width: 45%;">
+                <el-option
+                  v-for="d in 31"
+                  :key="d"
+                  :label="`${d}日`"
+                  :value="d"
+                />
+              </el-select>
+            </div>
+            <el-select v-else-if="assetForm.period === '月'" v-model="assetForm.income_day" placeholder="请选择日期" style="width: 100%;">
               <el-option
                 v-for="d in 31"
                 :key="d"
@@ -66,27 +76,19 @@
                 :value="d"
               />
             </el-select>
-          </div>
-          <el-select v-else-if="assetForm.period === '月'" v-model="assetForm.income_day" placeholder="请选择日期" style="width: 100%;">
-            <el-option
-              v-for="d in 31"
-              :key="d"
-              :label="`${d}日`"
-              :value="d"
-            />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="周期数量" v-if="assetForm.period">
-          <el-input
-            v-model.number="assetForm.period_count"
-            placeholder="请输入周期数量"
-            type="number"
-            min="1"
-            step="1"
-          >
-            <template #append>{{ assetForm.period }}</template>
-          </el-input>
-        </el-form-item>
+          </el-form-item>
+          <el-form-item label="周期数量" v-if="assetForm.period">
+            <el-input
+              v-model.number="assetForm.period_count"
+              placeholder="请输入周期数量"
+              type="number"
+              min="1"
+              step="1"
+            >
+              <template #append>{{ assetForm.period }}</template>
+            </el-input>
+          </el-form-item>
+        </template>
       </el-form>
     </div>
   </PageTemplate>
@@ -178,7 +180,7 @@ const addAsset = async () => {
     alert('请输入年收益率')
     return
   }
-  if (!assetForm.value.period) {
+  if (assetForm.value.calculation_type !== '无' && !assetForm.value.period) {
     alert('请选择收益周期')
     return
   }
@@ -203,17 +205,18 @@ const addAsset = async () => {
   }
 
   try {
+    const isNoCalc = assetForm.value.calculation_type === '无'
     await addAssetService({
       type: assetForm.value.type,
       name: assetForm.value.name,
       amount: assetForm.value.amount,
       account_id: assetForm.value.account_id,
-      calculation_type: assetForm.value.calculation_type as '按金额计算' | '按年收益率计算',
-      income_amount: assetForm.value.income_amount,
-      annual_yield_rate: assetForm.value.annual_yield_rate,
-      period: assetForm.value.period,
-      period_count: assetForm.value.period_count,
-      income_date: incomeDate
+      calculation_type: assetForm.value.calculation_type as '无' | '按金额计算' | '按年收益率计算',
+      income_amount: isNoCalc ? 0 : assetForm.value.income_amount,
+      annual_yield_rate: isNoCalc ? 0 : assetForm.value.annual_yield_rate,
+      period: isNoCalc ? undefined : assetForm.value.period,
+      period_count: isNoCalc ? 0 : assetForm.value.period_count,
+      income_date: isNoCalc ? undefined : incomeDate
     }, assetForm.value.deduct_from_account)
     emit('navigate', 'asset')
   } catch (error) {

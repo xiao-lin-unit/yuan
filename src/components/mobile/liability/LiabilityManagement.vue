@@ -1,5 +1,21 @@
 <template>
   <div class="liability-page">
+    <!-- 顶部导航栏 -->
+    <div class="top-nav-bar">
+      <div class="nav-title"></div>
+      <div class="top-icons">
+        <el-input
+          v-if="isSearchExpanded"
+          v-model="searchKeyword"
+          class="search-input"
+          placeholder="请输入名称"
+          clearable
+          @blur="onSearchBlur"
+        />
+        <el-icon class="nav-icon" @click="toggleSearch"><Search /></el-icon>
+      </div>
+    </div>
+
     <StatOverview
       v-if="!showSettled"
       :background="image"
@@ -47,7 +63,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue';
-import { Plus, Switch } from '@element-plus/icons-vue';
+import { Plus, Switch, Search } from '@element-plus/icons-vue';
 import LiabilityCard from './LiabilityCard.vue';
 import { getLiabilities } from '../../../services/liability/liabilityService';
 import type { Liability } from '../../../types/liability/liability';
@@ -60,11 +76,29 @@ const emit = defineEmits(['navigate']);
 const liabilities = ref<Liability[]>([]);
 const showSettled = ref(false);
 
+// 搜索
+const isSearchExpanded = ref(false);
+const searchKeyword = ref('');
+
+const toggleSearch = () => {
+  isSearchExpanded.value = !isSearchExpanded.value;
+};
+
+const onSearchBlur = () => {
+  if (!searchKeyword.value.trim()) {
+    isSearchExpanded.value = false;
+  }
+};
+
 const displayLiabilities = computed(() => {
-  return liabilities.value.filter(liability => {
+  let list = liabilities.value.filter(liability => {
     const isSettled = liability.status === '已结清';
     return showSettled.value ? isSettled : !isSettled;
   });
+  if (searchKeyword.value.trim()) {
+    list = list.filter(liability => liability.name.includes(searchKeyword.value.trim()));
+  }
+  return list;
 });
 
 const totalPrincipal = computed(() => {
@@ -183,6 +217,43 @@ onMounted(() => {
 .liability-page {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+/* 顶部导航栏 */
+.top-nav-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 50px;
+  padding: 0 15px;
+  background-color: white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.nav-title {
+  font-size: 16px;
+  font-weight: bold;
+  color: #303133;
+}
+
+.top-icons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nav-icon {
+  font-size: 18px;
+  color: #606266;
+  cursor: pointer;
+}
+
+.search-input {
+  width: 140px;
+}
+
+.search-input :deep(.el-input__inner) {
+  height: 32px;
 }
 
 .liability-cards-container {

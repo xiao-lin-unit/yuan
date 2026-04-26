@@ -14,6 +14,7 @@ export interface Account {
   total_limit?: number
   is_liquid?: boolean | number
   status?: string
+  asset_id?: string
   remark?: string
   created_at?: dayjs.Dayjs | string
   updated_at?: dayjs.Dayjs | string

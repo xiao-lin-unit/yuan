@@ -32,7 +32,8 @@ export const assetTypes = [
   { label: '租金', value: '租金' },
   { label: '版权', value: '版权' },
   { label: '社保', value: '社保' },
-  { label: '公积金', value: '公积金' }
+  { label: '公积金', value: '公积金' },
+  { label: '亲友借款', value: '亲友借款' }
 ]
 
 // 收益周期类型
@@ -44,6 +45,7 @@ export const periodTypes = [
 
 // 收益计算类型
 export const calculationTypes = [
+  { label: '无', value: '无' },
   { label: '按金额计算', value: '按金额计算' },
   { label: '按年收益率计算', value: '按年收益率计算' }
 ]

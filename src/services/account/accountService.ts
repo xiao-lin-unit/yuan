@@ -16,11 +16,23 @@ export async function addAccount(accountData: AccountInput): Promise<void> {
   const id = dateNow().toString()
   const transactionId = (dateNow() + 1).toString()
 
+  // 确定是否需要自动创建资产，并预生成资产ID
+  const assetAccountTypes: Record<string, string> = {
+    '现金': '储蓄',
+    '微信': '储蓄',
+    '支付宝': '储蓄',
+    '储蓄卡': '储蓄',
+    '社保卡': '社保',
+    '公积金': '公积金'
+  }
+  const assetType = assetAccountTypes[accountData.type]
+  const assetId = assetType ? (dateNow() + 2).toString() : null
+
   const statements = [
-    // 1. 创建账户
+    // 1. 创建账户（包含关联资产ID）
     {
-      statement: `INSERT INTO accounts (id, name, type, balance, used_limit, total_limit, is_liquid, remark) 
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      statement: `INSERT INTO accounts (id, name, type, balance, used_limit, total_limit, is_liquid, asset_id, remark) 
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       values: [
         id,
         accountData.name,
@@ -29,6 +41,7 @@ export async function addAccount(accountData: AccountInput): Promise<void> {
         accountData.used_limit || 0,
         accountData.total_limit || 0,
         accountData.is_liquid !== false ? 1 : 0,
+        assetId,
         accountData.remark || ''
       ]
     }
@@ -70,18 +83,7 @@ export async function addAccount(accountData: AccountInput): Promise<void> {
   }
 
   // 4. 为特定账户类型自动创建对应资产
-  const assetAccountTypes: Record<string, string> = {
-    '现金': '储蓄',
-    '微信': '储蓄',
-    '支付宝': '储蓄',
-    '储蓄卡': '储蓄',
-    '社保卡': '社保',
-    '公积金': '公积金'
-  }
-
-  const assetType = assetAccountTypes[accountData.type]
-  if (assetType) {
-    const assetId = (dateNow() + 2).toString()
+  if (assetType && assetId) {
     const tomorrow = dayjs(getCurrentISOString()).add(1, 'day').format('YYYY-MM-DD')
     statements.push({
       statement: `INSERT INTO assets (id, type, name, amount, account_id, period, calculation_type, annual_yield_rate, next_income_date, created_at, updated_at)
@@ -189,6 +191,7 @@ export async function getAccountById(accountId: string): Promise<Account | null>
  * @param description 交易描述
  * @param transactionId 交易记录ID（可选，不传则自动生成）
  * @param transactionTime 交易时间（可选，不传则使用当前时间）
+ * @param syncLinkedAsset 是否同步修改关联资产金额（可选，默认true；资产收益入账时应设为false以避免循环）
  * @returns 包含SQL语句数组和参数的对象，用于事务执行
  */
 export async function createDebitTransaction(
@@ -196,7 +199,8 @@ export async function createDebitTransaction(
   amount: number, 
   description: string,
   transactionId?: string,
-  transactionTime?: dayjs.Dayjs
+  transactionTime?: dayjs.Dayjs,
+  syncLinkedAsset: boolean = true
 ): Promise<{ 
   statements: { statement: string; values: any[] }[]; 
   balanceAfter: number;
@@ -269,8 +273,18 @@ export async function createDebitTransaction(
     ]
   }
 
+  const statements = [accountUpdateStatement, transactionStatement]
+
+  // 同步修改关联资产金额（储蓄账户出账时减少资产金额）
+  if (syncLinkedAsset && !isCreditCard && account.asset_id) {
+    statements.push({
+      statement: 'UPDATE assets SET amount = amount - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      values: [amount, account.asset_id]
+    })
+  }
+
   return {
-    statements: [accountUpdateStatement, transactionStatement],
+    statements,
     balanceAfter,
     transactionId: txId
   }
@@ -285,6 +299,7 @@ export async function createDebitTransaction(
  * @param description 交易描述
  * @param transactionId 交易记录ID（可选，不传则自动生成）
  * @param transactionTime 交易时间（可选，不传则使用当前时间）
+ * @param syncLinkedAsset 是否同步修改关联资产金额（可选，默认true；资产收益入账时应设为false以避免循环）
  * @returns 包含SQL语句数组和参数的对象，用于事务执行
  */
 export async function createCreditTransaction(
@@ -292,7 +307,8 @@ export async function createCreditTransaction(
   amount: number,
   description: string,
   transactionId?: string,
-  transactionTime?: dayjs.Dayjs
+  transactionTime?: dayjs.Dayjs,
+  syncLinkedAsset: boolean = true
 ): Promise<{ 
   statements: { statement: string; values: any[] }[]; 
   balanceAfter: number;
@@ -351,8 +367,18 @@ export async function createCreditTransaction(
     ]
   }
 
+  const statements = [accountUpdateStatement, transactionStatement]
+
+  // 同步修改关联资产金额（储蓄账户入账时增加资产金额）
+  if (syncLinkedAsset && !isCreditCard && account.asset_id) {
+    statements.push({
+      statement: 'UPDATE assets SET amount = amount + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      values: [amount, account.asset_id]
+    })
+  }
+
   return {
-    statements: [accountUpdateStatement, transactionStatement],
+    statements,
     balanceAfter,
     transactionId: txId
   }
@@ -391,6 +417,14 @@ export async function adjustBalance(input: BalanceAdjustInput): Promise<void> {
       ]
     }
   ]
+
+  // 同步修改关联资产金额
+  if (account.asset_id) {
+    statements.push({
+      statement: 'UPDATE assets SET amount = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      values: [newBalance, account.asset_id]
+    })
+  }
 
   await db.executeTransaction(statements)
 }
@@ -591,6 +625,14 @@ export async function repayCreditCard(input: RepayCreditCardInput): Promise<void
       ]
     }
   ]
+
+  // 同步修改来源账户关联资产金额
+  if (fromAccount.asset_id) {
+    statements.push({
+      statement: 'UPDATE assets SET amount = amount - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      values: [amount, fromAccount.asset_id]
+    })
+  }
 
   await db.executeTransaction(statements)
 }

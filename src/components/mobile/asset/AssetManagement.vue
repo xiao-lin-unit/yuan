@@ -1,5 +1,28 @@
 <template>
   <div class="asset-page">
+    <!-- 顶部导航栏 -->
+    <div class="top-nav-bar">
+      <el-select v-model="selectedAssetType" class="type-selector" placeholder="选择类型">
+        <el-option
+          v-for="item in assetTypeOptions"
+          :key="item.value"
+          :label="item.label"
+          :value="item.value"
+        />
+      </el-select>
+      <div class="top-icons">
+        <el-input
+          v-if="isSearchExpanded"
+          v-model="searchKeyword"
+          class="search-input"
+          placeholder="请输入名称"
+          clearable
+          @blur="onSearchBlur"
+        />
+        <el-icon class="nav-icon" @click="toggleSearch"><Search /></el-icon>
+      </div>
+    </div>
+
     <StatOverview v-if="!showEndedAssets"
       :background="image"
       :main="[{title: '资产金额', value: '￥' + totalAssetAmount.toFixed(2), color: undefined}]"
@@ -8,53 +31,59 @@
 
     <!-- 资产卡片容器 -->
     <div class="asset-cards-container">
-      <div v-if="displayGeneralAssets.length === 0 && 
-      displayStocks.length === 0 && 
-      displayFunds.length === 0" class="no-assets">
+      <div v-if="(selectedAssetType === '普通资产' && filteredGeneralAssets.length === 0) ||
+                  (selectedAssetType === '股票' && filteredStocks.length === 0) ||
+                  (selectedAssetType === '基金' && filteredFunds.length === 0)" class="no-assets">
         <el-empty :description="showEndedAssets ? '暂无历史资产' : '暂无资产'" />
       </div>
       <template v-else>
         <!-- 普通 -->
-        <AssetCard 
-          v-for="asset in displayGeneralAssets" 
-          :key="asset.id"
-          :title="asset.name"
-          :amount="asset.amount"
-          :icon="asset.icon"
-          :color="asset.color"
-          :assetId="asset.id"
-          :code="asset.type"
-          @click="viewAssetDetail"
-        />
-        
+        <template v-if="selectedAssetType === '普通资产'">
+          <AssetCard
+            v-for="asset in filteredGeneralAssets"
+            :key="asset.id"
+            :title="asset.name"
+            :amount="asset.amount"
+            :icon="asset.icon"
+            :color="asset.color"
+            :assetId="asset.id"
+            :code="asset.type"
+            @click="viewAssetDetail"
+          />
+        </template>
+
         <!-- 股票资产 -->
-        <AssetCard 
-          v-for="stock in displayStocks" 
-          :key="stock.id"
-          :title="stock.name"
-          :amount="stock.cost_price * stock.quantity"
-          :icon="stock.icon"
-          :color="stock.color"
-          :assetId="stock.id"
-          :code="stock.code"
-          @click="viewStockDetail(stock.id)"
-        />
-        
+        <template v-if="selectedAssetType === '股票'">
+          <AssetCard
+            v-for="stock in filteredStocks"
+            :key="stock.id"
+            :title="stock.name"
+            :amount="stock.cost_price * stock.quantity"
+            :icon="stock.icon"
+            :color="stock.color"
+            :assetId="stock.id"
+            :code="stock.code"
+            @click="viewStockDetail(stock.id)"
+          />
+        </template>
+
         <!-- 基金资产 -->
-        <AssetCard 
-          v-for="fund in displayFunds" 
-          :key="fund.id"
-          :title="fund.name"
-          :amount="fund.cost_nav * fund.shares"
-          :icon="fund.icon"
-          :color="fund.color"
-          :assetId="fund.id"
-          :code="fund.code"
-          @click="viewFundDetail(fund.id)"
-        />
+        <template v-if="selectedAssetType === '基金'">
+          <AssetCard
+            v-for="fund in filteredFunds"
+            :key="fund.id"
+            :title="fund.name"
+            :amount="fund.cost_nav * fund.shares"
+            :icon="fund.icon"
+            :color="fund.color"
+            :assetId="fund.id"
+            :code="fund.code"
+            @click="viewFundDetail(fund.id)"
+          />
+        </template>
       </template>
     </div>
-    
+
     <!-- 切换当前/历史资产按钮 -->
     <div class="toggle-assets-button" @click="toggleAssetsView">
       <el-icon style="color: white;"><Switch /></el-icon>
@@ -69,7 +98,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue';
 import dayjs from 'dayjs';
-import { More, Goods, TrendCharts, DataAnalysis, Switch } from '@element-plus/icons-vue';
+import { More, Goods, TrendCharts, DataAnalysis, Switch, Search } from '@element-plus/icons-vue';
 import AssetCard from './AssetCard.vue';
 import StatOverview from '../../../components/common/StatOverview.vue';
 import { getAllStocks } from '../../../services/asset/stockService';
@@ -103,9 +132,26 @@ const isMoreMenuExpanded = ref(false);
 // 是否显示已结束资产
 const showEndedAssets = ref(false);
 
-// 切换菜单展开状态
-const toggleMoreMenu = () => {
-  isMoreMenuExpanded.value = !isMoreMenuExpanded.value;
+// 选择的资产类型
+const selectedAssetType = ref<'普通资产' | '股票' | '基金'>('普通资产');
+const assetTypeOptions = [
+  { label: '普通资产', value: '普通资产' },
+  { label: '股票', value: '股票' },
+  { label: '基金', value: '基金' }
+];
+
+// 搜索
+const isSearchExpanded = ref(false);
+const searchKeyword = ref('');
+
+const toggleSearch = () => {
+  isSearchExpanded.value = !isSearchExpanded.value;
+};
+
+const onSearchBlur = () => {
+  if (!searchKeyword.value.trim()) {
+    isSearchExpanded.value = false;
+  }
 };
 
 // 切换当前/历史资产视图
@@ -113,58 +159,76 @@ const toggleAssetsView = () => {
   showEndedAssets.value = !showEndedAssets.value;
 };
 
-// 计算属性：根据ended状态过滤资产
-const displayGeneralAssets = computed(() => {
-  return generalAssets.value.filter(asset => {
+// 计算属性：根据ended状态和搜索关键词过滤资产
+const filteredGeneralAssets = computed(() => {
+  let list = generalAssets.value.filter(asset => {
     const isEnded = asset.ended === 1;
     return showEndedAssets.value ? isEnded : !isEnded;
   });
+  if (searchKeyword.value.trim()) {
+    list = list.filter(asset => asset.name.includes(searchKeyword.value.trim()));
+  }
+  return list;
 });
 
-const displayStocks = computed(() => {
-  return stocks.value.filter(stock => {
+const filteredStocks = computed(() => {
+  let list = stocks.value.filter(stock => {
     const isEnded = stock.ended === 1;
     return showEndedAssets.value ? isEnded : !isEnded;
   });
+  if (searchKeyword.value.trim()) {
+    list = list.filter(stock => stock.name.includes(searchKeyword.value.trim()));
+  }
+  return list;
 });
 
-const displayFunds = computed(() => {
-  return funds.value.filter(fund => {
+const filteredFunds = computed(() => {
+  let list = funds.value.filter(fund => {
     const isEnded = fund.ended === 1;
     return showEndedAssets.value ? isEnded : !isEnded;
   });
+  if (searchKeyword.value.trim()) {
+    list = list.filter(fund => fund.name.includes(searchKeyword.value.trim()));
+  }
+  return list;
 });
 
 const totalAssetAmount = computed(() => {
-  const generalTotal = displayGeneralAssets.value.reduce((sum, a) => sum + (a.amount || 0), 0);
-  const stockTotal = displayStocks.value.reduce((sum, s) => sum + (s.cost_price * s.quantity || 0), 0);
-  const fundTotal = displayFunds.value.reduce((sum, f) => sum + (f.cost_nav * f.shares || 0), 0);
-  return generalTotal + stockTotal + fundTotal;
+  if (selectedAssetType.value === '普通资产') {
+    return filteredGeneralAssets.value.reduce((sum, a) => sum + (a.amount || 0), 0);
+  } else if (selectedAssetType.value === '股票') {
+    return filteredStocks.value.reduce((sum, s) => sum + (s.cost_price * s.quantity || 0), 0);
+  } else {
+    return filteredFunds.value.reduce((sum, f) => sum + (f.cost_nav * f.shares || 0), 0);
+  }
 });
 
 const totalAssetCount = computed(() => {
-  return displayGeneralAssets.value.length + displayStocks.value.length + displayFunds.value.length;
+  if (selectedAssetType.value === '普通资产') return filteredGeneralAssets.value.length;
+  if (selectedAssetType.value === '股票') return filteredStocks.value.length;
+  return filteredFunds.value.length;
 });
 
 const actionButtons = computed(() => {
-  const buttons = [
-    {
+  if (selectedAssetType.value === '普通资产') {
+    return [{
       text: '新增普通资产',
       icon: Goods,
       action: navigateToAddAsset
-    },
-    {
+    }];
+  } else if (selectedAssetType.value === '股票') {
+    return [{
       text: '新增股票',
       icon: TrendCharts,
       action: navigateToAddStock
-    },
-    {
+    }];
+  } else {
+    return [{
       text: '新增基金',
       icon: DataAnalysis,
       action: navigateToAddFund
-    }
-  ];
-  return buttons;
+    }];
+  }
 });
 
 // 表单数据
@@ -347,6 +411,62 @@ const navigateToAddFund = () => {
 .asset-page {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+/* 顶部导航栏 */
+.top-nav-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 50px;
+  padding: 0 15px;
+  background-color: white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.type-selector {
+  width: 100px;
+}
+
+.type-selector :deep(.el-select__wrapper) {
+  box-shadow: none !important;
+  background: transparent;
+  border: none !important;
+}
+
+.type-selector :deep(.el-select__wrapper:hover) {
+  box-shadow: none !important;
+  border: none !important;
+}
+
+.type-selector :deep(.el-select__wrapper.is-focus) {
+  box-shadow: none !important;
+  border: none !important;
+}
+
+.type-selector :deep(.el-select .el-select.is-focus .el-select__wrapper) {
+  box-shadow: none !important;
+  border: none !important;
+}
+
+.top-icons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nav-icon {
+  font-size: 18px;
+  color: #606266;
+  cursor: pointer;
+}
+
+.search-input {
+  width: 140px;
+}
+
+.search-input :deep(.el-input__inner) {
+  height: 32px;
 }
 
 

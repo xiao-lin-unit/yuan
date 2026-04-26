@@ -36,6 +36,16 @@
       </div>
       <div class="asset-meta">
         <div class="meta-item">
+          <div class="meta-label">计算类型</div>
+          <div class="meta-value">{{ assetInfo.calculation_type || '-' }}</div>
+        </div>
+        <div v-if="assetInfo.calculation_type && assetInfo.calculation_type !== '无'" class="meta-item">
+          <div class="meta-label">{{ assetInfo.calculation_type === '按年收益率计算' ? '年收益率' : '每期收益' }}</div>
+          <div class="meta-value">
+            {{ assetInfo.calculation_type === '按年收益率计算' ? (assetInfo.annual_yield_rate * 100).toFixed(2) + '%' : '¥' + (assetInfo.income_amount || 0).toFixed(2) }}
+          </div>
+        </div>
+        <div v-if="assetInfo.calculation_type && assetInfo.calculation_type !== '无'" class="meta-item">
           <div class="meta-label">下一收益日</div>
           <div class="meta-value">{{ formatDate(assetInfo.next_income_date) }}</div>
         </div>
@@ -75,17 +85,68 @@
 
     <!-- 悬浮操作按钮（仅在未结束时显示） -->
     <FloatingActionMenu v-if="!assetInfo.ended" :buttons="actionButtons" />
+
+    <!-- 修改资产信息弹框 -->
+    <el-dialog v-model="showEditDialog" title="修改资产信息" width="90%" align-center>
+      <el-form :model="editForm" label-width="100px">
+        <el-form-item label="计算类型" required>
+          <el-select v-model="editForm.calculation_type" placeholder="请选择计算类型" style="width: 100%">
+            <el-option
+              v-for="item in calculationTypes"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item v-if="editForm.calculation_type && editForm.calculation_type !== '无'" label="收益周期" required>
+          <el-select v-model="editForm.period" placeholder="请选择收益周期" style="width: 100%">
+            <el-option
+              v-for="item in periodTypes"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item v-if="editForm.calculation_type === '按年收益率计算'" label="年收益率" required>
+          <el-input
+            v-model.number="editForm.annual_yield_rate"
+            placeholder="请输入年收益率，如0.03表示3%"
+            type="number"
+            min="0"
+            step="0.0001"
+          />
+        </el-form-item>
+        <el-form-item v-if="editForm.calculation_type === '按金额计算'" label="每期收益" required>
+          <el-input
+            v-model.number="editForm.income_amount"
+            placeholder="请输入每期收益金额"
+            type="number"
+            min="0"
+            step="0.01"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="showEditDialog = false">取消</el-button>
+          <el-button type="primary" @click="saveEdit">保存</el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import dayjs from 'dayjs';
-import { ArrowLeft, SwitchButton } from '@element-plus/icons-vue';
+import { ArrowLeft, SwitchButton, Edit } from '@element-plus/icons-vue';
 import { ElMessageBox, ElMessage } from 'element-plus';
 import FloatingActionMenu from '../../../components/common/FloatingActionMenu.vue';
-import { getAssetById, endAsset } from '../../../services/asset/assetService';
+import { getAssetById, endAsset, updateAsset, getAssetIncomeRecords } from '../../../services/asset/assetService';
 import { getAccounts } from '../../../services/account/accountService';
+import { calculationTypes, periodTypes } from '../../../utils/dictionaries';
 
 interface AssetIncomeRecord {
   id: string
@@ -116,7 +177,18 @@ const assetInfo = ref({
   next_income_date: '',
   accountName: '',
   ended: 0,
-  created_at: '' as string | Date
+  created_at: '' as string | Date | dayjs.Dayjs,
+  calculation_type: '' as '无' | '按金额计算' | '按年收益率计算' | '',
+  annual_yield_rate: 0,
+  income_amount: 0
+});
+
+const showEditDialog = ref(false);
+const editForm = ref({
+  calculation_type: '' as '无' | '按金额计算' | '按年收益率计算' | '',
+  period: '',
+  annual_yield_rate: 0,
+  income_amount: 0
 });
 
 const incomeRecords = ref<AssetIncomeRecord[]>([]);
@@ -153,7 +225,59 @@ const handleEndAsset = async () => {
   }
 };
 
+const openEditDialog = () => {
+  editForm.value = {
+    calculation_type: assetInfo.value.calculation_type || '',
+    period: assetInfo.value.period || '',
+    annual_yield_rate: assetInfo.value.annual_yield_rate || 0,
+    income_amount: assetInfo.value.income_amount || 0
+  };
+  showEditDialog.value = true;
+};
+
+const saveEdit = async () => {
+  try {
+    if (!editForm.value.calculation_type) {
+      ElMessage.warning('请选择计算类型');
+      return;
+    }
+    if (editForm.value.calculation_type !== '无' && !editForm.value.period) {
+      ElMessage.warning('请选择收益周期');
+      return;
+    }
+    if (editForm.value.calculation_type === '按年收益率计算' && (editForm.value.annual_yield_rate === undefined || editForm.value.annual_yield_rate < 0)) {
+      ElMessage.warning('请输入有效的年收益率');
+      return;
+    }
+    if (editForm.value.calculation_type === '按金额计算' && (editForm.value.income_amount === undefined || editForm.value.income_amount < 0)) {
+      ElMessage.warning('请输入有效的每期收益金额');
+      return;
+    }
+
+    const isNoCalc = editForm.value.calculation_type === '无';
+    await updateAsset(props.assetId, {
+      calculation_type: editForm.value.calculation_type,
+      period: isNoCalc ? '' : editForm.value.period,
+      annual_yield_rate: editForm.value.calculation_type === '按年收益率计算' ? editForm.value.annual_yield_rate : 0,
+      income_amount: editForm.value.calculation_type === '按金额计算' ? editForm.value.income_amount : 0,
+      next_income_date: isNoCalc ? '' : undefined
+    });
+
+    ElMessage.success('资产信息已更新');
+    showEditDialog.value = false;
+    await loadAssetDetail();
+  } catch (error) {
+    console.error('修改资产信息失败:', error);
+    ElMessage.error('修改资产信息失败');
+  }
+};
+
 const actionButtons = [
+  {
+    text: '修改',
+    icon: Edit,
+    action: openEditDialog
+  },
   {
     text: '结束',
     icon: SwitchButton,
@@ -162,24 +286,13 @@ const actionButtons = [
 ];
 
 const loadIncomeRecords = async () => {
-  // TODO: 从数据库加载收益记录
-  // 目前使用模拟数据
-  incomeRecords.value = [
-    {
-      id: '1',
-      asset_id: props.assetId,
-      income_amount: 150.00,
-      record_time: '2026-04-10 10:30:00',
-      remark: '4月收益'
-    },
-    {
-      id: '2',
-      asset_id: props.assetId,
-      income_amount: 120.50,
-      record_time: '2026-03-10 10:30:00',
-      remark: '3月收益'
-    }
-  ];
+  try {
+    const records = await getAssetIncomeRecords(props.assetId);
+    incomeRecords.value = records;
+  } catch (error) {
+    console.error('加载收益记录失败:', error);
+    incomeRecords.value = [];
+  }
 };
 
 const loadAssetDetail = async () => {
@@ -209,7 +322,10 @@ const loadAssetDetail = async () => {
       next_income_date: asset.next_income_date || '',
       accountName,
       ended: asset.ended,
-      created_at: asset.created_at || ''
+      created_at: asset.created_at || '',
+      calculation_type: asset.calculation_type || '',
+      annual_yield_rate: asset.annual_yield_rate || 0,
+      income_amount: asset.income_amount || 0
     };
 
     // 加载收益记录

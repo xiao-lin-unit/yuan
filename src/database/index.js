@@ -443,6 +443,7 @@ class DatabaseManager {
               total_limit REAL DEFAULT 0,
               is_liquid INTEGER DEFAULT 1,
               status TEXT DEFAULT '启用',
+              asset_id TEXT,
               remark TEXT,
               created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
               updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -736,6 +737,20 @@ class DatabaseManager {
             )
           `
         },
+        // 创建普通资产收益记录表
+        {
+          sql: `
+            CREATE TABLE IF NOT EXISTS asset_income_records (
+              id TEXT PRIMARY KEY,
+              asset_id TEXT NOT NULL,
+              income_amount REAL NOT NULL,
+              record_time TIMESTAMP NOT NULL,
+              remark TEXT,
+              created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+              FOREIGN KEY (asset_id) REFERENCES assets(id)
+            )
+          `
+        },
         // 创建索引（性能优化）
         { sql: 'CREATE INDEX IF NOT EXISTS idx_accounts_type ON accounts(type)' },
         { sql: 'CREATE INDEX IF NOT EXISTS idx_accounts_is_liquid ON accounts(is_liquid)' },
@@ -753,7 +768,8 @@ class DatabaseManager {
         { sql: 'CREATE INDEX IF NOT EXISTS idx_pending_repayments_due_date ON pending_repayments(due_date)' },
         { sql: 'CREATE INDEX IF NOT EXISTS idx_financial_goals_account_id ON financial_goals(account_id)' },
         { sql: 'CREATE INDEX IF NOT EXISTS idx_financial_goals_status ON financial_goals(status)' },
-        { sql: 'CREATE INDEX IF NOT EXISTS idx_categories_type ON categories(type)' }
+        { sql: 'CREATE INDEX IF NOT EXISTS idx_categories_type ON categories(type)' },
+        { sql: 'CREATE INDEX IF NOT EXISTS idx_asset_income_records_asset_id ON asset_income_records(asset_id)' }
       ]
 
       // 批量执行
@@ -777,6 +793,11 @@ class DatabaseManager {
       }
       try {
         await this.run('ALTER TABLE assets ADD COLUMN annual_yield_rate REAL DEFAULT 0')
+      } catch (e) {
+        // Column may already exist
+      }
+      try {
+        await this.run('ALTER TABLE accounts ADD COLUMN asset_id TEXT')
       } catch (e) {
         // Column may already exist
       }
