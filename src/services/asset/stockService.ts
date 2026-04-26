@@ -67,21 +67,18 @@ export async function checkAccountBalance(accountId: string, requiredAmount: num
 /**
  * Add a new stock with initial buy transaction
  */
-export async function addStock(stockData: StockInput): Promise<void> {
+export async function addStock(stockData: StockInput, deductFromAccount: boolean = true): Promise<void> {
   const stockId = dayjs().valueOf().toString()
   const totalCost = calculateTotalCost(stockData.price, stockData.quantity, stockData.fee)
-
-  // 使用新的出账接口
-  const debitResult = await createDebitTransaction(stockData.account_id, totalCost, `股票买入：${stockData.name}`)
 
   // Calculate cost price
   const costPrice = calculateCostPrice(stockData.price, stockData.quantity, stockData.fee)
 
-  const statements = []
+  const statements: { statement: string; values: any[] }[] = []
 
   // Create stock record
   statements.push({
-    statement: `INSERT INTO stocks (id, name, code, quantity, current_price, cost_price, first_buy_date, account_id) 
+    statement: `INSERT INTO stocks (id, name, code, quantity, current_price, cost_price, first_buy_date, account_id)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     values: [
       stockId,
@@ -100,7 +97,7 @@ export async function addStock(stockData: StockInput): Promise<void> {
 
   // Create stock holding record
   statements.push({
-    statement: `INSERT INTO stock_holdings (id, stock_id, price, quantity, remaining_quantity, fee, transaction_time, account_id) 
+    statement: `INSERT INTO stock_holdings (id, stock_id, price, quantity, remaining_quantity, fee, transaction_time, account_id)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     values: [
       holdingId,
@@ -116,7 +113,7 @@ export async function addStock(stockData: StockInput): Promise<void> {
 
   // Create stock transaction record (buy)
   statements.push({
-    statement: `INSERT INTO stock_transactions (id, stock_id, price, quantity, type, hold_ids, fee, transaction_time, account_id) 
+    statement: `INSERT INTO stock_transactions (id, stock_id, price, quantity, type, hold_ids, fee, transaction_time, account_id)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     values: [
       transactionId,
@@ -131,8 +128,11 @@ export async function addStock(stockData: StockInput): Promise<void> {
     ]
   })
 
-  // 使用出账接口返回的SQL语句（已包含账户更新和交易记录）
-  statements.push(...debitResult.statements)
+  // Deduct from account if requested
+  if (deductFromAccount) {
+    const debitResult = await createDebitTransaction(stockData.account_id, totalCost, `股票买入：${stockData.name}`)
+    statements.push(...debitResult.statements)
+  }
 
   await db.executeTransaction(statements)
 }

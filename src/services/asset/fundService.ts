@@ -75,21 +75,18 @@ export function calculateLockEndDate(transactionTime: dayjs.Dayjs | string | Dat
 /**
  * Add a new fund with initial buy transaction
  */
-export async function addFund(fundData: FundInput): Promise<void> {
+export async function addFund(fundData: FundInput, deductFromAccount: boolean = true): Promise<void> {
   const fundId = dayjs().valueOf().toString()
   const totalCost = calculateTotalCost(fundData.cost_nav, fundData.shares, fundData.fee)
-
-  // 使用新的出账接口
-  const debitResult = await createDebitTransaction(fundData.account_id, totalCost, `基金买入：${fundData.name}`)
 
   // Calculate lock end date
   const lockEndDate = calculateLockEndDate(fundData.transaction_time, fundData.lock_period)
 
-  const statements = []
+  const statements: { statement: string; values: any[] }[] = []
 
   // Create fund record
   statements.push({
-    statement: `INSERT INTO funds (id, name, code, shares, current_nav, cost_nav, total_fee, first_buy_date, has_lock, lock_period, account_id) 
+    statement: `INSERT INTO funds (id, name, code, shares, current_nav, cost_nav, total_fee, first_buy_date, has_lock, lock_period, account_id)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     values: [
       fundId,
@@ -111,7 +108,7 @@ export async function addFund(fundData: FundInput): Promise<void> {
 
   // Create fund holding record
   statements.push({
-    statement: `INSERT INTO fund_holdings (id, fund_id, nav, shares, remaining_shares, fee, lock_period, lock_end_date, transaction_time, account_id) 
+    statement: `INSERT INTO fund_holdings (id, fund_id, nav, shares, remaining_shares, fee, lock_period, lock_end_date, transaction_time, account_id)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     values: [
       holdingId,
@@ -129,7 +126,7 @@ export async function addFund(fundData: FundInput): Promise<void> {
 
   // Create fund transaction record (buy)
   statements.push({
-    statement: `INSERT INTO fund_transactions (id, fund_id, transaction_nav, shares, type, hold_ids, fee, transaction_time, account_id) 
+    statement: `INSERT INTO fund_transactions (id, fund_id, transaction_nav, shares, type, hold_ids, fee, transaction_time, account_id)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     values: [
       transactionId,
@@ -144,8 +141,11 @@ export async function addFund(fundData: FundInput): Promise<void> {
     ]
   })
 
-  // 使用出账接口返回的SQL语句（已包含账户更新和交易记录）
-  statements.push(...debitResult.statements)
+  // Deduct from account if requested
+  if (deductFromAccount) {
+    const debitResult = await createDebitTransaction(fundData.account_id, totalCost, `基金买入：${fundData.name}`)
+    statements.push(...debitResult.statements)
+  }
 
   await db.executeTransaction(statements)
 }

@@ -31,6 +31,9 @@
             <el-option v-for="account in accounts" :key="account.id" :label="account.name" :value="account.id" />
           </el-select>
         </el-form-item>
+        <el-form-item label="账户扣款">
+          <el-switch v-model="stockForm.deduct_from_account" active-text="是" inactive-text="否" />
+        </el-form-item>
       </el-form>
     </div>
   </PageTemplate>
@@ -60,7 +63,8 @@ const stockForm = ref({
   quantity: 0,
   fee: 0,
   transaction_time: dayjs(),
-  account_id: ''
+  account_id: '',
+  deduct_from_account: true
 })
 
 onMounted(async () => {
@@ -136,7 +140,7 @@ const addStock = async () => {
       fee: stockForm.value.fee,
       transaction_time: stockForm.value.transaction_time,
       account_id: stockForm.value.account_id
-    })
+    }, stockForm.value.deduct_from_account)
 
     emit('navigate', 'asset')
   } catch (error) {

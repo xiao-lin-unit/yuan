@@ -21,13 +21,16 @@
         </el-form-item>
         <el-form-item label="关联账户" required>
           <el-select v-model="assetForm.account_id" placeholder="请选择关联账户">
-            <el-option 
-              v-for="account in filteredAccounts" 
-              :key="account.id" 
-              :label="account.name" 
-              :value="account.id" 
+            <el-option
+              v-for="account in filteredAccounts"
+              :key="account.id"
+              :label="account.name"
+              :value="account.id"
             />
           </el-select>
+        </el-form-item>
+        <el-form-item label="账户扣款">
+          <el-switch v-model="assetForm.deduct_from_account" active-text="是" inactive-text="否" />
         </el-form-item>
         <el-form-item label="计算类型" required>
           <el-select v-model="assetForm.calculation_type" placeholder="请选择计算类型">
@@ -111,6 +114,7 @@ const assetForm = ref({
   calculation_type: '',
   income_amount: 0,
   annual_yield_rate: 0,
+  deduct_from_account: true,
   period: '',
   period_count: 1,
   income_month: 0,
@@ -210,7 +214,7 @@ const addAsset = async () => {
       period: assetForm.value.period,
       period_count: assetForm.value.period_count,
       income_date: incomeDate
-    })
+    }, assetForm.value.deduct_from_account)
     emit('navigate', 'asset')
   } catch (error) {
     console.error('新增资产失败:', error)

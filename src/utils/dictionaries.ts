@@ -27,15 +27,12 @@ export const adjustmentTypes = [
 
 // 普通资产类型
 export const assetTypes = [
-  { label: '工资', value: '工资' },
-  { label: '租金', value: '租金' },
+  { label: '储蓄', value: '储蓄' },
   { label: '利息', value: '利息' },
+  { label: '租金', value: '租金' },
   { label: '版权', value: '版权' },
-  { label: '副业', value: '副业' },
-  { label: '被动收入', value: '被动收入' },
   { label: '社保', value: '社保' },
-  { label: '公积金', value: '公积金' },
-  { label: '其他', value: '其他' }
+  { label: '公积金', value: '公积金' }
 ]
 
 // 收益周期类型

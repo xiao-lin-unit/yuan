@@ -15,11 +15,15 @@
 - [StatOverview.vue](file://src/components/common/StatOverview.vue)
 - [ExpensePage.vue](file://src/components/mobile/expense/ExpensePage.vue)
 - [AccountManagement.vue](file://src/components/mobile/account/AccountManagement.vue)
+- [AccountDetailPage.vue](file://src/components/mobile/account/AccountDetailPage.vue)
 - [AssetDetailPage.vue](file://src/components/mobile/asset/AssetDetailPage.vue)
 - [AssetManagement.vue](file://src/components/mobile/asset/AssetManagement.vue)
 - [StockDetailPage.vue](file://src/components/mobile/asset/StockDetailPage.vue)
 - [FundDetailPage.vue](file://src/components/mobile/asset/FundDetailPage.vue)
 - [AssetCard.vue](file://src/components/mobile/asset/AssetCard.vue)
+- [LiabilityManagement.vue](file://src/components/mobile/liability/LiabilityManagement.vue)
+- [LiabilityDetailPage.vue](file://src/components/mobile/liability/LiabilityDetailPage.vue)
+- [MonthlyStats.vue](file://src/components/mobile/expense/MonthlyStats.vue)
 - [assetService.ts](file://src/services/asset/assetService.ts)
 - [stockService.ts](file://src/services/asset/stockService.ts)
 - [fundService.ts](file://src/services/asset/fundService.ts)
@@ -46,12 +50,12 @@
 ## 简介
 本文件面向财务应用程序的UI组件体系，系统性梳理通用布局组件（头部导航、页面内容、底部栏）、页面模板组件、侧边菜单、日历组件、浮动操作菜单以及新增的StatOverview统计组件的设计与实现要点。文档同时覆盖组件属性、事件、插槽、样式与主题适配、最佳实践与性能优化建议，并给出扩展与自定义指导，帮助开发者快速理解与高效使用这些组件。
 
-**更新** 本次更新反映了应用的UI组件现代化升级，新增了 StatOverview 组件提供卡片式界面、渐变覆盖层、响应式设计和自定义颜色方案，并已在资产、负债、支出和收入管理模块中集成使用，显著提升了用户界面的一致性和美观度。
+**更新** 本次更新反映了应用的UI组件现代化升级，新增了 StatOverview 组件提供卡片式界面、渐变覆盖层、响应式设计和自定义颜色方案，并已在资产、负债、支出和收入管理模块中集成使用，显著提升了用户界面的一致性和美观度。**特别重要的是，FloatingActionMenu浮动操作菜单组件已被集成到所有主要业务页面中，作为统一的操作入口体验，包括资产管理和负债管理页面、账户管理页面、收支页面以及各类详情页面。**
 
 ## 项目结构
 应用采用"根组件 + 通用组件 + 移动端页面"的分层组织方式：
 - 根组件负责全局布局与路由/状态协调
-- 通用组件提供跨页面的基础UI能力，包括新增的StatOverview统计组件
+- 通用组件提供跨页面的基础UI能力，包括新增的StatOverview统计组件和FloatingActionMenu浮动操作菜单
 - 移动端页面聚焦业务场景，组合通用组件完成具体页面
 
 ```mermaid
@@ -73,13 +77,15 @@ STATOVERVIEW["StatOverview.vue<br/>财务统计组件"]
 end
 subgraph "移动端页面"
 EXPENSE["ExpensePage.vue<br/>支出页"]
-ACCOUNT["AccountManagement.vue<br/>账户管理页"]
+ACCOUNTMGMT["AccountManagement.vue<br/>账户管理页"]
+ACCOUNTDETAIL["AccountDetailPage.vue<br/>账户详情页"]
 ASSETDETAIL["AssetDetailPage.vue<br/>通用资产详情页"]
 STOCKDETAIL["StockDetailPage.vue<br/>股票详情页"]
 FUNDDETAIL["FundDetailPage.vue<br/>基金详情页"]
 ASSETMGMT["AssetManagement.vue<br/>资产管理页"]
 ASSETCARD["AssetCard.vue<br/>资产卡片组件"]
 LIABILITYMGMT["LiabilityManagement.vue<br/>负债管理页"]
+LIABILITYDETAIL["LiabilityDetailPage.vue<br/>负债详情页"]
 MONTHLYSTATS["MonthlyStats.vue<br/>月度统计页"]
 end
 MAIN --> APP
@@ -88,19 +94,24 @@ APP --> CONTENT
 APP --> FOOTER
 APP --> SIDEMENU
 CONTENT --> EXPENSE
-CONTENT --> ACCOUNT
+CONTENT --> ACCOUNTMGMT
+CONTENT --> ACCOUNTDETAIL
 CONTENT --> ASSETMGMT
+CONTENT --> ASSETDETAIL
+CONTENT --> STOCKDETAIL
+CONTENT --> FUNDDETAIL
+CONTENT --> LIABILITYMGMT
+CONTENT --> LIABILITYDETAIL
 ASSETMGMT --> ASSETCARD
 ASSETMGMT --> ASSETDETAIL
 ASSETMGMT --> STOCKDETAIL
 ASSETMGMT --> FUNDDETAIL
 ASSETMGMT --> STATOVERVIEW
-EXPENSE --> PHEADER
-EXPENSE --> CALENDAR
-EXPENSE --> FAM
-ACCOUNT --> PHEADER
-ACCOUNT --> FAM
+ACCOUNTMGMT --> FAM
+ACCOUNTDETAIL --> FAM
 LIABILITYMGMT --> STATOVERVIEW
+LIABILITYDETAIL --> FAM
+EXPENSE --> FAM
 MONTHLYSTATS --> STATOVERVIEW
 ```
 
@@ -117,13 +128,15 @@ MONTHLYSTATS --> STATOVERVIEW
 - [FloatingActionMenu.vue:1-151](file://src/components/common/FloatingActionMenu.vue#L1-L151)
 - [StatOverview.vue:1-119](file://src/components/common/StatOverview.vue#L1-L119)
 - [ExpensePage.vue:1-88](file://src/components/mobile/expense/ExpensePage.vue#L1-L88)
-- [AccountManagement.vue:1-650](file://src/components/mobile/account/AccountManagement.vue#L1-L650)
+- [AccountManagement.vue:1-689](file://src/components/mobile/account/AccountManagement.vue#L1-L689)
+- [AccountDetailPage.vue:1-587](file://src/components/mobile/account/AccountDetailPage.vue#L1-L587)
 - [AssetDetailPage.vue:1-435](file://src/components/mobile/asset/AssetDetailPage.vue#L1-L435)
-- [AssetManagement.vue:1-490](file://src/components/mobile/asset/AssetManagement.vue#L1-L490)
+- [AssetManagement.vue:1-414](file://src/components/mobile/asset/AssetManagement.vue#L1-L414)
 - [StockDetailPage.vue:1-558](file://src/components/mobile/asset/StockDetailPage.vue#L1-L558)
 - [FundDetailPage.vue:1-796](file://src/components/mobile/asset/FundDetailPage.vue#L1-L796)
 - [AssetCard.vue:1-180](file://src/components/mobile/asset/AssetCard.vue#L1-L180)
-- [LiabilityManagement.vue:1-300](file://src/components/mobile/liability/LiabilityManagement.vue#L1-L300)
+- [LiabilityManagement.vue:1-247](file://src/components/mobile/liability/LiabilityManagement.vue#L1-L247)
+- [LiabilityDetailPage.vue:1-200](file://src/components/mobile/liability/LiabilityDetailPage.vue#L1-L200)
 - [MonthlyStats.vue:1-191](file://src/components/mobile/expense/MonthlyStats.vue#L1-L191)
 
 **章节来源**
@@ -177,7 +190,7 @@ MONTHLYSTATS --> STATOVERVIEW
   - 职责：单按钮直显或展开多按钮菜单，支持提示标签
   - 属性：buttons（数组，包含text、icon、action）
   - 事件：无（通过action回调触发）
-  - 适用：页面内快捷操作
+  - 适用：页面内快捷操作，**现已集成到所有主要业务页面中**
 
 - StatOverview（财务统计组件）
   - 职责：提供卡片式统计界面，支持渐变覆盖层、响应式设计和自定义颜色方案
@@ -196,7 +209,7 @@ MONTHLYSTATS --> STATOVERVIEW
 - [StatOverview.vue:1-119](file://src/components/common/StatOverview.vue#L1-L119)
 
 ## 架构总览
-应用通过根组件App.vue集中管理当前页面组件、导航参数与日期状态，并将事件向上/向下分发至通用组件与业务页面。通用组件之间通过事件与属性协作，形成稳定的UI基础设施。新增的StatOverview组件作为通用统计组件，为各个业务模块提供统一的统计展示界面。
+应用通过根组件App.vue集中管理当前页面组件、导航参数与日期状态，并将事件向上/向下分发至通用组件与业务页面。通用组件之间通过事件与属性协作，形成稳定的UI基础设施。新增的StatOverview组件作为通用统计组件，为各个业务模块提供统一的统计展示界面。**FloatingActionMenu组件已成为所有主要业务页面的标准操作入口，提供统一的用户体验。**
 
 ```mermaid
 sequenceDiagram
@@ -206,6 +219,7 @@ participant APP as "App.vue"
 participant AC as "AppContent"
 participant AF as "AppFooter"
 participant SM as "SideMenu"
+participant FAM as "FloatingActionMenu"
 participant SO as "StatOverview"
 U->>AH : 点击头像
 AH-->>APP : 触发 "toggle-menu"
@@ -218,6 +232,8 @@ APP-->>AC : 传递 currentComponent/componentProps
 U->>AC : 页面内触发 navigate/dateChange
 AC-->>APP : 事件冒泡
 APP->>APP : 更新状态并重新计算组件映射
+U->>FAM : 点击操作按钮
+FAM-->>U : 执行对应action回调
 U->>SO : 传入统计数据
 SO-->>U : 渲染统计卡片
 ```
@@ -227,6 +243,7 @@ SO-->>U : 渲染统计卡片
 - [AppHeader.vue:45-47](file://src/components/common/AppHeader.vue#L45-L47)
 - [AppFooter.vue:3-23](file://src/components/common/AppFooter.vue#L3-L23)
 - [AppContent.vue:3-21](file://src/components/common/AppContent.vue#L3-L21)
+- [FloatingActionMenu.vue:33-58](file://src/components/common/FloatingActionMenu.vue#L33-L58)
 - [StatOverview.vue:29-35](file://src/components/common/StatOverview.vue#L29-L35)
 
 **章节来源**
@@ -401,6 +418,9 @@ Select --> |否| Wait["等待交互"]
   - 通过按钮 action 回调触发，组件不直接发出事件
 - 使用建议
   - buttons 数组按需传入，确保每个按钮包含 icon 与 action
+- **集成现状**
+  - 已集成到所有主要业务页面：资产管理和负债管理页面、账户管理页面、收支页面以及各类详情页面
+  - 提供统一的操作入口体验，提升用户操作效率
 
 ```mermaid
 classDiagram
@@ -505,6 +525,9 @@ Responsive --> Output
   - more 按钮展开菜单，逐项悬停显示提示
 - 动画与样式
   - 滑入动画、阴影、缩放与透明度过渡
+- **集成优势**
+  - 统一的用户体验，所有页面操作入口一致
+  - 减少页面间的操作差异，提升学习成本
 
 **章节来源**
 - [FloatingActionMenu.vue:1-151](file://src/components/common/FloatingActionMenu.vue#L1-L151)
@@ -523,6 +546,8 @@ Responsive --> Output
   - 返回上级：通过 navigate 事件返回资产页面
   - 结束资产：弹窗确认后调用服务层 endAsset 方法
   - 格式化显示：日期格式化、金额格式化
+- **FloatingActionMenu集成**
+  - 使用统一的操作入口，提供结束资产等操作
 
 ```mermaid
 flowchart TD
@@ -549,7 +574,7 @@ Interact --> |返回| Back
 - 设计要点
   - 当前资产与历史资产切换视图
   - 资产卡片网格布局，支持响应式
-  - 浮动操作菜单，支持新增不同类型资产
+  - **浮动操作菜单，支持新增不同类型资产**
   - 资产卡片组件化设计
 - 功能特性
   - 资产分类展示：通用资产、股票、基金
@@ -564,6 +589,9 @@ Interact --> |返回| Back
   - 在非历史资产视图下显示总资产统计
   - 主要统计项显示资产金额
   - 详细统计项显示资产数量
+- **FloatingActionMenu集成**
+  - 提供新增普通资产、股票、基金的操作入口
+  - 统一的新增操作体验
 
 ```mermaid
 flowchart TD
@@ -585,13 +613,13 @@ ChooseType --> NavigateAdd["导航到新增页面"]
 - [AssetManagement.vue:249-262](file://src/components/mobile/asset/AssetManagement.vue#L249-L262)
 
 **章节来源**
-- [AssetManagement.vue:1-490](file://src/components/mobile/asset/AssetManagement.vue#L1-L490)
+- [AssetManagement.vue:1-414](file://src/components/mobile/asset/AssetManagement.vue#L1-L414)
 
 ### 负债管理页面 LiabilityManagement 的统计集成
 - 设计要点
   - 当前负债与历史负债切换视图
   - 负债卡片网格布局，支持响应式
-  - 浮动操作菜单，支持新增负债
+  - **浮动操作菜单，支持新增负债**
   - 负债卡片组件化设计
 - 功能特性
   - 负债类型分类展示：房贷、车贷、信用卡等
@@ -605,9 +633,12 @@ ChooseType --> NavigateAdd["导航到新增页面"]
   - 使用 liabilityService 提供负债数据
   - 支持异步数据加载与错误处理
   - 模拟数据回退机制
+- **FloatingActionMenu集成**
+  - 提供新增负债的操作入口
+  - 统一的新增操作体验
 
 **章节来源**
-- [LiabilityManagement.vue:1-300](file://src/components/mobile/liability/LiabilityManagement.vue#L1-L300)
+- [LiabilityManagement.vue:1-247](file://src/components/mobile/liability/LiabilityManagement.vue#L1-L247)
 
 ### 支出统计页面 MonthlyStats 的统计实现
 - 设计要点
@@ -665,6 +696,8 @@ ChooseType --> NavigateAdd["导航到新增页面"]
 - 服务层集成
   - 使用 stockService 提供完整的股票数据服务
   - 支持价格更新、交易记录查询等功能
+- **FloatingActionMenu集成**
+  - 提供买入、修改价格、卖出等操作入口
 
 **章节来源**
 - [StockDetailPage.vue:1-558](file://src/components/mobile/asset/StockDetailPage.vue#L1-L558)
@@ -683,6 +716,8 @@ ChooseType --> NavigateAdd["导航到新增页面"]
 - 服务层集成
   - 使用 fundService 提供专业的基金数据服务
   - 支持净值更新、交易记录查询、锁定期管理
+- **FloatingActionMenu集成**
+  - 提供买入、修改净值、卖出等操作入口
 
 **章节来源**
 - [FundDetailPage.vue:1-796](file://src/components/mobile/asset/FundDetailPage.vue#L1-L796)
@@ -705,6 +740,105 @@ ChooseType --> NavigateAdd["导航到新增页面"]
 
 **章节来源**
 - [AssetCard.vue:1-180](file://src/components/mobile/asset/AssetCard.vue#L1-L180)
+
+### 账户管理页面 AccountManagement 的操作集成
+- 设计要点
+  - 账户分类展示：信用卡、流动资金、其他资金
+  - 账户详情导航：点击卡片跳转到相应详情页面
+  - **浮动操作菜单，支持新增账户、编辑账户、余额调整等操作**
+- 功能特性
+  - 账户类型分类：信用卡、储蓄、公积金等
+  - 财务指标计算：总资产、总负债、净资产、负债率等
+  - 账户状态管理：流动资金与非流动资金区分
+- 服务层集成
+  - 使用 accountService 提供完整的账户数据服务
+  - 支持账户增删改查、余额调整等功能
+- **FloatingActionMenu集成**
+  - 提供新增账户、编辑账户、余额调整等操作入口
+  - 统一的操作体验，提升用户效率
+
+**章节来源**
+- [AccountManagement.vue:1-689](file://src/components/mobile/account/AccountManagement.vue#L1-L689)
+
+### 账户详情页面 AccountDetailPage 的操作集成
+- 设计要点
+  - 账户基本信息展示：类型、余额、额度等
+  - 交易记录明细：收入、支出、信用卡还款等
+  - **悬浮操作按钮：停用、编辑、还款等操作**
+  - 响应式布局与美观的卡片设计
+- 功能特性
+  - 账户详情计算：余额、已用额度、可用额度等
+  - 交易记录查询：支持多种类型的交易记录
+  - 账户状态管理：停用、启用等状态控制
+  - 交互式操作：导航到还款页面等
+- 服务层集成
+  - 使用 accountService 提供完整的账户数据服务
+  - 支持账户详情、交易记录、停用等功能
+- **FloatingActionMenu集成**
+  - 提供停用、编辑、还款等操作入口
+  - 根据账户类型动态调整操作按钮
+
+**章节来源**
+- [AccountDetailPage.vue:1-587](file://src/components/mobile/account/AccountDetailPage.vue#L1-L587)
+
+### 支出页面 ExpensePage 的操作集成
+- 设计要点
+  - 支出记录列表：日期、金额、类别、备注
+  - 支出统计概览：当日支出、当月支出等
+  - **浮动操作菜单，支持新增支出、编辑、删除等操作**
+- 功能特性
+  - 支出记录管理：支持新增、编辑、删除操作
+  - 统计分析：支持按日、周、月、年维度统计
+  - 类别管理：支持自定义支出类别
+- 服务层集成
+  - 使用 expenseService 提供完整的支出数据服务
+  - 支持支出记录增删改查、统计分析等功能
+- **FloatingActionMenu集成**
+  - 提供新增支出等操作入口
+  - 简化用户的操作流程
+
+**章节来源**
+- [ExpensePage.vue:1-88](file://src/components/mobile/expense/ExpensePage.vue#L1-L88)
+
+### 收入页面 IncomePage 的操作集成
+- 设计要点
+  - 收入记录列表：日期、金额、来源、备注
+  - 收入统计概览：当日收入、当月收入等
+  - **浮动操作菜单，支持新增收入、编辑、删除等操作**
+- 功能特性
+  - 收入记录管理：支持新增、编辑、删除操作
+  - 统计分析：支持按日、周、月、年维度统计
+  - 来源管理：支持自定义收入来源
+- 服务层集成
+  - 使用 incomeService 提供完整的收入数据服务
+  - 支持收入记录增删改查、统计分析等功能
+- **FloatingActionMenu集成**
+  - 提供新增收入等操作入口
+  - 统一的操作体验
+
+**章节来源**
+- [IncomePage.vue:1-15](file://src/components/mobile/income/IncomePage.vue#L1-L15)
+
+### 负债详情页面 LiabilityDetailPage 的操作集成
+- 设计要点
+  - 负债基本信息展示：类型、本金、剩余本金、利率等
+  - 还款计划明细：每月还款额、已还期数、剩余期数等
+  - **悬浮操作按钮：提前还款、修改信息、结清等操作**
+  - 响应式布局与美观的卡片设计
+- 功能特性
+  - 负债详情计算：剩余总额、总利息、月供等指标
+  - 还款计划查询：支持详细的还款计划展示
+  - 负债状态管理：未结清、已结清等状态控制
+  - 交互式操作：导航到还款页面等
+- 服务层集成
+  - 使用 liabilityService 提供完整的负债数据服务
+  - 支持负债详情、还款计划、提前还款等功能
+- **FloatingActionMenu集成**
+  - 提供提前还款、修改信息、结清等操作入口
+  - 根据负债状态动态调整操作按钮
+
+**章节来源**
+- [LiabilityDetailPage.vue:1-200](file://src/components/mobile/liability/LiabilityDetailPage.vue#L1-L200)
 
 ### 服务层架构的现代化升级
 - 资产服务层
@@ -737,6 +871,9 @@ ChooseType --> NavigateAdd["导航到新增页面"]
   - Capacitor（原生平台键盘插件）
 - 服务层依赖
   - 数据库适配器、事务处理、类型安全
+- **FloatingActionMenu组件依赖**
+  - 无外部依赖，仅使用内置样式与Element Plus图标
+  - 统一的图标系统，支持多种操作类型的图标
 - StatOverview 组件依赖
   - 无外部依赖，仅使用内置样式与图片资源
 
@@ -751,6 +888,7 @@ SASS["Sass"] --> VITE
 CAP["Capacitor"] --> KEYBOARD["@capacitor/keyboard"]
 SERVICE["服务层"] --> DB["数据库适配器"]
 SERVICE --> TYPES["TypeScript类型定义"]
+FAM["FloatingActionMenu组件"] --> ICONS["@element-plus/icons-vue"]
 STATOVERVIEW["StatOverview组件"] --> IMG["内置图片资源"]
 ```
 
@@ -758,6 +896,7 @@ STATOVERVIEW["StatOverview组件"] --> IMG["内置图片资源"]
 - [package.json:19-36](file://package.json#L19-L36)
 - [vite.config.ts:1-11](file://vite.config.ts#L1-L11)
 - [tsconfig.json:1-25](file://tsconfig.json#L1-L25)
+- [FloatingActionMenu.vue:35](file://src/components/common/FloatingActionMenu.vue#L35)
 - [StatOverview.vue:27](file://src/components/common/StatOverview.vue#L27)
 
 **章节来源**
@@ -773,6 +912,7 @@ STATOVERVIEW["StatOverview组件"] --> IMG["内置图片资源"]
   - AppContent 使用动态组件，建议保持组件映射稳定，减少不必要的重渲染
 - 浮动菜单
   - 展开动画与阴影会带来一定开销，按钮数量较多时建议合并相似操作或延迟渲染
+  - **FloatingActionMenu组件已集成到多个页面，需要注意组件实例的复用与销毁**
 - StatOverview 组件
   - 卡片式布局，渲染开销较小
   - 响应式样式使用媒体查询，性能影响可忽略
@@ -798,6 +938,10 @@ STATOVERVIEW["StatOverview组件"] --> IMG["内置图片资源"]
   - 检查 scoped 样式与 :deep 选择器使用
   - 确认 Element Plus 图标与主题样式加载顺序
   - 检查 StatOverview 组件的渐变覆盖层样式
+- **FloatingActionMenu操作无效**
+  - 确认按钮数组格式正确，包含text、icon、action属性
+  - 检查action回调函数是否正确绑定
+  - 确认图标组件正确导入
 - 资产详情加载失败
   - 检查服务层调用是否正确
   - 确认资产ID参数传递
@@ -819,6 +963,7 @@ STATOVERVIEW["StatOverview组件"] --> IMG["内置图片资源"]
 - [Calendar.vue:88-94](file://src/components/common/Calendar.vue#L88-L94)
 - [Calendar.vue:262-264](file://src/components/common/Calendar.vue#L262-L264)
 - [SideMenu.vue:80-83](file://src/components/common/SideMenu.vue#L80-L83)
+- [FloatingActionMenu.vue:45-50](file://src/components/common/FloatingActionMenu.vue#L45-L50)
 - [StatOverview.vue:29-35](file://src/components/common/StatOverview.vue#L29-L35)
 - [AssetDetailPage.vue:189-225](file://src/components/mobile/asset/AssetDetailPage.vue#L189-L225)
 - [StockDetailPage.vue:300-349](file://src/components/mobile/asset/StockDetailPage.vue#L300-L349)
@@ -827,9 +972,9 @@ STATOVERVIEW["StatOverview组件"] --> IMG["内置图片资源"]
 ## 结论
 本UI组件体系以通用布局组件为核心，结合页面模板与交互组件，形成可复用、可扩展的移动端财务应用界面框架。通过事件与属性的清晰边界、响应式与主题适配策略，以及合理的性能与可维护性设计，能够支撑多样化的业务页面需求。
 
-**更新** 本次现代化升级显著提升了资产相关页面的功能完整性与用户体验，新增的 StatOverview 组件提供了一致的统计展示界面，已在资产、负债、支出和收入管理模块中集成使用。该组件具有卡片式界面、渐变覆盖层、响应式设计和自定义颜色方案等特点，显著提升了用户界面的一致性和美观度。配合完善的股票、基金详情页面，形成了完整的资产管理UI体系。服务层架构的引入确保了数据处理的可靠性与可维护性，TypeScript类型定义提供了更好的开发体验与类型安全保障。
+**更新** 本次现代化升级显著提升了资产相关页面的功能完整性与用户体验，新增的 StatOverview 组件提供了一致的统计展示界面，已在资产、负债、支出和收入管理模块中集成使用。该组件具有卡片式界面、渐变覆盖层、响应式设计和自定义颜色方案等特点，显著提升了用户界面的一致性和美观度。**特别重要的是，FloatingActionMenu浮动操作菜单组件已被集成到所有主要业务页面中，作为统一的操作入口体验，包括资产管理和负债管理页面、账户管理页面、收支页面以及各类详情页面。这一集成大幅提升了用户操作效率，减少了页面间的操作差异，提供了更加一致和便捷的用户体验。**
 
-建议在实际使用中遵循事件冒泡规范、合理拆分组件职责，并根据业务场景扩展组件能力。对于新增的StatOverview组件，建议重点关注数据格式标准化与颜色主题的一致性，确保在不同业务模块中提供统一的视觉体验。
+建议在实际使用中遵循事件冒泡规范、合理拆分组件职责，并根据业务场景扩展组件能力。对于新增的StatOverview组件，建议重点关注数据格式标准化与颜色主题的一致性，确保在不同业务模块中提供统一的视觉体验。**对于FloatingActionMenu组件，建议统一按钮图标风格和操作逻辑，确保所有页面的操作入口保持一致的用户体验。**
 
 ## 附录
 
@@ -885,6 +1030,23 @@ STATOVERVIEW["StatOverview组件"] --> IMG["内置图片资源"]
   - 属性：title、amount、secondaryAmount、icon、color、assetId
   - 事件：click
   - 插槽：无
+- AccountManagement
+  - 事件：navigate
+  - 插槽：无
+- AccountDetailPage
+  - 属性：accountId（必需）
+  - 事件：navigate
+  - 插槽：无
+- ExpensePage
+  - 事件：navigate
+  - 插槽：无
+- IncomePage
+  - 事件：navigate
+  - 插槽：无
+- LiabilityDetailPage
+  - 属性：liabilityId（必需）
+  - 事件：navigate
+  - 插槽：无
 
 **章节来源**
 - [AppHeader.vue:16-18](file://src/components/common/AppHeader.vue#L16-L18)
@@ -903,18 +1065,26 @@ STATOVERVIEW["StatOverview组件"] --> IMG["内置图片资源"]
 - [StockDetailPage.vue:185-190](file://src/components/mobile/asset/StockDetailPage.vue#L185-L190)
 - [FundDetailPage.vue:200-205](file://src/components/mobile/asset/FundDetailPage.vue#L200-L205)
 - [AssetCard.vue:24-49](file://src/components/mobile/asset/AssetCard.vue#L24-L49)
+- [AccountManagement.vue:151-159](file://src/components/mobile/account/AccountManagement.vue#L151-L159)
+- [AccountDetailPage.vue:208-213](file://src/components/mobile/account/AccountDetailPage.vue#L208-L213)
+- [ExpensePage.vue:1-88](file://src/components/mobile/expense/ExpensePage.vue#L1-L88)
+- [IncomePage.vue:1-15](file://src/components/mobile/income/IncomePage.vue#L1-L15)
+- [LiabilityDetailPage.vue:1-200](file://src/components/mobile/liability/LiabilityDetailPage.vue#L1-L200)
 
 ### 样式定制与主题适配
 - 主题色
   - 组件广泛使用统一主色，可通过CSS变量或覆盖类名进行主题定制
   - 资产卡片支持自定义颜色主题
   - StatOverview 组件支持自定义颜色方案，支持白色主题
+  - **FloatingActionMenu组件使用统一的蓝色主题，确保视觉一致性**
 - 响应式
   - 多处媒体查询适配小屏设备，建议在新增样式时同步考虑断点
   - 资产管理页面支持网格布局的响应式调整
   - StatOverview 组件支持多种屏幕尺寸的自适应
+  - **FloatingActionMenu组件位置固定，适配各种屏幕尺寸**
 - Element Plus
   - 图标与组件样式由 Element Plus 提供，建议统一引入其样式文件
+  - **FloatingActionMenu组件使用Element Plus图标库，确保图标一致性**
 - 资产详情页面
   - 支持深色主题适配
   - 响应式卡片布局设计
@@ -929,7 +1099,7 @@ STATOVERVIEW["StatOverview组件"] --> IMG["内置图片资源"]
 - [FloatingActionMenu.vue:61-151](file://src/components/common/FloatingActionMenu.vue#L61-L151)
 - [AssetCard.vue:68-180](file://src/components/mobile/asset/AssetCard.vue#L68-L180)
 - [AssetDetailPage.vue:232-435](file://src/components/mobile/asset/AssetDetailPage.vue#L232-L435)
-- [AssetManagement.vue:283-490](file://src/components/mobile/asset/AssetManagement.vue#L283-L490)
+- [AssetManagement.vue:283-414](file://src/components/mobile/asset/AssetManagement.vue#L283-L414)
 - [StatOverview.vue:37-119](file://src/components/common/StatOverview.vue#L37-L119)
 - [main.ts:3-5](file://src/main.ts#L3-L5)
 
@@ -941,6 +1111,7 @@ STATOVERVIEW["StatOverview组件"] --> IMG["内置图片资源"]
   - 通用组件只负责UI与交互，业务逻辑下沉到页面或store
   - 服务层负责数据处理与业务逻辑，页面组件负责展示
   - StatOverview 组件专门负责统计展示，不包含业务逻辑
+  - **FloatingActionMenu组件专门负责操作入口，不包含业务逻辑**
 - 动态组件
   - 使用 computed 维护组件映射，避免在模板中直接分支过多
   - 资产详情页面使用 props 接收参数，支持灵活的数据传递
@@ -949,23 +1120,29 @@ STATOVERVIEW["StatOverview组件"] --> IMG["内置图片资源"]
   - 资产详情页面使用懒加载优化大数据量展示
   - 服务层使用并行加载提升数据获取效率
   - StatOverview 组件使用轻量级渲染，适合频繁更新
+  - **FloatingActionMenu组件实例较少，性能影响可忽略**
 - 可访问性
   - 为图标与按钮提供语义化文本与键盘可达性
   - 资产卡片支持点击事件，提供明确的视觉反馈
   - StatOverview 组件提供清晰的统计信息层次结构
+  - **FloatingActionMenu组件提供悬停提示，提升可访问性**
 - 类型安全
   - 使用 TypeScript 类型定义确保数据结构正确性
   - 服务层返回值使用明确的类型注解
   - StatOverview 组件使用严格的 props 类型定义
+  - **FloatingActionMenu组件使用ActionButton接口定义按钮结构**
 - 错误处理
   - 实现完善的错误处理机制，提供友好的用户反馈
   - 资产详情页面支持模拟数据回退，确保页面稳定性
   - StatOverview 组件支持空数据状态的优雅降级
+  - **FloatingActionMenu组件支持按钮失效状态，提升用户体验**
 - 扩展建议
   - StatOverview 组件可扩展为支持更多统计维度
   - 支持动画过渡效果，提升用户体验
   - 可添加统计图表集成，提供更直观的数据展示
   - 支持主题切换，适配深色模式
+  - **FloatingActionMenu组件可扩展为支持更多操作类型，如分享、导出等**
+  - 统一操作按钮的图标风格和交互效果
 
 **章节来源**
 - [App.vue:65-89](file://src/App.vue#L65-L89)
@@ -973,5 +1150,6 @@ STATOVERVIEW["StatOverview组件"] --> IMG["内置图片资源"]
 - [AssetDetailPage.vue:189-225](file://src/components/mobile/asset/AssetDetailPage.vue#L189-L225)
 - [AssetManagement.vue:189-231](file://src/components/mobile/asset/AssetManagement.vue#L189-L231)
 - [statOverview.vue:29-35](file://src/components/common/StatOverview.vue#L29-L35)
+- [FloatingActionMenu.vue:38-50](file://src/components/common/FloatingActionMenu.vue#L38-L50)
 - [stockService.ts:154-244](file://src/services/asset/stockService.ts#L154-L244)
 - [fundService.ts:169-264](file://src/services/asset/fundService.ts#L169-L264)

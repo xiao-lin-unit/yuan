@@ -69,6 +69,37 @@ export async function addAccount(accountData: AccountInput): Promise<void> {
     })
   }
 
+  // 4. 为特定账户类型自动创建对应资产
+  const assetAccountTypes: Record<string, string> = {
+    '现金': '储蓄',
+    '微信': '储蓄',
+    '支付宝': '储蓄',
+    '储蓄卡': '储蓄',
+    '社保卡': '社保',
+    '公积金': '公积金'
+  }
+
+  const assetType = assetAccountTypes[accountData.type]
+  if (assetType) {
+    const assetId = (dateNow() + 2).toString()
+    const tomorrow = dayjs(getCurrentISOString()).add(1, 'day').format('YYYY-MM-DD')
+    statements.push({
+      statement: `INSERT INTO assets (id, type, name, amount, account_id, period, calculation_type, annual_yield_rate, next_income_date, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+      values: [
+        assetId,
+        assetType,
+        accountData.name,
+        accountData.balance || 0,
+        id,
+        '日',
+        '按年收益率计算',
+        0,
+        tomorrow
+      ]
+    })
+  }
+
   await db.executeTransaction(statements)
 }
 

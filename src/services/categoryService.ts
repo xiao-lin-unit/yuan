@@ -238,10 +238,10 @@ export class CategoryService {
       const defaultIncomeCategories = [
         { id: 'cat_23', name: '工资', icon: 'salary-icon', iconText: '💰', type: 'income' },
         { id: 'cat_24', name: '奖金', icon: 'bonus-icon', iconText: '🎊', type: 'income' },
-        { id: 'cat_25', name: '投资收益', icon: 'investment-icon', iconText: '📈', type: 'income' },
         { id: 'cat_26', name: '兼职', icon: 'parttime-icon', iconText: '💼', type: 'income' },
+        { id: 'cat_29', name: '副业', icon: 'sidejob-icon', iconText: '💡', type: 'income' },
         { id: 'cat_27', name: '礼金', icon: 'gift-icon', iconText: '🎁', type: 'income' },
-        { id: 'cat_28', name: '其它', icon: 'other-icon', iconText: '📦', type: 'income' }
+        { id: 'cat_28', name: '其他', icon: 'other-icon', iconText: '📦', type: 'income' }
       ]
       
       // 插入默认分类

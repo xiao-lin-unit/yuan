@@ -42,6 +42,9 @@
             <el-option v-for="account in accounts" :key="account.id" :label="account.name" :value="account.id" />
           </el-select>
         </el-form-item>
+        <el-form-item label="账户扣款">
+          <el-switch v-model="fundForm.deduct_from_account" active-text="是" inactive-text="否" />
+        </el-form-item>
       </el-form>
     </div>
   </PageTemplate>
@@ -51,7 +54,6 @@
 import { ref, onMounted } from 'vue'
 import dayjs from 'dayjs'
 import PageTemplate from '../../common/PageTemplate.vue'
-import { transactionTypes } from '../../../utils/dictionaries'
 import { validateFundCode, checkFundExists, addFund as addFundService, checkAccountBalance } from '../../../services/asset/fundService'
 import { getNonCreditCardAccounts } from '../../../services/account/accountService'
 
@@ -72,7 +74,8 @@ const fundForm = ref({
   lock_period: 0,
   transaction_time: dayjs(),
   type: '买入',
-  account_id: ''
+  account_id: '',
+  deduct_from_account: true
 })
 
 onMounted(async () => {
@@ -140,15 +143,17 @@ const addFund = async () => {
       return
     }
     
-    // 检查账户余额
-    const totalCost = (fundForm.value.cost_nav * fundForm.value.shares) + fundForm.value.fee
-    const balanceCheck = await checkAccountBalance(fundForm.value.account_id, totalCost)
-    
-    if (!balanceCheck.sufficient) {
-      alert(`账户余额不足，需要 ¥${totalCost.toFixed(2)}，当前余额 ¥${balanceCheck.currentBalance.toFixed(2)}`)
-      return
+    // 检查账户余额（仅在扣款时）
+    if (fundForm.value.deduct_from_account) {
+      const totalCost = (fundForm.value.cost_nav * fundForm.value.shares) + fundForm.value.fee
+      const balanceCheck = await checkAccountBalance(fundForm.value.account_id, totalCost)
+
+      if (!balanceCheck.sufficient) {
+        alert(`账户余额不足，需要 ¥${totalCost.toFixed(2)}，当前余额 ¥${balanceCheck.currentBalance.toFixed(2)}`)
+        return
+      }
     }
-    
+
     // 添加基金
     await addFundService({
       name: fundForm.value.name,
@@ -160,7 +165,7 @@ const addFund = async () => {
       lock_period: fundForm.value.lock_period,
       transaction_time: fundForm.value.transaction_time,
       account_id: fundForm.value.account_id
-    })
+    }, fundForm.value.deduct_from_account)
     
     emit('navigate', 'asset')
   } catch (error) {

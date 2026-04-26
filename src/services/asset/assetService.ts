@@ -6,6 +6,7 @@
 import dayjs from 'dayjs'
 import db from '../../database/index.js'
 import type { Asset, AssetInput } from '../../types/asset/asset.js'
+import { createDebitTransaction } from '../account/accountService.js'
 
 /**
  * Calculate next income date based on period and income date
@@ -83,7 +84,7 @@ export function calculatePerAssetIncome(asset: Asset): number {
 /**
  * Add a new general asset
  */
-export async function addAsset(assetData: AssetInput): Promise<void> {
+export async function addAsset(assetData: AssetInput, deductFromAccount: boolean = true): Promise<void> {
   const id = dayjs().valueOf().toString()
 
   // Calculate next income date
@@ -92,9 +93,12 @@ export async function addAsset(assetData: AssetInput): Promise<void> {
     nextIncomeDate = calculateNextIncomeDate(assetData.period, assetData.income_date || '')
   }
 
-  await db.run(
-    'INSERT INTO assets (id, type, name, amount, account_id, period, period_count, income_date, next_income_date, calculation_type, income_amount, annual_yield_rate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    [
+  const statements: { statement: string; values: any[] }[] = []
+
+  // Create asset record
+  statements.push({
+    statement: 'INSERT INTO assets (id, type, name, amount, account_id, period, period_count, income_date, next_income_date, calculation_type, income_amount, annual_yield_rate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    values: [
       id,
       assetData.type,
       assetData.name,
@@ -108,7 +112,15 @@ export async function addAsset(assetData: AssetInput): Promise<void> {
       assetData.income_amount || 0,
       assetData.annual_yield_rate || 0
     ]
-  )
+  })
+
+  // Deduct from account if requested
+  if (deductFromAccount) {
+    const debitResult = await createDebitTransaction(assetData.account_id, assetData.amount, `新增资产：${assetData.name}`)
+    statements.push(...debitResult.statements)
+  }
+
+  await db.executeTransaction(statements)
 }
 
 /**
