@@ -72,7 +72,7 @@
 
     <!-- 还款与待还记录明细 -->
     <div class="liability-transactions">
-      <el-tabs v-model="activeTag" class="transaction-tabs" type="card">
+      <el-tabs v-model="activeTag" class="transaction-tabs">
         <!-- 待还记录 -->
         <el-tab-pane label="待还记录" name="pending" v-if="liabilityInfo.status !== '已结清' && liabilityInfo.repayment_method !== '随借随还'">
           <div class="transaction-list">
@@ -225,7 +225,7 @@ const liabilityInfo = ref<Liability>({
 const repayments = ref<Repayment[]>([]);
 const pendingRepayments = ref<PendingRepayment[]>([]);
 const repayDialogVisible = ref(false);
-const activeTag = ref('pending');
+const activeTag = computed(() => liabilityInfo.value.status !== '已结清' && liabilityInfo.value.repayment_method !== '随借随还' ? 'pending' : 'repayments');
 
 const repayForm = ref({
   amount: 0,
@@ -538,6 +538,7 @@ onMounted(() => {
   border-radius: 8px;
   padding: 15px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  margin-bottom: 3px;
 }
 
 .transaction-header {

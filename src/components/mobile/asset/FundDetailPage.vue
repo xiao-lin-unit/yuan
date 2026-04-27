@@ -59,7 +59,7 @@
       <!-- <h3 class="section-title">交易记录明细</h3> -->
       
       <!-- Tab切换 -->
-      <el-tabs v-model="activeTag" class="transaction-tabs" type="card">
+      <el-tabs v-model="activeTag" class="transaction-tabs">
         <!-- 持有记录 -->
         <el-tab-pane label="持有记录" name="holdings">
           <div class="transaction-list">
@@ -727,6 +727,7 @@ onMounted(() => {
   border-radius: 8px;
   padding: 15px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  margin-bottom: 3px;
 }
 
 .transaction-header {
