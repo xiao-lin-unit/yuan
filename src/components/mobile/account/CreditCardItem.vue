@@ -4,9 +4,9 @@
     <div class="card-info">
       <div class="card-header-row">
         <div class="card-name">{{ card.name }}</div>
-        <div class="card-balance" v-if="card.used_limit">{{ formatCurrency(card.used_limit) }}</div>
+        <div class="card-balance" v-if="card.used_limit || card.used_limit === 0">{{ formatCurrency(card.used_limit) }}</div>
       </div>
-      <div class="card-progress" v-if="card.used_limit && card.total_limit">
+      <div class="card-progress" v-if="(card.used_limit || card.used_limit === 0) && card.total_limit">
         <div class="progress-bar">
           <div class="progress-fill" :style="{ width: progress + '%' }"></div>
         </div>

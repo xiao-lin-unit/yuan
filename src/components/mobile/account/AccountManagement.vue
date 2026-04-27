@@ -4,7 +4,7 @@
     <div class="net-worth-section">
       <div class="net-worth-header">
         <span>净资产</span>
-        <el-icon class="eye-icon"><View /></el-icon>
+        <!-- <el-icon class="eye-icon"><View /></el-icon> -->
       </div>
       <div class="net-worth-amount">{{ formatCurrency(netWorth) }}</div>
       <div class="assets-liabilities">
@@ -51,7 +51,7 @@
       <div class="section-header" @click="toggleCreditCard">
         <span>信用卡</span>
         <div class="section-header-right">
-          <span class="total-liability">{{ formatCurrency(totalLiabilities) }}</span>
+          <span class="total-liability">{{ formatCurrency(totalCreditCardAvailable) }}</span>
           <el-icon class="arrow-icon" :class="{ 'rotated': !isCreditCardExpanded }"><ArrowDown /></el-icon>
         </div>
       </div>
@@ -156,12 +156,24 @@ import FloatingActionMenu from '../../common/FloatingActionMenu.vue'
 import { ArrowDown, View, More, Plus, RefreshLeft, DataLine } from '@element-plus/icons-vue'
 import { accountTypes, adjustmentTypes } from '../../../utils/dictionaries'
 import { getAccounts, updateAccount as updateAccountService, deleteAccount as deleteAccountService, adjustBalance as adjustBalanceService } from '../../../services/account/accountService'
+import { getAssets } from '../../../services/asset/assetService'
+import { getAllStocks } from '../../../services/asset/stockService'
+import { getAllFunds } from '../../../services/asset/fundService'
+import { getLiabilities } from '../../../services/liability/liabilityService'
 import type { Account } from '../../../types/account/account'
+import type { Asset } from '../../../types/asset/asset'
+import type { Stock } from '../../../types/asset/stock'
+import type { Fund } from '../../../types/asset/fund'
+import type { Liability } from '../../../types/liability/liability'
 
 const emit = defineEmits(['navigate'])
 
 // 账户数据
 const accounts = ref<Account[]>([])
+const assets = ref<Asset[]>([])
+const stocks = ref<Stock[]>([])
+const fundList = ref<Fund[]>([])
+const liabilities = ref<Liability[]>([])
 
 const dialogVisible = ref({
   add: false,
@@ -189,21 +201,14 @@ const adjustForm = ref({
 
 // 计算数据
 const totalAssets = computed(() => {
-  return accounts.value.reduce((total, account) => {
-    if (account.balance > 0 && account.is_liquid !== 0 && account.is_liquid !== false) return total + account.balance
-    return total
-  }, 0)
+  const generalAssets = assets.value.reduce((total, asset) => total + (asset.amount || 0), 0)
+  const stockAssets = stocks.value.reduce((total, stock) => total + (stock.current_price || 0) * (stock.quantity || 0), 0)
+  const fundAssets = fundList.value.reduce((total, fund) => total + (fund.current_nav || 0) * (fund.shares || 0), 0)
+  return generalAssets + stockAssets + fundAssets
 })
 
 const totalLiabilities = computed(() => {
-  return accounts.value.reduce((total, account) => {
-    if (account.type === '信用卡') {
-      return total + (account.used_limit || 0)
-    } else if (account.balance < 0) {
-      return total + Math.abs(account.balance)
-    }
-    return total
-  }, 0)
+  return liabilities.value.reduce((total, liability) => total + (liability.remaining_principal || 0), 0)
 })
 
 const netWorth = computed(() => {
@@ -211,11 +216,11 @@ const netWorth = computed(() => {
 })
 
 const assetsCount = computed(() => {
-  return accounts.value.filter(account => account.balance > 0).length
+  return assets.value.length
 })
 
 const liabilitiesCount = computed(() => {
-  return accounts.value.filter(account => account.type === '信用卡' || account.balance < 0).length
+  return liabilities.value.filter(liability => liability.status !== '已结清').length
 })
 
 const debtRatio = computed(() => {
@@ -225,11 +230,26 @@ const debtRatio = computed(() => {
 
 const trendPercentage = computed(() => {
   if (totalAssets.value === 0) return 0
-  return (totalLiabilities.value / totalAssets.value) * 100
+  return Math.min((totalLiabilities.value / totalAssets.value) * 100, 100)
 })
 
-const totalBorrowed = ref(0)
-const totalLent = ref(40000)
+const totalBorrowed = computed(() => {
+  return liabilities.value
+    .filter(liability => liability.status !== '已结清' && liability.type === '亲友借款')
+    .reduce((total, liability) => total + (liability.remaining_principal || 0), 0)
+})
+
+const totalLent = computed(() => {
+  return assets.value
+    .filter(asset => asset.type === '亲友借款')
+    .reduce((total, asset) => total + (asset.amount || 0), 0)
+})
+
+const totalCreditCardAvailable = computed(() => {
+  return accounts.value
+    .filter(account => account.type === '信用卡')
+    .reduce((total, card) => total + ((card.total_limit || 0) - (card.used_limit || 0)), 0)
+})
 
 // 从accounts中计算信用卡和资金数据
 // 信用卡列表
@@ -339,6 +359,10 @@ const formatCurrency = (value: number = 0) => {
 const loadAccounts = async () => {
   try {
     accounts.value = await getAccounts()
+    assets.value = await getAssets()
+    stocks.value = await getAllStocks()
+    fundList.value = await getAllFunds()
+    liabilities.value = await getLiabilities()
   } catch (error) {
     console.error('加载账户失败:', error)
   }

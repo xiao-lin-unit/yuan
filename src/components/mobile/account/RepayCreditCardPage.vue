@@ -56,9 +56,13 @@ const emit = defineEmits(['navigate'])
 const allAccounts = ref<Account[]>([])
 const creditCardInfo = ref<Account | null>(null)
 
-// 可用账户（非信用卡账户）
+// 可用账户（流动资金账户，排除信用卡、社保卡、公积金）
 const availableAccounts = computed(() => {
-  return allAccounts.value.filter(account => account.type !== '信用卡')
+  return allAccounts.value.filter(account => {
+    if (account.type === '信用卡') return false
+    const isLiquid = account.is_liquid === 1 || account.is_liquid === true
+    return isLiquid
+  })
 })
 
 // 表单数据

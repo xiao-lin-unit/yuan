@@ -6,6 +6,8 @@ import App from './App.vue'
 import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc'
 import timezone from 'dayjs/plugin/timezone'
+import { runAutoTasks } from './auto'
+import './auto/tasks'
 
 dayjs.extend(utc)
 dayjs.extend(timezone)
@@ -50,6 +52,9 @@ const app = createApp(App)
 app.use(createPinia())
 app.use(ElementPlus)
 app.mount('#app')
+
+// 启动自动任务
+runAutoTasks()
 
 const componentMap: Record<string, any> = {
       account: MobileAccountManagement,

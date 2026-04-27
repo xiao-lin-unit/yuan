@@ -188,6 +188,31 @@
 
     <!-- 悬浮操作按钮 -->
     <FloatingActionMenu :buttons="actionButtons" />
+
+    <!-- 编辑账户信息弹框 -->
+    <el-dialog v-model="showEditDialog" :title="accountInfo.type === '信用卡' ? '编辑信用卡' : '编辑账户余额'" width="90%" align-center>
+      <el-form :model="editForm" label-width="100px">
+        <template v-if="accountInfo.type === '信用卡'">
+          <el-form-item label="总额度" required>
+            <el-input v-model.number="editForm.total_limit" placeholder="请输入总额度" type="number" min="0" step="0.01" />
+          </el-form-item>
+          <el-form-item label="已用额度" required>
+            <el-input v-model.number="editForm.used_limit" placeholder="请输入已用额度" type="number" min="0" step="0.01" />
+          </el-form-item>
+        </template>
+        <template v-else>
+          <el-form-item label="账户余额" required>
+            <el-input v-model.number="editForm.balance" placeholder="请输入账户余额" type="number" step="0.01" />
+          </el-form-item>
+        </template>
+      </el-form>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="showEditDialog = false">取消</el-button>
+          <el-button type="primary" @click="saveEdit">确定</el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -201,7 +226,9 @@ import {
   getAccountById,
   getAccountTransactions,
   deactivateAccount,
-  deactivateCreditCard
+  deactivateCreditCard,
+  updateAccount as updateAccountService,
+  updateAccountBalance
 } from '../../../services/account/accountService';
 import type { Account, AccountTransaction } from '../../../types/account/account';
 
@@ -228,6 +255,14 @@ const accountInfo = ref<Account>({
 
 // 当前激活的标签
 const activeTab = ref('income');
+
+// 编辑对话框
+const showEditDialog = ref(false);
+const editForm = ref({
+  balance: 0,
+  used_limit: 0,
+  total_limit: 0
+});
 
 // 交易记录数据
 const allTransactions = ref<AccountTransaction[]>([]);
@@ -319,10 +354,51 @@ const navigateToRepay = () => {
   emit('navigate', { key: 'repayCreditCard', params: { accountId: props.accountId } });
 };
 
-// 编辑账户信息
+// 打开编辑对话框
 const editAccountInfo = () => {
-  // 可以扩展为打开编辑对话框
-  ElMessage.info('编辑功能开发中...');
+  if (accountInfo.value.type === '信用卡') {
+    editForm.value = {
+      balance: 0,
+      used_limit: accountInfo.value.used_limit || 0,
+      total_limit: accountInfo.value.total_limit || 0
+    };
+  } else {
+    editForm.value = {
+      balance: accountInfo.value.balance || 0,
+      used_limit: 0,
+      total_limit: 0
+    };
+  }
+  showEditDialog.value = true;
+};
+
+// 保存编辑
+const saveEdit = async () => {
+  try {
+    if (accountInfo.value.type === '信用卡') {
+      if (editForm.value.used_limit < 0) {
+        ElMessage.warning('已用额度不能为负数');
+        return;
+      }
+      if (editForm.value.total_limit <= 0) {
+        ElMessage.warning('总额度必须大于0');
+        return;
+      }
+      await updateAccountService(props.accountId, {
+        used_limit: editForm.value.used_limit,
+        total_limit: editForm.value.total_limit
+      });
+      ElMessage.success('信用卡信息已更新');
+    } else {
+      await updateAccountBalance(props.accountId, editForm.value.balance, '账户余额调整');
+      ElMessage.success('账户余额已更新');
+    }
+    showEditDialog.value = false;
+    await loadAccountDetail();
+  } catch (error: any) {
+    console.error('更新账户失败:', error);
+    ElMessage.error(error.message || '更新账户失败');
+  }
 };
 
 // 定义按钮列表

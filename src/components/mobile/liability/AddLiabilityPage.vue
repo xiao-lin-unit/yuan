@@ -30,7 +30,7 @@
           <el-date-picker v-model="liabilityForm.start_date" type="date" placeholder="请选择借款日期" style="width: 100%" />
         </el-form-item>
         <el-form-item label="还款方式" required>
-          <el-select v-model="liabilityForm.repayment_method" placeholder="请选择还款方式">
+          <el-select v-model="liabilityForm.repayment_method" placeholder="请选择还款方式" :disabled="!liabilityForm.is_interest">
             <el-option v-for="item in repaymentMethods" :key="item.value" :label="item.label" :value="item.value" />
           </el-select>
         </el-form-item>
@@ -69,7 +69,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import dayjs from 'dayjs'
 import PageTemplate from '../../common/PageTemplate.vue'
 import { liabilityTypes, repaymentMethods } from '../../../utils/dictionaries'
@@ -96,6 +96,12 @@ const liabilityForm = ref({
 
 onMounted(async () => {
   await loadAccounts()
+})
+
+watch(() => liabilityForm.value.is_interest, () => {
+  if (!liabilityForm.value.is_interest) {
+    liabilityForm.value.repayment_method = '随借随还'
+  }
 })
 
 const loadAccounts = async () => {

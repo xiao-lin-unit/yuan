@@ -578,59 +578,75 @@ export async function repayCreditCard(input: RepayCreditCardInput): Promise<void
     throw new Error(`还款金额不能超过已用额度 ¥${usedLimit.toFixed(2)}`)
   }
 
-  // 检查来源账户余额
-  if (fromAccount.balance < amount) {
-    throw new Error(`还款来源账户余额不足，当前余额：¥${fromAccount.balance.toFixed(2)}`)
+  const txTime = dayjs(transaction_time)
+
+  // 使用标准入账/出账接口，确保事务一致性
+  const creditResult = await createCreditTransaction(
+    credit_card_id,
+    amount,
+    `还款来自：${fromAccount.name}${remark ? ' - ' + remark : ''}`,
+    undefined,
+    txTime,
+    false
+  )
+
+  const debitResult = await createDebitTransaction(
+    from_account_id,
+    amount,
+    `还款至：${creditCard.name}${remark ? ' - ' + remark : ''}`,
+    undefined,
+    txTime,
+    true
+  )
+
+  const statements = [
+    ...creditResult.statements,
+    ...debitResult.statements
+  ]
+
+  await db.executeTransaction(statements)
+}
+
+/**
+ * Update account balance directly and generate transaction record
+ * Also syncs linked asset if applicable
+ */
+export async function updateAccountBalance(accountId: string, newBalance: number, remark?: string): Promise<void> {
+  const account = await getAccountById(accountId)
+  if (!account) {
+    throw new Error('账户不存在')
   }
+
+  const diff = newBalance - account.balance
+  if (diff === 0) return
 
   const transactionId = dateNow().toString()
 
   const statements = [
-    // 1. 减少信用卡已用额度
     {
-      statement: 'UPDATE accounts SET used_limit = used_limit - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-      values: [amount, credit_card_id]
+      statement: 'UPDATE accounts SET balance = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      values: [newBalance, accountId]
     },
-    // 2. 减少还款来源账户余额
-    {
-      statement: 'UPDATE accounts SET balance = balance - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-      values: [amount, from_account_id]
-    },
-    // 3. 创建信用卡还款记录（入账记录）
     {
       statement: `INSERT INTO account_transactions (id, account_id, type, amount, balance_after, description, transaction_time) 
                   VALUES (?, ?, ?, ?, ?, ?, ?)`,
       values: [
-        transactionId + '_cc',
-        credit_card_id,
-        '收入',
-        amount,
-        Math.max(0, usedLimit - amount),
-        `还款来自：${fromAccount.name}${remark ? ' - ' + remark : ''}`,
-        dayjs(transaction_time).toISOString()
-      ]
-    },
-    // 4. 创建来源账户支出记录
-    {
-      statement: `INSERT INTO account_transactions (id, account_id, type, amount, balance_after, description, transaction_time) 
-                  VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      values: [
-        transactionId + '_from',
-        from_account_id,
-        '支出',
-        amount,
-        fromAccount.balance - amount,
-        `还款至：${creditCard.name}${remark ? ' - ' + remark : ''}`,
-        dayjs(transaction_time).toISOString()
+        transactionId,
+        accountId,
+        diff > 0 ? '收入' : '支出',
+        Math.abs(diff),
+        newBalance,
+        remark || '账户余额调整',
+        getCurrentISOString()
       ]
     }
   ]
 
-  // 同步修改来源账户关联资产金额
-  if (fromAccount.asset_id) {
+  // 同步修改关联资产金额
+  if (account.asset_id) {
     statements.push({
-      statement: 'UPDATE assets SET amount = amount - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-      values: [amount, fromAccount.asset_id]
+      statement: 'UPDATE assets SET amount = amount + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      values: [diff, account.asset_id]
     })
   }
 

@@ -31,7 +31,7 @@ const handleClick = () => {
 .fund-item {
   display: flex;
   align-items: center;
-  padding: 15px 0;
+  padding: 15px 0 8px 0;
   border-top: 1px solid #f0f0f0;
   cursor: pointer;
 }
