@@ -355,7 +355,6 @@ onMounted(() => {
   background-color: #f5f7fa;
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
 }
 
 /* 顶部导航栏 */
@@ -366,7 +365,6 @@ onMounted(() => {
   padding: 15px;
   background-color: #ffffff;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  flex-shrink: 0;
 }
 
 .header-left,
@@ -390,7 +388,6 @@ onMounted(() => {
   padding: 16px 20px;
   background-color: #ffffff;
   margin-bottom: 10px;
-  flex-shrink: 0;
 }
 
 .liability-name {
@@ -416,8 +413,10 @@ onMounted(() => {
 }
 
 .liability-status-tag {
-  font-size: 12px;
-  padding: 2px 8px;
+  font-size: 13px;
+  color: #909399;
+  background-color: #f4f4f5;
+  padding: 2px 10px;
   border-radius: 10px;
 }
 
@@ -504,7 +503,6 @@ onMounted(() => {
   padding: 15px;
   background-color: #ffffff;
   margin-bottom: 80px;
-  flex-shrink: 0;
 }
 
 /* Tab样式 */
@@ -538,7 +536,7 @@ onMounted(() => {
   border-radius: 8px;
   padding: 15px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-  margin-bottom: 3px;
+  margin-bottom: 5px;
 }
 
 .transaction-header {

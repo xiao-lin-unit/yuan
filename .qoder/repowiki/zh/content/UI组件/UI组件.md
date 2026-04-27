@@ -35,6 +35,13 @@
 - [tsconfig.json](file://tsconfig.json)
 </cite>
 
+## 更新摘要
+**变更内容**
+- 更新了资产详情页面收益记录头部间距的样式调整
+- 优化了股票和基金详情页面交易记录头部间距的布局设计
+- 简化了负债详情页面标签页样式并改进了动态标签选择逻辑
+- 增强了组件样式的响应式设计和间距一致性
+
 ## 目录
 1. [简介](#简介)
 2. [项目结构](#项目结构)
@@ -130,13 +137,13 @@ MONTHLYSTATS --> STATOVERVIEW
 - [ExpensePage.vue:1-88](file://src/components/mobile/expense/ExpensePage.vue#L1-L88)
 - [AccountManagement.vue:1-689](file://src/components/mobile/account/AccountManagement.vue#L1-L689)
 - [AccountDetailPage.vue:1-587](file://src/components/mobile/account/AccountDetailPage.vue#L1-L587)
-- [AssetDetailPage.vue:1-435](file://src/components/mobile/asset/AssetDetailPage.vue#L1-L435)
+- [AssetDetailPage.vue:1-546](file://src/components/mobile/asset/AssetDetailPage.vue#L1-L546)
 - [AssetManagement.vue:1-414](file://src/components/mobile/asset/AssetManagement.vue#L1-L414)
-- [StockDetailPage.vue:1-558](file://src/components/mobile/asset/StockDetailPage.vue#L1-L558)
+- [StockDetailPage.vue:1-553](file://src/components/mobile/asset/StockDetailPage.vue#L1-L553)
 - [FundDetailPage.vue:1-796](file://src/components/mobile/asset/FundDetailPage.vue#L1-L796)
 - [AssetCard.vue:1-180](file://src/components/mobile/asset/AssetCard.vue#L1-L180)
 - [LiabilityManagement.vue:1-247](file://src/components/mobile/liability/LiabilityManagement.vue#L1-L247)
-- [LiabilityDetailPage.vue:1-200](file://src/components/mobile/liability/LiabilityDetailPage.vue#L1-L200)
+- [LiabilityDetailPage.vue:1-607](file://src/components/mobile/liability/LiabilityDetailPage.vue#L1-L607)
 - [MonthlyStats.vue:1-191](file://src/components/mobile/expense/MonthlyStats.vue#L1-L191)
 
 **章节来源**
@@ -548,6 +555,9 @@ Responsive --> Output
   - 格式化显示：日期格式化、金额格式化
 - **FloatingActionMenu集成**
   - 使用统一的操作入口，提供结束资产等操作
+- **样式优化**
+  - 收益记录头部间距调整，提升视觉层次感
+  - 交易卡片间距优化，改善阅读体验
 
 ```mermaid
 flowchart TD
@@ -568,7 +578,7 @@ Interact --> |返回| Back
 - [AssetDetailPage.vue:137-158](file://src/components/mobile/asset/AssetDetailPage.vue#L137-L158)
 
 **章节来源**
-- [AssetDetailPage.vue:1-435](file://src/components/mobile/asset/AssetDetailPage.vue#L1-L435)
+- [AssetDetailPage.vue:1-546](file://src/components/mobile/asset/AssetDetailPage.vue#L1-L546)
 
 ### 资产管理页面 AssetManagement 的现代化改进
 - 设计要点
@@ -698,9 +708,12 @@ ChooseType --> NavigateAdd["导航到新增页面"]
   - 支持价格更新、交易记录查询等功能
 - **FloatingActionMenu集成**
   - 提供买入、修改价格、卖出等操作入口
+- **样式优化**
+  - 交易记录头部间距优化，提升视觉层次感
+  - 交易卡片间距调整，改善阅读体验
 
 **章节来源**
-- [StockDetailPage.vue:1-558](file://src/components/mobile/asset/StockDetailPage.vue#L1-L558)
+- [StockDetailPage.vue:1-553](file://src/components/mobile/asset/StockDetailPage.vue#L1-L553)
 
 ### 基金详情页面 FundDetailPage 的高级功能
 - 设计要点
@@ -718,6 +731,9 @@ ChooseType --> NavigateAdd["导航到新增页面"]
   - 支持净值更新、交易记录查询、锁定期管理
 - **FloatingActionMenu集成**
   - 提供买入、修改净值、卖出等操作入口
+- **样式优化**
+  - 交易记录头部间距优化，提升视觉层次感
+  - 交易卡片间距调整，改善阅读体验
 
 **章节来源**
 - [FundDetailPage.vue:1-796](file://src/components/mobile/asset/FundDetailPage.vue#L1-L796)
@@ -836,9 +852,13 @@ ChooseType --> NavigateAdd["导航到新增页面"]
 - **FloatingActionMenu集成**
   - 提供提前还款、修改信息、结清等操作入口
   - 根据负债状态动态调整操作按钮
+- **样式优化**
+  - 标签页样式简化，提升界面简洁性
+  - 动态标签选择逻辑改进，优化用户体验
+  - 交易记录头部间距调整，改善视觉层次
 
 **章节来源**
-- [LiabilityDetailPage.vue:1-200](file://src/components/mobile/liability/LiabilityDetailPage.vue#L1-L200)
+- [LiabilityDetailPage.vue:1-607](file://src/components/mobile/liability/LiabilityDetailPage.vue#L1-L607)
 
 ### 服务层架构的现代化升级
 - 资产服务层
@@ -920,6 +940,7 @@ STATOVERVIEW["StatOverview组件"] --> IMG["内置图片资源"]
 - 资产详情页面
   - 使用虚拟滚动优化大量交易记录的渲染性能
   - 按需加载数据，避免一次性加载所有数据
+  - **样式优化减少了不必要的间距计算，提升渲染性能**
 - 服务层优化
   - 使用Promise.all并行加载多个数据源
   - 实现数据缓存机制，减少重复请求
@@ -938,6 +959,8 @@ STATOVERVIEW["StatOverview组件"] --> IMG["内置图片资源"]
   - 检查 scoped 样式与 :deep 选择器使用
   - 确认 Element Plus 图标与主题样式加载顺序
   - 检查 StatOverview 组件的渐变覆盖层样式
+  - **检查交易记录头部间距样式是否正确应用**
+  - **确认标签页样式简化后的兼容性**
 - **FloatingActionMenu操作无效**
   - 确认按钮数组格式正确，包含text、icon、action属性
   - 检查action回调函数是否正确绑定
@@ -950,6 +973,7 @@ STATOVERVIEW["StatOverview组件"] --> IMG["内置图片资源"]
   - 检查账户余额验证逻辑
   - 确认交易数量与可用数量匹配
   - 验证锁定期限制（基金）
+  - **检查交易记录头部间距样式是否影响交互**
 - StatOverview 统计数据不显示
   - 检查 main 和 details 数组格式是否正确
   - 确认 background 图片路径有效
@@ -958,6 +982,10 @@ STATOVERVIEW["StatOverview组件"] --> IMG["内置图片资源"]
   - 检查媒体查询断点设置
   - 确认渐变背景层的 z-index 层级
   - 验证响应式字体大小设置
+- **负债详情页面标签页问题**
+  - 检查动态标签选择逻辑是否正确
+  - 确认标签页样式简化后的显示效果
+  - 验证标签切换功能的兼容性
 
 **章节来源**
 - [Calendar.vue:88-94](file://src/components/common/Calendar.vue#L88-L94)
@@ -968,11 +996,18 @@ STATOVERVIEW["StatOverview组件"] --> IMG["内置图片资源"]
 - [AssetDetailPage.vue:189-225](file://src/components/mobile/asset/AssetDetailPage.vue#L189-L225)
 - [StockDetailPage.vue:300-349](file://src/components/mobile/asset/StockDetailPage.vue#L300-L349)
 - [FundDetailPage.vue:327-375](file://src/components/mobile/asset/FundDetailPage.vue#L327-L375)
+- [LiabilityDetailPage.vue:228](file://src/components/mobile/liability/LiabilityDetailPage.vue#L228)
 
 ## 结论
 本UI组件体系以通用布局组件为核心，结合页面模板与交互组件，形成可复用、可扩展的移动端财务应用界面框架。通过事件与属性的清晰边界、响应式与主题适配策略，以及合理的性能与可维护性设计，能够支撑多样化的业务页面需求。
 
 **更新** 本次现代化升级显著提升了资产相关页面的功能完整性与用户体验，新增的 StatOverview 组件提供了一致的统计展示界面，已在资产、负债、支出和收入管理模块中集成使用。该组件具有卡片式界面、渐变覆盖层、响应式设计和自定义颜色方案等特点，显著提升了用户界面的一致性和美观度。**特别重要的是，FloatingActionMenu浮动操作菜单组件已被集成到所有主要业务页面中，作为统一的操作入口体验，包括资产管理和负债管理页面、账户管理页面、收支页面以及各类详情页面。这一集成大幅提升了用户操作效率，减少了页面间的操作差异，提供了更加一致和便捷的用户体验。**
+
+**样式优化成果**
+- 资产详情页面收益记录头部间距调整，提升了视觉层次感和阅读体验
+- 股票和基金详情页面交易记录头部间距优化，改善了卡片布局的视觉平衡
+- 负债详情页面标签页样式简化，增强了界面简洁性和用户友好性
+- 动态标签选择逻辑改进，提升了标签切换的流畅性和响应速度
 
 建议在实际使用中遵循事件冒泡规范、合理拆分组件职责，并根据业务场景扩展组件能力。对于新增的StatOverview组件，建议重点关注数据格式标准化与颜色主题的一致性，确保在不同业务模块中提供统一的视觉体验。**对于FloatingActionMenu组件，建议统一按钮图标风格和操作逻辑，确保所有页面的操作入口保持一致的用户体验。**
 
@@ -1069,7 +1104,7 @@ STATOVERVIEW["StatOverview组件"] --> IMG["内置图片资源"]
 - [AccountDetailPage.vue:208-213](file://src/components/mobile/account/AccountDetailPage.vue#L208-L213)
 - [ExpensePage.vue:1-88](file://src/components/mobile/expense/ExpensePage.vue#L1-L88)
 - [IncomePage.vue:1-15](file://src/components/mobile/income/IncomePage.vue#L1-L15)
-- [LiabilityDetailPage.vue:1-200](file://src/components/mobile/liability/LiabilityDetailPage.vue#L1-L200)
+- [LiabilityDetailPage.vue:1-607](file://src/components/mobile/liability/LiabilityDetailPage.vue#L1-L607)
 
 ### 样式定制与主题适配
 - 主题色
@@ -1088,19 +1123,28 @@ STATOVERVIEW["StatOverview组件"] --> IMG["内置图片资源"]
 - 资产详情页面
   - 支持深色主题适配
   - 响应式卡片布局设计
+  - **样式优化提升了收益记录的视觉层次**
 - StatOverview 组件
   - 渐变覆盖层支持透明度调节
   - 字体大小根据屏幕尺寸自动调整
   - 支持自定义背景图片与颜色方案
+- **交易记录样式优化**
+  - 统一的头部间距设计，提升视觉一致性
+  - 优化的卡片间距，改善阅读体验
+  - 简化的标签页样式，增强界面简洁性
+  - 改进的动态标签选择逻辑，提升交互流畅性
 
 **章节来源**
 - [AppHeader.vue:50-135](file://src/components/common/AppHeader.vue#L50-L135)
 - [AppFooter.vue:34-98](file://src/components/common/AppFooter.vue#L34-L98)
 - [FloatingActionMenu.vue:61-151](file://src/components/common/FloatingActionMenu.vue#L61-L151)
 - [AssetCard.vue:68-180](file://src/components/mobile/asset/AssetCard.vue#L68-L180)
-- [AssetDetailPage.vue:232-435](file://src/components/mobile/asset/AssetDetailPage.vue#L232-L435)
+- [AssetDetailPage.vue:232-546](file://src/components/mobile/asset/AssetDetailPage.vue#L232-L546)
 - [AssetManagement.vue:283-414](file://src/components/mobile/asset/AssetManagement.vue#L283-L414)
 - [StatOverview.vue:37-119](file://src/components/common/StatOverview.vue#L37-L119)
+- [StockDetailPage.vue:458-553](file://src/components/mobile/asset/StockDetailPage.vue#L458-L553)
+- [FundDetailPage.vue:697-786](file://src/components/mobile/asset/FundDetailPage.vue#L697-L786)
+- [LiabilityDetailPage.vue:501-607](file://src/components/mobile/liability/LiabilityDetailPage.vue#L501-L607)
 - [main.ts:3-5](file://src/main.ts#L3-L5)
 
 ### 最佳实践与扩展建议
@@ -1121,6 +1165,7 @@ STATOVERVIEW["StatOverview组件"] --> IMG["内置图片资源"]
   - 服务层使用并行加载提升数据获取效率
   - StatOverview 组件使用轻量级渲染，适合频繁更新
   - **FloatingActionMenu组件实例较少，性能影响可忽略**
+  - **样式优化减少了不必要的计算，提升了整体性能**
 - 可访问性
   - 为图标与按钮提供语义化文本与键盘可达性
   - 资产卡片支持点击事件，提供明确的视觉反馈
@@ -1143,6 +1188,8 @@ STATOVERVIEW["StatOverview组件"] --> IMG["内置图片资源"]
   - 支持主题切换，适配深色模式
   - **FloatingActionMenu组件可扩展为支持更多操作类型，如分享、导出等**
   - 统一操作按钮的图标风格和交互效果
+  - **交易记录样式可进一步优化，提升视觉一致性**
+  - **标签页样式可继续简化，提升界面简洁性**
 
 **章节来源**
 - [App.vue:65-89](file://src/App.vue#L65-L89)

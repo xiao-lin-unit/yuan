@@ -490,7 +490,7 @@ onMounted(() => {
   border-radius: 8px;
   padding: 15px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-  margin-bottom: 3px;
+  margin-bottom: 5px;
 }
 
 .income-header {

@@ -51,7 +51,7 @@
     <el-card class="mt-4">
       <template #header>
         <div class="card-header">
-          <span>资产趋势</span>
+          <span>趋势</span>
           <el-select v-model="timeRange" placeholder="选择时间范围" size="small">
             <el-option label="近6个月" value="6months" />
             <el-option label="近12个月" value="12months" />
