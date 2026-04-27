@@ -52,14 +52,14 @@
       <template #header>
         <div class="card-header">
           <span>趋势</span>
-          <el-select v-model="timeRange" placeholder="选择时间范围" size="small">
+          <el-select v-model="timeRange" placeholder="选择时间范围" size="small" class="time-range-select">
             <el-option label="近6个月" value="6months" />
             <el-option label="近12个月" value="12months" />
           </el-select>
         </div>
       </template>
-      <div ref="chartRef" class="chart-container"></div>
       <div v-if="!hasSnapshotData" class="no-data-tip">暂无历史数据，系统将自动记录每月资产变化</div>
+      <div ref="chartRef" class="chart-container"></div>
     </el-card>
   </div>
 </template>
@@ -89,23 +89,8 @@ const confirmedProfitStocks = ref(0)
 const confirmedProfitFunds = ref(0)
 const lastMonthSnapshot = ref<any>(null)
 
-// ============ 快照管理（数据表） ============
-const saveSnapshot = async (year: number, month: number, data: any) => {
-  const existing = await db.query(
-    'SELECT id FROM asset_monthly_snapshots WHERE year = ? AND month = ?',
-    [year, month]
-  )
-  if (existing.length === 0) {
-    const id = `${year}_${month}_${Date.now()}`
-    await db.run(
-      `INSERT INTO asset_monthly_snapshots (id, year, month, total_assets, total_liabilities, net_worth, confirmed_profit_stocks, confirmed_profit_funds)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, year, month, data.totalAssets, data.totalLiabilities, data.netWorth, data.confirmedProfitStocks, data.confirmedProfitFunds]
-    )
-  }
-}
-
 const loadSnapshot = async (year: number, month: number) => {
+  console.log('加载快照数据:', year, month)
   const result = await db.query(
     'SELECT * FROM asset_monthly_snapshots WHERE year = ? AND month = ?',
     [year, month]
@@ -120,7 +105,7 @@ const getSnapshotHistory = async (months: number) => {
   const start = now.subtract(months - 1, 'month')
   const startYear = start.year()
   const startMonth = start.month() + 1
-
+  console.log('获取快照历史数据:', startYear, startMonth, endYear, endMonth)
   const result = await db.query(
     `SELECT * FROM asset_monthly_snapshots
      WHERE (year > ? OR (year = ? AND month >= ?))
@@ -142,8 +127,6 @@ const loadAllData = async () => {
   try {
     await db.connect()
     const now = dayjs()
-    const year = now.year()
-    const month = now.month() + 1
     const monthStart = now.startOf('month').toISOString()
     const monthEnd = now.endOf('month').toISOString()
     const monthStartDate = now.startOf('month').format('YYYY-MM-DD')
@@ -194,16 +177,6 @@ const loadAllData = async () => {
     // 加载上月快照
     const lastMonth = now.subtract(1, 'month')
     lastMonthSnapshot.value = await loadSnapshot(lastMonth.year(), lastMonth.month() + 1)
-
-    // 保存本月快照
-    const snapshotData = {
-      totalAssets: totalAssets.value,
-      totalLiabilities: totalLiabilities.value,
-      netWorth: netWorth.value,
-      confirmedProfitStocks: confirmedProfitStocks.value,
-      confirmedProfitFunds: confirmedProfitFunds.value
-    }
-    await saveSnapshot(year, month, snapshotData)
   } catch (error) {
     console.error('加载财务数据失败:', error)
   }
@@ -568,13 +541,14 @@ const updateChart = async () => {
     grid: {
       left: '3%',
       right: '4%',
+      top: '12%',
       bottom: '3%',
       containLabel: true
     },
     xAxis: {
       type: 'category',
       data: history.map((h: any) => h.label),
-      axisLabel: { fontSize: 10 }
+      axisLabel: { fontSize: 11 }
     },
     yAxis: {
       type: 'value',
@@ -583,7 +557,7 @@ const updateChart = async () => {
           if (value >= 10000) return (value / 10000).toFixed(1) + '万'
           return value.toFixed(0)
         },
-        fontSize: 10
+        fontSize: 11
       }
     },
     series: [
@@ -810,7 +784,11 @@ onMounted(() => {
 
 .chart-container {
   width: 100%;
-  height: 260px;
+  height: 220px;
+}
+
+.time-range-select {
+  width: 100px;
 }
 
 .no-data-tip {
@@ -818,6 +796,12 @@ onMounted(() => {
   color: #909399;
   font-size: 13px;
   padding: 20px 0;
+}
+
+.time-range-select :deep(.el-select__wrapper) {
+  box-shadow: none !important;
+  background: transparent;
+  border: none !important;
 }
 
 @media (max-width: 375px) {

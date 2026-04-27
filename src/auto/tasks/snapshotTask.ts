@@ -18,7 +18,7 @@ registerTask('monthlyFinancialSnapshot', async () => {
 
   // Load all accounts
   const accounts = await db.query(
-    "SELECT * FROM accounts WHERE status IS NULL OR status = '启用'"
+    "SELECT * FROM accounts WHERE status = '启用'"
   )
 
   // Load all assets
@@ -98,6 +98,7 @@ registerTask('monthlyFinancialSnapshot', async () => {
     'SELECT id FROM asset_monthly_snapshots WHERE year = ? AND month = ?',
     [year, month]
   )
+  console.log('新增或者修改月统计数据:', totalAssets, totalLiabilities, netWorth, confirmedProfitStocks, confirmedProfitFunds, year, month)
 
   if (existing.length > 0) {
     // Update existing record

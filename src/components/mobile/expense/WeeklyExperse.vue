@@ -58,17 +58,13 @@ const getBarHeight = (amount: number): string => {
 // 获取本周的开始和结束日期
 const getWeekRange = (): { start: dayjs.Dayjs; end: dayjs.Dayjs } => {
   const now = dayjs();
-  console.log('当前日期:', now.toISOString());
   const dayOfWeek = now.day(); // 0-6，0表示周日
-  console.log('当前星期:', dayOfWeek);
 
   // 计算本周一的日期（如果今天是周日，则上周日为一周的开始）
   const start = now.subtract(dayOfWeek === 0 ? 6 : dayOfWeek - 1, 'day').startOf('day');
-  console.log('本周开始日期:', start.toISOString());
 
   // 计算本周日的日期
   const end = start.add(6, 'day').endOf('day');
-  console.log('本周结束日期:', end.toISOString());
 
   return { start, end };
 };
@@ -79,23 +75,16 @@ const loadWeeklyExpenses = async () => {
     console.log('开始加载本周支出数据');
     
     // 连接数据库
-    console.log('正在连接数据库...');
     await db.connect();
-    console.log('数据库连接成功');
     
     // 获取本周的开始和结束日期
     const { start, end } = getWeekRange();
-    console.log('本周日期范围:', start.toISOString(), '至', end.toISOString());
     
     // 从流水表中查询类型为账户支出的记录
-    console.log('正在查询流水记录...');
     const transactions = await db.query(
       'SELECT t.* FROM transactions t WHERE t.type = ? AND t.created_at BETWEEN ? AND ?',
       ['账户支出', start.toISOString(), end.toISOString()]
     );
-    
-    console.log('查询到的流水记录数量:', transactions.length);
-    console.log('查询到的流水记录:', transactions);
     
     // 按日期分组统计支出
     const dailyExpenses = new Map<string, number>();
