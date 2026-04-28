@@ -1,6 +1,5 @@
 <template>
   <div class="financial-sandbox">
-    <PageHeader title="财务沙盘" :show-back="false" />
 
     <div class="scene-grid">
       <div
@@ -19,7 +18,12 @@
       </div>
     </div>
 
-    <FloatingActionMenu :buttons="fabButtons" />
+    <div class="toggle-simulation-button" @click="toggleAssetsView">
+      <el-icon style="color: white;"><Switch /></el-icon>
+      <span class="toggle-text">{{ '历史推演' }}</span>
+    </div>
+
+    <!-- <FloatingActionMenu :buttons="fabButtons" /> -->
   </div>
 </template>
 
@@ -28,9 +32,8 @@ import { computed } from 'vue'
 import {
   Wallet, TrendCharts, Bottom, Money, Checked, Top,
   ShoppingCart, BottomLeft, Sell, DocumentAdd, FirstAidKit,
-  Warning, Coin
+  Warning, Coin, Switch
 } from '@element-plus/icons-vue'
-import PageHeader from '../../common/PageHeader.vue'
 import FloatingActionMenu from '../../common/FloatingActionMenu.vue'
 import { SCENES } from '../../../services/sandbox/sandboxService'
 
@@ -50,13 +53,17 @@ const selectScene = (sceneType: number) => {
   emit('navigate', { key: 'sandboxSimulation', params: { sceneType } })
 }
 
-const fabButtons = [
-  {
-    text: '历史推演',
-    icon: 'Clock',
-    action: () => emit('navigate', 'sandboxHistory')
-  }
-]
+// const fabButtons = [
+//   {
+//     text: '历史推演',
+//     icon: 'Clock',
+//     action: () => emit('navigate', 'sandboxHistory')
+//   }
+// ]
+
+const toggleAssetsView = () => {
+  emit('navigate', { key: 'sandboxHistory' })
+}
 </script>
 
 <style scoped>
@@ -116,5 +123,33 @@ const fabButtons = [
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+/* 切换推演情景按钮 */
+.toggle-simulation-button {
+  position: fixed;
+  bottom: 80px;
+  left: 20px;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background-color: #67c23a;
+  border-radius: 24px;
+  box-shadow: 0 4px 12px rgba(103, 194, 58, 0.5);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.toggle-simulation-button:hover {
+  transform: scale(1.05);
+  box-shadow: 0 6px 16px rgba(103, 194, 58, 0.5);
+}
+
+.toggle-text {
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
 }
 </style>

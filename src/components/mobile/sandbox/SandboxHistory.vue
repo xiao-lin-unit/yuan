@@ -1,6 +1,5 @@
 <template>
   <div class="sandbox-history">
-    <PageHeader title="历史推演" @back="goBack" />
 
     <div v-if="loading" class="loading-tip">加载中...</div>
 
@@ -27,14 +26,17 @@
       </div>
     </div>
 
-    <FloatingActionMenu :buttons="fabButtons" />
+    <div class="toggle-simulation-button" @click="toggleAssetsView">
+      <el-icon style="color: white;"><Switch /></el-icon>
+      <span class="toggle-text">{{ '推演情景' }}</span>
+    </div>
+    <!-- <FloatingActionMenu :buttons="fabButtons" /> -->
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { Clock, Plus } from '@element-plus/icons-vue'
-import PageHeader from '../../common/PageHeader.vue'
+import { Switch } from '@element-plus/icons-vue';
 import FloatingActionMenu from '../../common/FloatingActionMenu.vue'
 import { getSandboxHistoryList, softDeleteSandboxHistory } from '../../../services/sandbox/sandboxService'
 import type { SandboxHistory as SandboxHistoryType } from '../../../services/sandbox/sandboxService'
@@ -44,9 +46,12 @@ const emit = defineEmits(['navigate'])
 const historyList = ref<SandboxHistoryType[]>([])
 const loading = ref(false)
 
-const fabButtons = [
-  { text: '新建推演', icon: 'Plus', action: () => emit('navigate', 'sandbox') }
-]
+// const fabButtons = [
+//   { text: '新建推演', icon: 'Plus', action: () => emit('navigate', 'sandbox') }
+// ]
+const toggleAssetsView = () => {
+  emit('navigate', { key: 'sandbox' })
+}
 
 const loadHistory = async () => {
   loading.value = true
@@ -141,4 +146,33 @@ const confirmDelete = async (id: number) => {
   justify-content: flex-end;
   gap: 8px;
 }
+
+/* 切换资产按钮 */
+.toggle-simulation-button {
+  position: fixed;
+  bottom: 80px;
+  left: 20px;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background-color: #67c23a;
+  border-radius: 24px;
+  box-shadow: 0 4px 12px rgba(103, 194, 58, 0.5);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.toggle-simulation-button:hover {
+  transform: scale(1.05);
+  box-shadow: 0 6px 16px rgba(103, 194, 58, 0.5);
+}
+
+.toggle-text {
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+}
+
 </style>

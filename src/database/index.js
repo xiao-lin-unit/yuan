@@ -355,8 +355,29 @@ class DatabaseManager {
     const db = await this.getDB()
 
     try {
-      // 直接使用executeSet的自动事务功能（transaction默认为true）
-      const result = await db.executeSet(statements)
+      let result
+
+      if (this.isNative) {
+        // 原生平台使用 Capacitor SQLite 的 executeSet
+        result = await db.executeSet(statements)
+      } else {
+        // Web 环境使用 sql.js，手动执行事务
+        db.exec('BEGIN TRANSACTION')
+        try {
+          for (const item of statements) {
+            const sql = item.statement || item.sql
+            const params = item.values || item.params || []
+            const stmt = db.prepare(sql)
+            stmt.run(params)
+            stmt.free()
+          }
+          db.exec('COMMIT')
+          result = { changes: 1 }
+        } catch (txErr) {
+          try { db.exec('ROLLBACK') } catch (_) { /* ignore rollback error */ }
+          throw txErr
+        }
+      }
       
       // 清除缓存
       this.clearCache()
@@ -778,7 +799,7 @@ class DatabaseManager {
         sql: `
           CREATE TABLE IF NOT EXISTS sandbox_result (
             id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-            history_id INTEGER NOT NULL,
+            history_id TEXT NOT NULL,
             net_assets DECIMAL(16,2),
             net_assets_change TEXT,
             cash_flow_monthly DECIMAL(16,2),

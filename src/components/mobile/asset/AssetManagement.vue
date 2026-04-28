@@ -89,6 +89,7 @@
       <el-icon style="color: white;"><Switch /></el-icon>
       <span class="toggle-text">{{ showEndedAssets ? '当前资产' : '历史资产' }}</span>
     </div>
+    <!-- <FloatingSwitchButton :active="showEndedAssets" active-text="当前资产" inactive-text="历史资产" /> -->
     
     <FloatingActionMenu :buttons="actionButtons" />    
 
@@ -108,6 +109,7 @@ import { getAccounts } from '../../../services/account/accountService';
 import type { Account } from '../../../types/account/account';
 import image from '@/assets/img/m2.jpg';
 import FloatingActionMenu from '../../common/FloatingActionMenu.vue';
+// import FloatingSwitchButton from '../../common/FloatingSwitchButton.vue';
 
 const emit = defineEmits(['navigate']);
 

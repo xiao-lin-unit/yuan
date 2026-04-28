@@ -217,8 +217,8 @@ async function loadUserFinancialData() {
   // 月负债还款
   const monthlyRepayment = liabilities.reduce((s: number, l: any) => {
     if (l.repayment_method === 'equal_principal_and_interest' || l.repayment_method === '等额本息') {
-      const rate = (l.annual_rate || 0) / 100 / 12
-      const n = l.remaining_periods || 1
+      const rate = (l.interest_rate || 0) / 100 / 12
+      const n = l.period || 1
       const p = l.remaining_principal || 0
       if (rate === 0) return s + p / n
       return s + p * rate * Math.pow(1 + rate, n) / (Math.pow(1 + rate, n) - 1)
@@ -335,21 +335,21 @@ export async function computeSandbox(sceneType: number, params: any): Promise<{ 
       const rateIncrease = params.rate_increase || 1
       const oldMonthly = data.monthlyRepayment
       const newMonthly = data.liabilities.reduce((s: number, l: any) => {
-        const newRate = (l.annual_rate || 0) + rateIncrease
-        const months = l.remaining_periods || 1
+        const newRate = (l.interest_rate || 0) + rateIncrease
+        const months = l.period || 1
         const principal = l.remaining_principal || 0
         return s + calcMonthlyPayment(principal, newRate, months)
       }, 0)
       monthlyPaymentChange = newMonthly - oldMonthly
-      const oldTotalInterest = data.liabilities.reduce((s: number, l: any) => s + calcTotalInterest(l.remaining_principal || 0, l.annual_rate || 0, l.remaining_periods || 1), 0)
-      const newTotalInterest = data.liabilities.reduce((s: number, l: any) => s + calcTotalInterest(l.remaining_principal || 0, (l.annual_rate || 0) + rateIncrease, l.remaining_periods || 1), 0)
+      const oldTotalInterest = data.liabilities.reduce((s: number, l: any) => s + calcTotalInterest(l.remaining_principal || 0, l.interest_rate || 0, l.period || 1), 0)
+      const newTotalInterest = data.liabilities.reduce((s: number, l: any) => s + calcTotalInterest(l.remaining_principal || 0, (l.interest_rate || 0) + rateIncrease, l.period || 1), 0)
       totalInterestChange = newTotalInterest - oldTotalInterest
       cashFlow = data.monthlyCashFlow - monthlyPaymentChange
       const newRatio = data.monthlyIncome > 0 ? (newMonthly / data.monthlyIncome) * 100 : 0
       debtPressureLevel = getDebtPressureLevel(newRatio)
       debtPressureDesc = `利率上涨${rateIncrease}%后，月供增加${monthlyPaymentChange.toFixed(2)}元，负债收入比升至${newRatio.toFixed(1)}%`
 
-      const maxMonths = Math.max(...data.liabilities.map((l: any) => l.remaining_periods || 12), 12)
+      const maxMonths = Math.max(...data.liabilities.map((l: any) => l.period || 12), 12)
       chartX = Array.from({ length: Math.min(maxMonths, 60) }, (_, i) => `${i + 1}月`)
       chartNetAssets = chartX.map((_, i) => data.netWorth + cashFlow * (i + 1))
       chartCashFlow = chartX.map(() => cashFlow)
@@ -420,8 +420,8 @@ export async function computeSandbox(sceneType: number, params: any): Promise<{ 
       const newMonthly = oldMonthly * (1 - repayRatio)
       monthlyPaymentChange = newMonthly - oldMonthly
       const remainingPrincipal = data.totalLiabilities - actualRepay
-      const oldInterest = data.liabilities.reduce((s: number, l: any) => s + calcTotalInterest(l.remaining_principal || 0, l.annual_rate || 0, l.remaining_periods || 1), 0)
-      const newInterest = data.liabilities.reduce((s: number, l: any) => s + calcTotalInterest((l.remaining_principal || 0) * (1 - repayRatio), l.annual_rate || 0, l.remaining_periods || 1), 0)
+      const oldInterest = data.liabilities.reduce((s: number, l: any) => s + calcTotalInterest(l.remaining_principal || 0, l.interest_rate || 0, l.period || 1), 0)
+      const newInterest = data.liabilities.reduce((s: number, l: any) => s + calcTotalInterest((l.remaining_principal || 0) * (1 - repayRatio), l.interest_rate || 0, l.period || 1), 0)
       interestSave = oldInterest - newInterest
       netAssets = data.netWorth - actualRepay
       cashFlow = data.monthlyCashFlow - monthlyPaymentChange
@@ -528,7 +528,7 @@ export async function computeSandbox(sceneType: number, params: any): Promise<{ 
         interestSave = data.liabilities.reduce((s: number, l: any) => {
           const pr = (l.remaining_principal || 0)
           const repaid = pr * (debtReduction / Math.max(data.totalLiabilities, 1))
-          return s + calcTotalInterest(pr, l.annual_rate || 0, l.remaining_periods || 1) - calcTotalInterest(Math.max(0, pr - repaid), l.annual_rate || 0, l.remaining_periods || 1)
+          return s + calcTotalInterest(pr, l.interest_rate || 0, l.period || 1) - calcTotalInterest(Math.max(0, pr - repaid), l.interest_rate || 0, l.period || 1)
         }, 0)
       }
       netAssets = data.netWorth - fee - (use === 'debt_repay' ? 0 : netSell)
@@ -705,11 +705,11 @@ export async function saveSandboxSimulation(sceneType: number, params: any): Pro
         values: [history.id, history.scene_type, history.scene_name, history.simulate_time, history.params, history.result_desc, history.created_at, history.is_deleted]
       },
       {
-        statement: `INSERT INTO sandbox_result (id, history_id, net_assets, net_assets_change, cash_flow_monthly, cash_flow_change,
+        statement: `INSERT INTO sandbox_result (history_id, net_assets, net_assets_change, cash_flow_monthly, cash_flow_change,
             debt_pressure_level, debt_pressure_desc, survival_months, interest_save, monthly_payment_change,
             total_interest_change, chart_x, chart_net_assets, chart_cash_flow, chart_debt, conclusion, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        values: [result.id, result.history_id, result.net_assets, result.net_assets_change, result.cash_flow_monthly, result.cash_flow_change,
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        values: [result.history_id, result.net_assets, result.net_assets_change, result.cash_flow_monthly, result.cash_flow_change,
             result.debt_pressure_level, result.debt_pressure_desc, result.survival_months, result.interest_save,
             result.monthly_payment_change, result.total_interest_change, result.chart_x, result.chart_net_assets,
             result.chart_cash_flow, result.chart_debt, result.conclusion, result.created_at]

@@ -100,7 +100,7 @@
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import * as echarts from 'echarts'
 import PageHeader from '../../common/PageHeader.vue'
-import { getSandboxHistoryById, getSandboxResultByHistoryId } from '../../../services/sandbox/sandboxService'
+import { getSandboxHistoryById, getSandboxResultByHistoryId, getSceneByType, ParamField } from '../../../services/sandbox/sandboxService'
 import type { SandboxHistory, SandboxResult } from '../../../services/sandbox/sandboxService'
 
 const props = defineProps<{ historyId: string | number }>()
@@ -112,10 +112,35 @@ const loading = ref(false)
 const chartRef = ref<HTMLElement | null>(null)
 let chart: echarts.ECharts | null = null
 
+const formatValue = (val: any, field: ParamField | undefined) => {
+  if(!field) return val;
+  const type = field?.type
+  switch (type) {
+    case 'number':
+      return val ? formatNumber(val) : '-'
+    case 'select':
+      return val ? field?.options?.find((option: any) => option.value === val)?.label || '-' : '-'
+    case 'switch':
+      return val ? '是' : '否'
+    default:
+      return val
+  }
+}
+
 const paramsObj = computed(() => {
   if (!history.value) return {}
   try {
-    return JSON.parse(history.value.params)
+    const sceneType = history.value.scene_type
+    const paramSchema = getSceneByType(sceneType)?.paramSchema || []
+    const params = JSON.parse(history.value.params)
+    const result: Record<string, any> = {
+
+    }
+    Object.entries(params).forEach(([key, value]) => {
+      let schema = paramSchema.find((param: any) => param.key === key)
+      result[schema?.label || key] = formatValue(value, schema)
+    });
+    return result
   } catch {
     return {}
   }

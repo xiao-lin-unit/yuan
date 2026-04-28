@@ -19,7 +19,7 @@ export function calculateTotalInterest(
 ): number {
   if (!annualRate || annualRate <= 0 || !periods || periods <= 0) return 0
 
-  const monthlyRate = annualRate / 12
+  const monthlyRate = annualRate / 100 / 12
 
   switch (repaymentMethod) {
     case '等额本息': {
@@ -43,7 +43,7 @@ export function generatePendingRepayment(
   liability: Liability,
   periodNumber: number
 ): { id: string; liability_id: string; period_number: number; due_date: string; principal_amount: number; interest_amount: number; total_amount: number } {
-  const monthlyRate = liability.interest_rate / 12
+  const monthlyRate = liability.interest_rate / 100 / 12
   let principalAmount = 0
   let interestAmount = 0
   let totalAmount = 0
