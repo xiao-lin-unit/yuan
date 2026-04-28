@@ -5,6 +5,7 @@
 - [IncomeStats.vue](file://src/components/mobile/income/IncomeStats.vue)
 - [MonthlyStats.vue](file://src/components/mobile/income/MonthlyStats.vue)
 - [WeeklyIncome.vue](file://src/components/mobile/income/WeeklyIncome.vue)
+- [DailyIncome.vue](file://src/components/mobile/income/DailyIncome.vue)
 - [accountService.ts](file://src/services/account/accountService.ts)
 - [account.ts](file://src/stores/account.ts)
 - [account.ts 类型定义](file://src/types/account/account.ts)
@@ -16,6 +17,12 @@
 - [main.ts 应用入口](file://src/main.ts)
 - [package.json](file://package.json)
 </cite>
+
+## 更新摘要
+**变更内容**
+- 更新了周度收入组件的调试日志处理说明
+- 新增了代码清洁度和性能优化的相关内容
+- 强调了console.log调试语句的移除对用户体验的改善
 
 ## 目录
 1. [简介](#简介)
@@ -38,6 +45,7 @@
 - **跨平台兼容**：同时支持Electron桌面应用和移动设备
 - **实时数据同步**：通过Pinia状态管理实现组件间数据共享
 - **灵活的分类系统**：支持自定义收入分类和标签管理
+- **代码清洁度优化**：移除冗余调试日志，提升用户体验
 
 ## 项目结构
 
@@ -118,6 +126,11 @@ class WeeklyIncome {
 +methods : loadWeeklyIncomes(), getWeekRange()
 +computed : maxIncome, totalIncome
 }
+class DailyIncome {
++props : date, dateStr, year, month
++state : incomes, totalIncome
++methods : loadDailyIncomes()
+}
 class Calendar {
 +props : width, height, year, month, amount, type
 +methods : getCalendarDates(), selectDate()
@@ -127,12 +140,14 @@ IncomeStats --> Calendar : "使用"
 IncomeStats --> CategoryService : "查询分类"
 MonthlyStats --> DatabaseManager : "查询数据"
 WeeklyIncome --> DatabaseManager : "查询数据"
+DailyIncome --> DatabaseManager : "查询数据"
 ```
 
 **图表来源**
 - [IncomeStats.vue:77-466](file://src/components/mobile/income/IncomeStats.vue#L77-L466)
 - [MonthlyStats.vue:9-90](file://src/components/mobile/income/MonthlyStats.vue#L9-L90)
 - [WeeklyIncome.vue:21-154](file://src/components/mobile/income/WeeklyIncome.vue#L21-L154)
+- [DailyIncome.vue:25-208](file://src/components/mobile/income/DailyIncome.vue#L25-L208)
 - [Calendar.vue:75-283](file://src/components/common/calendar/Calendar.vue#L75-L283)
 
 ### 数据库架构
@@ -197,39 +212,41 @@ subgraph "表现层"
 A[IncomeStats.vue]
 B[MonthlyStats.vue]
 C[WeeklyIncome.vue]
-D[Calendar.vue]
+D[DailyIncome.vue]
+E[Calendar.vue]
 end
 subgraph "业务逻辑层"
-E[CategoryService]
-F[AccountService]
-G[Calculations]
+F[CategoryService]
+G[AccountService]
+H[Calculations]
 end
 subgraph "状态管理层"
-H[Pinia Store]
-I[Account Store]
+I[Pinia Store]
+J[Account Store]
 end
 subgraph "数据访问层"
-J[Database Manager]
-K[SQLite Adapter]
+K[Database Manager]
+L[SQLite Adapter]
 end
 subgraph "数据模型层"
-L[Account Types]
-M[Transaction Types]
-N[Category Types]
+M[Account Types]
+N[Transaction Types]
+O[Category Types]
 end
-A --> E
-B --> J
-C --> J
-D --> A
-E --> J
-F --> J
-G --> H
+A --> F
+B --> K
+C --> K
+D --> K
+E --> A
+F --> K
+G --> K
 H --> I
 I --> J
 J --> K
 K --> L
-K --> M
-K --> N
+L --> M
+L --> N
+L --> O
 ```
 
 **图表来源**
@@ -358,8 +375,40 @@ TransformData --> GenerateWeekData
 **图表来源**
 - [WeeklyIncome.vue:59-135](file://src/components/mobile/income/WeeklyIncome.vue#L59-L135)
 
+#### 代码清洁度优化
+
+**更新** 移除了13个console.log调试语句，包括：
+- 日期范围计算过程的日志输出
+- 数据库连接状态的详细日志
+- 查询结果的结构化输出
+- 错误处理时的详细错误信息
+
+这些调试语句的移除显著减少了浏览器控制台的冗余信息，提升了代码的清洁度和用户体验。
+
 **章节来源**
 - [WeeklyIncome.vue:21-154](file://src/components/mobile/income/WeeklyIncome.vue#L21-L154)
+
+### 日收入组件 (DailyIncome)
+
+DailyIncome组件提供特定日期的详细收入记录展示：
+
+#### 数据查询流程
+
+```mermaid
+flowchart TD
+LoadData[加载当日数据] --> ParseDate[解析日期字符串]
+ParseDate --> BuildRange[构建日期范围]
+BuildRange --> QueryTransactions["查询当日收入记录"]
+QueryTransactions --> ProcessResults["处理查询结果"]
+ProcessResults --> FormatData["格式化收入数据"]
+FormatData --> RenderList["渲染收入列表"]
+```
+
+**图表来源**
+- [DailyIncome.vue:54-101](file://src/components/mobile/income/DailyIncome.vue#L54-L101)
+
+**章节来源**
+- [DailyIncome.vue:25-208](file://src/components/mobile/income/DailyIncome.vue#L25-L208)
 
 ### 数据库管理系统
 
@@ -392,6 +441,14 @@ TransactionOperation --> [*]
 
 **图表来源**
 - [index.js 数据库管理:56-190](file://src/database/index.js#L56-L190)
+
+#### 性能配置优化
+
+**更新** 数据库管理器包含一个性能配置系统，支持调试日志的开关控制：
+
+- `PERFORMANCE_CONFIG.DEBUG`：控制调试日志的输出
+- `PERFORMANCE_CONFIG.SAVE_THROTTLE_MS`：Web环境持久化的节流时间
+- 条件性日志输出：仅在调试模式下输出详细信息
 
 **章节来源**
 - [index.js 数据库管理:21-374](file://src/database/index.js#L21-L374)
@@ -431,33 +488,35 @@ subgraph "收入统计模块"
 A[IncomeStats.vue]
 B[MonthlyStats.vue]
 C[WeeklyIncome.vue]
+D[DailyIncome.vue]
 end
 subgraph "服务层"
-D[CategoryService]
-E[AccountService]
+E[CategoryService]
+F[AccountService]
 end
 subgraph "存储层"
-F[Pinia Store]
-G[Account Store]
+G[Pinia Store]
+H[Account Store]
 end
 subgraph "数据库层"
-H[Database Manager]
-I[SQLite Adapter]
+I[Database Manager]
+J[SQLite Adapter]
 end
 subgraph "工具层"
-J[Calculations]
-K[Timezone Utils]
+K[Calculations]
+L[Timezone Utils]
 end
-A --> D
-A --> H
-B --> H
-C --> H
-D --> H
-E --> H
-F --> G
+A --> E
+B --> I
+C --> I
+D --> I
+E --> I
+F --> I
 G --> H
 H --> I
+I --> J
 J --> K
+J --> L
 ```
 
 **图表来源**
@@ -491,6 +550,7 @@ J --> K
 2. **查询缓存**：缓存常用查询结果
 3. **批量操作**：支持批量SQL执行
 4. **索引优化**：为常用查询字段建立索引
+5. **条件性日志**：通过DEBUG配置控制日志输出
 
 ### 图表渲染优化
 
@@ -509,6 +569,18 @@ ECharts图表组件采用了以下优化策略：
 2. **自适应尺寸**：根据屏幕尺寸调整组件大小
 3. **触摸友好**：优化触摸交互体验
 4. **性能监控**：提供性能指标监控
+
+### 代码清洁度优化
+
+**新增** 应用注重代码的清洁度和用户体验：
+
+- **调试日志管理**：移除生产环境的冗余console.log输出
+- **错误处理优化**：提供优雅的错误降级机制
+- **资源清理**：及时释放数据库连接和缓存资源
+- **性能监控**：通过状态管理器监控数据库使用情况
+
+**章节来源**
+- [index.js 数据库管理:862-870](file://src/database/index.js#L862-L870)
 
 ## 故障排除指南
 
@@ -559,6 +631,20 @@ ECharts图表组件采用了以下优化策略：
 3. 减少同时渲染的图表数量
 4. 清理无用数据
 
+#### 调试日志问题
+
+**问题症状**：浏览器控制台出现大量调试信息
+
+**可能原因**：
+1. 开发环境的console.log输出
+2. 数据库DEBUG模式开启
+
+**解决步骤**：
+1. 检查PERFORMANCE_CONFIG.DEBUG配置
+2. 确认生产环境的调试日志已被移除
+3. 验证数据库连接状态
+4. 清理缓存数据
+
 **章节来源**
 - [index.js 数据库管理:214-264](file://src/database/index.js#L214-L264)
 - [IncomeStats.vue:159-162](file://src/components/mobile/income/IncomeStats.vue#L159-L162)
@@ -574,6 +660,7 @@ ECharts图表组件采用了以下优化策略：
 3. **跨平台支持**：统一的技术栈实现了多平台部署
 4. **数据安全**：本地化存储确保了用户数据的安全性
 5. **用户体验**：直观的界面设计和丰富的可视化功能
+6. **代码清洁度**：持续优化的代码质量和调试日志管理
 
 ### 技术亮点
 
@@ -581,6 +668,8 @@ ECharts图表组件采用了以下优化策略：
 - **ECharts集成**：实现了专业级的数据可视化效果
 - **跨平台架构**：通过Capacitor实现了原生功能
 - **状态管理**：使用Pinia提供了现代化的状态管理方案
+- **性能监控**：通过状态管理器监控数据库使用情况
+- **调试日志管理**：通过DEBUG配置控制日志输出
 
 ### 发展方向
 
@@ -589,5 +678,6 @@ ECharts图表组件采用了以下优化策略：
 2. **AI辅助分析**：提供智能财务建议
 3. **导出功能**：支持数据导出和备份
 4. **通知提醒**：提供财务提醒和预警功能
+5. **性能分析**：提供详细的性能监控和分析工具
 
-这个项目为财务管理应用的开发提供了优秀的参考模板，展示了如何在保持代码质量的同时实现复杂的功能需求。
+这个项目为财务管理应用的开发提供了优秀的参考模板，展示了如何在保持代码质量的同时实现复杂的功能需求。通过持续的优化和改进，应用将继续为用户提供更好的财务管理体验。

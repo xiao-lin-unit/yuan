@@ -24,7 +24,7 @@
     />
 
     <!-- 负债卡片容器 -->
-    <div class="liability-cards-container">
+    <div class="liability-cards-container" :style="{ 'margin-top': !showSettled ? '0' : '20px' }">
       <div v-if="displayLiabilities.length === 0" class="no-liabilities">
         <el-empty :description="showSettled ? '暂无历史负债' : '暂无负债'" />
       </div>

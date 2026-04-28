@@ -30,7 +30,7 @@
     />
 
     <!-- 资产卡片容器 -->
-    <div class="asset-cards-container">
+    <div class="asset-cards-container" :style="{ 'margin-top': !showEndedAssets ? '0' : '20px' }">
       <div v-if="(selectedAssetType === '普通资产' && filteredGeneralAssets.length === 0) ||
                   (selectedAssetType === '股票' && filteredStocks.length === 0) ||
                   (selectedAssetType === '基金' && filteredFunds.length === 0)" class="no-assets">
