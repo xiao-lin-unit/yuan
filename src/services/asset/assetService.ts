@@ -139,10 +139,10 @@ export async function getAssetsByType(type: string): Promise<Asset[]> {
 }
 
 /**
- * Get active assets (not ended)
+ * Get active assets (not ended), includes paused assets
  */
 export async function getActiveAssets(): Promise<Asset[]> {
-  return await db.query('SELECT * FROM assets WHERE ended = 0 ORDER BY created_at DESC')
+  return await db.query("SELECT * FROM assets WHERE status != '结束' ORDER BY created_at DESC")
 }
 
 /**
@@ -200,9 +200,9 @@ export async function updateAsset(assetId: string, data: Partial<Asset>): Promis
     fields.push('annual_yield_rate = ?')
     values.push(data.annual_yield_rate)
   }
-  if (data.ended !== undefined) {
-    fields.push('ended = ?')
-    values.push(data.ended)
+  if (data.status !== undefined) {
+    fields.push('status = ?')
+    values.push(data.status)
   }
 
   if (fields.length === 0) return
@@ -228,7 +228,27 @@ export async function deleteAsset(assetId: string): Promise<void> {
  */
 export async function endAsset(assetId: string): Promise<void> {
   await db.run(
-    'UPDATE assets SET ended = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+    "UPDATE assets SET status = '结束', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+    [assetId]
+  )
+}
+
+/**
+ * Pause asset (exclude from income calculation)
+ */
+export async function pauseAsset(assetId: string): Promise<void> {
+  await db.run(
+    "UPDATE assets SET status = '暂停', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+    [assetId]
+  )
+}
+
+/**
+ * Resume asset (back to active)
+ */
+export async function resumeAsset(assetId: string): Promise<void> {
+  await db.run(
+    "UPDATE assets SET status = '开启', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
     [assetId]
   )
 }

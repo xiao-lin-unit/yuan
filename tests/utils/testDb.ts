@@ -59,8 +59,8 @@ export async function seedTestData(db: any) {
     ['acc3', '工资卡', '储蓄卡', 20000, 0, 0, 1, '启用'])
 
   // Insert test assets
-  await db.run(`INSERT INTO assets (id, type, name, amount, account_id, annual_yield_rate, ended) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    ['asset1', '储蓄', '定期存款', 10000, 'acc3', 2.5, 0])
+  await db.run(`INSERT INTO assets (id, type, name, amount, account_id, annual_yield_rate, status) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    ['asset1', '储蓄', '定期存款', 10000, 'acc3', 2.5, '开启'])
 
   // Insert test stocks
   await db.run(`INSERT INTO stocks (id, name, code, quantity, current_price, cost_price, account_id, ended) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,

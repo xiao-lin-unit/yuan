@@ -14,7 +14,8 @@
       <h2 class="asset-name">{{ assetInfo.name }}</h2>
       <div class="asset-type-row">
         <span class="asset-type-tag">{{ assetInfo.type }}</span>
-        <span v-if="assetInfo.ended" class="asset-ended-tag">已结束</span>
+        <span v-if="assetInfo.status === '结束'" class="asset-ended-tag">已结束</span>
+        <span v-else-if="assetInfo.status === '暂停'" class="asset-paused-tag">已暂停</span>
       </div>
       <div class="asset-amount">
         <div class="amount-label">资产金额(元)</div>
@@ -84,7 +85,7 @@
     </div>
 
     <!-- 悬浮操作按钮（仅在未结束时显示） -->
-    <FloatingActionMenu v-if="!assetInfo.ended" :buttons="actionButtons" />
+    <FloatingActionMenu v-if="assetInfo.status !== '结束'" :buttons="actionButtons" />
 
     <!-- 修改资产信息弹框 -->
     <el-dialog v-model="showEditDialog" title="修改资产信息" width="90%" align-center>
@@ -139,12 +140,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import dayjs from 'dayjs';
-import { ArrowLeft, SwitchButton, Edit } from '@element-plus/icons-vue';
+import { ArrowLeft, SwitchButton, Edit, VideoPause, VideoPlay } from '@element-plus/icons-vue';
 import { ElMessageBox, ElMessage } from 'element-plus';
 import FloatingActionMenu from '../../../components/common/FloatingActionMenu.vue';
-import { getAssetById, endAsset, updateAsset, getAssetIncomeRecords } from '../../../services/asset/assetService';
+import { getAssetById, endAsset, pauseAsset, resumeAsset, updateAsset, getAssetIncomeRecords } from '../../../services/asset/assetService';
 import { getAccounts } from '../../../services/account/accountService';
 import { calculationTypes, periodTypes } from '../../../utils/dictionaries';
 
@@ -176,7 +177,7 @@ const assetInfo = ref({
   income_date: '',
   next_income_date: '',
   accountName: '',
-  ended: 0,
+  status: '开启',
   created_at: '' as string | Date | dayjs.Dayjs,
   calculation_type: '' as '无' | '按金额计算' | '按年收益率计算' | '',
   annual_yield_rate: 0,
@@ -222,6 +223,40 @@ const handleEndAsset = async () => {
       console.error('结束资产失败:', error);
       ElMessage.error('结束资产失败');
     }
+  }
+};
+
+const handlePauseAsset = async () => {
+  try {
+    await ElMessageBox.confirm(
+      `确认要暂停资产"${assetInfo.value.name}"吗？暂停后该资产不再参与收益计算和沙盘推演。`,
+      '暂停资产',
+      {
+        confirmButtonText: '确认暂停',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    );
+
+    await pauseAsset(props.assetId);
+    ElMessage.success('资产已暂停');
+    await loadAssetDetail();
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('暂停资产失败:', error);
+      ElMessage.error('暂停资产失败');
+    }
+  }
+};
+
+const handleResumeAsset = async () => {
+  try {
+    await resumeAsset(props.assetId);
+    ElMessage.success('资产已恢复');
+    await loadAssetDetail();
+  } catch (error) {
+    console.error('恢复资产失败:', error);
+    ElMessage.error('恢复资产失败');
   }
 };
 
@@ -272,18 +307,34 @@ const saveEdit = async () => {
   }
 };
 
-const actionButtons = [
-  {
-    text: '修改',
-    icon: Edit,
-    action: openEditDialog
-  },
-  {
+const actionButtons = computed(() => {
+  const buttons = [
+    {
+      text: '修改',
+      icon: Edit,
+      action: openEditDialog
+    }
+  ];
+  if (assetInfo.value.status === '暂停') {
+    buttons.push({
+      text: '恢复',
+      icon: VideoPlay,
+      action: handleResumeAsset
+    });
+  } else {
+    buttons.push({
+      text: '暂停',
+      icon: VideoPause,
+      action: handlePauseAsset
+    });
+  }
+  buttons.push({
     text: '结束',
     icon: SwitchButton,
     action: handleEndAsset
-  }
-];
+  });
+  return buttons;
+});
 
 const loadIncomeRecords = async () => {
   try {
@@ -321,7 +372,7 @@ const loadAssetDetail = async () => {
       income_date: asset.income_date || '',
       next_income_date: asset.next_income_date || '',
       accountName,
-      ended: asset.ended,
+      status: asset.status || '开启',
       created_at: asset.created_at || '',
       calculation_type: asset.calculation_type || '',
       annual_yield_rate: asset.annual_yield_rate || 0,
@@ -408,6 +459,14 @@ onMounted(() => {
   font-size: 13px;
   color: #909399;
   background-color: #f4f4f5;
+  padding: 2px 10px;
+  border-radius: 10px;
+}
+
+.asset-paused-tag {
+  font-size: 13px;
+  color: #e6a23c;
+  background-color: #fdf6ec;
   padding: 2px 10px;
   border-radius: 10px;
 }

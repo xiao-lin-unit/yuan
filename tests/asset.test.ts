@@ -11,7 +11,7 @@ describe('Asset Module', () => {
 
   describe('Asset CRUD', () => {
     it('should retrieve assets with account info', async () => {
-      const assets = await db.query(`SELECT * FROM assets WHERE ended = 0`)
+      const assets = await db.query(`SELECT * FROM assets WHERE status != '结束'`)
       expect(assets.length).toBe(1)
       expect(assets[0].name).toBe('定期存款')
       expect(assets[0].amount).toBe(10000)

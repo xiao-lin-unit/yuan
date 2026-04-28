@@ -509,7 +509,7 @@ class DatabaseManager {
             calculation_type TEXT,
             income_amount REAL DEFAULT 0,
             annual_yield_rate REAL DEFAULT 0,
-            ended INTEGER DEFAULT 0,
+            status TEXT DEFAULT '开启',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (account_id) REFERENCES accounts(id)
@@ -866,6 +866,17 @@ class DatabaseManager {
 
       // 批量执行
       await this.batch(createStatements)
+
+      // 迁移：assets表 ended -> status
+      try {
+        const assetColumns = await this.getColumns('assets')
+        if (assetColumns.includes('ended') && !assetColumns.includes('status')) {
+          await this.run(`ALTER TABLE assets ADD COLUMN status TEXT DEFAULT '开启'`)
+          await this.run(`UPDATE assets SET status = CASE WHEN ended = 1 THEN '结束' ELSE '开启' END`)
+        }
+      } catch (migrateErr) {
+        console.log('Assets migration warning:', migrateErr)
+      }
 
       this.initialized = true
 

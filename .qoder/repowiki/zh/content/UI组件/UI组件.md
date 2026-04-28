@@ -12,7 +12,12 @@
 - [SideMenu.vue](file://src/components/common/SideMenu.vue)
 - [Calendar.vue](file://src/components/common/Calendar.vue)
 - [FloatingActionMenu.vue](file://src/components/common/FloatingActionMenu.vue)
+- [FloatingSwitchButton.vue](file://src/components/common/FloatingSwitchButton.vue)
 - [StatOverview.vue](file://src/components/common/StatOverview.vue)
+- [FinancialSandbox.vue](file://src/components/mobile/sandbox/FinancialSandbox.vue)
+- [SandboxHistory.vue](file://src/components/mobile/sandbox/SandboxHistory.vue)
+- [SandboxResultDetail.vue](file://src/components/mobile/sandbox/SandboxResultDetail.vue)
+- [SandboxSimulationPage.vue](file://src/components/mobile/sandbox/SandboxSimulationPage.vue)
 - [ExpensePage.vue](file://src/components/mobile/expense/ExpensePage.vue)
 - [AccountManagement.vue](file://src/components/mobile/account/AccountManagement.vue)
 - [AccountDetailPage.vue](file://src/components/mobile/account/AccountDetailPage.vue)
@@ -24,6 +29,7 @@
 - [LiabilityManagement.vue](file://src/components/mobile/liability/LiabilityManagement.vue)
 - [LiabilityDetailPage.vue](file://src/components/mobile/liability/LiabilityDetailPage.vue)
 - [MonthlyStats.vue](file://src/components/mobile/expense/MonthlyStats.vue)
+- [sandboxService.ts](file://src/services/sandbox/sandboxService.ts)
 - [assetService.ts](file://src/services/asset/assetService.ts)
 - [stockService.ts](file://src/services/asset/stockService.ts)
 - [fundService.ts](file://src/services/asset/fundService.ts)
@@ -37,11 +43,11 @@
 
 ## 更新摘要
 **变更内容**
-- 更新了资产详情页面收益记录头部间距的样式调整
-- 优化了股票和基金详情页面交易记录头部间距的布局设计
-- 简化了负债详情页面标签页样式并改进了动态标签选择逻辑
-- 增强了组件样式的响应式设计和间距一致性
-- **新增浮动操作菜单集成：所有主要业务页面均已集成FloatingActionMenu组件，提供统一的操作入口体验**
+- 新增FloatingSwitchButton浮动切换按钮组件，提供Material Design风格的绿色圆形按钮设计
+- 重构金融沙盒组件体系，包括FinancialSandbox、SandboxHistory、SandboxResultDetail、SandboxSimulationPage四个核心组件
+- 金融沙盒组件采用统一的Material Design风格按钮设计，提升视觉一致性
+- 所有沙盒相关组件集成统一的切换按钮样式，支持历史推演与推演情景之间的切换
+- 优化了组件间的事件传递和导航机制，提供更好的用户体验
 
 ## 目录
 1. [简介](#简介)
@@ -56,14 +62,14 @@
 10. [附录](#附录)
 
 ## 简介
-本文件面向财务应用程序的UI组件体系，系统性梳理通用布局组件（头部导航、页面内容、底部栏）、页面模板组件、侧边菜单、日历组件、浮动操作菜单以及新增的StatOverview统计组件的设计与实现要点。文档同时覆盖组件属性、事件、插槽、样式与主题适配、最佳实践与性能优化建议，并给出扩展与自定义指导，帮助开发者快速理解与高效使用这些组件。
+本文件面向财务应用程序的UI组件体系，系统性梳理通用布局组件（头部导航、页面内容、底部栏）、页面模板组件、侧边菜单、日历组件、浮动操作菜单以及新增的FloatingSwitchButton切换按钮组件的设计与实现要点。文档同时覆盖组件属性、事件、插槽、样式与主题适配、最佳实践与性能优化建议，并给出扩展与自定义指导，帮助开发者快速理解与高效使用这些组件。
 
-**更新** 本次更新反映了应用的UI组件现代化升级，新增了 StatOverview 组件提供卡片式界面、渐变覆盖层、响应式设计和自定义颜色方案，并已在资产、负债、支出和收入管理模块中集成使用，显著提升了用户界面的一致性和美观度。**特别重要的是，FloatingActionMenu浮动操作菜单组件已被集成到所有主要业务页面中，作为统一的操作入口体验，包括资产管理和负债管理页面、账户管理页面、收支页面以及各类详情页面。**
+**更新** 本次更新反映了应用的UI组件现代化升级，新增了FloatingSwitchButton浮动切换按钮组件，提供Material Design风格的绿色圆形按钮设计，支持历史推演与推演情景之间的快速切换。金融沙盒组件体系得到全面重构，包括FinancialSandbox沙盒首页、SandboxHistory历史记录、SandboxResultDetail结果详情、SandboxSimulationPage仿真页面四个核心组件，形成了完整的沙盒推演功能闭环。所有组件均采用统一的Material Design风格设计，显著提升了用户界面的一致性和专业性。
 
 ## 项目结构
 应用采用"根组件 + 通用组件 + 移动端页面"的分层组织方式：
 - 根组件负责全局布局与路由/状态协调
-- 通用组件提供跨页面的基础UI能力，包括新增的StatOverview统计组件和FloatingActionMenu浮动操作菜单
+- 通用组件提供跨页面的基础UI能力，包括新增的FloatingSwitchButton切换按钮组件和重构的金融沙盒组件
 - 移动端页面聚焦业务场景，组合通用组件完成具体页面
 
 ```mermaid
@@ -81,8 +87,15 @@ PTEMPLATE["PageTemplate.vue<br/>页面模板"]
 SIDEMENU["SideMenu.vue<br/>侧边菜单"]
 CALENDAR["Calendar.vue<br/>日历"]
 FAM["FloatingActionMenu.vue<br/>浮动操作菜单"]
+FSB["FloatingSwitchButton.vue<br/>浮动切换按钮"]
 STATOVERVIEW["StatOverview.vue<br/>财务统计组件"]
-end
+END
+subgraph "金融沙盒组件"
+FINANCIALSANDBOX["FinancialSandbox.vue<br/>沙盒首页"]
+SANDBOXHISTORY["SandboxHistory.vue<br/>历史记录"]
+SANDBOXRESULTDETAIL["SandboxResultDetail.vue<br/>结果详情"]
+SANDBOXSIMULATIONPAGE["SandboxSimulationPage.vue<br/>仿真页面"]
+END
 subgraph "移动端页面"
 EXPENSE["ExpensePage.vue<br/>支出页"]
 ACCOUNTMGMT["AccountManagement.vue<br/>账户管理页"]
@@ -121,6 +134,11 @@ LIABILITYMGMT --> STATOVERVIEW
 LIABILITYDETAIL --> FAM
 EXPENSE --> FAM
 MONTHLYSTATS --> STATOVERVIEW
+FINANCIALSANDBOX --> SANDBOXHISTORY
+FINANCIALSANDBOX --> SANDBOXRESULTDETAIL
+FINANCIALSANDBOX --> SANDBOXSIMULATIONPAGE
+SANDBOXHISTORY --> SANDBOXRESULTDETAIL
+SANDBOXSIMULATIONPAGE --> SANDBOXRESULTDETAIL
 ```
 
 **图表来源**
@@ -134,18 +152,12 @@ MONTHLYSTATS --> STATOVERVIEW
 - [SideMenu.vue:1-255](file://src/components/common/SideMenu.vue#L1-L255)
 - [Calendar.vue:1-477](file://src/components/common/Calendar.vue#L1-L477)
 - [FloatingActionMenu.vue:1-151](file://src/components/common/FloatingActionMenu.vue#L1-L151)
+- [FloatingSwitchButton.vue:1-59](file://src/components/common/FloatingSwitchButton.vue#L1-L59)
 - [StatOverview.vue:1-119](file://src/components/common/StatOverview.vue#L1-L119)
-- [ExpensePage.vue:1-88](file://src/components/mobile/expense/ExpensePage.vue#L1-L88)
-- [AccountManagement.vue:1-689](file://src/components/mobile/account/AccountManagement.vue#L1-L689)
-- [AccountDetailPage.vue:1-587](file://src/components/mobile/account/AccountDetailPage.vue#L1-L587)
-- [AssetDetailPage.vue:1-546](file://src/components/mobile/asset/AssetDetailPage.vue#L1-L546)
-- [AssetManagement.vue:1-414](file://src/components/mobile/asset/AssetManagement.vue#L1-L414)
-- [StockDetailPage.vue:1-553](file://src/components/mobile/asset/StockDetailPage.vue#L1-L553)
-- [FundDetailPage.vue:1-796](file://src/components/mobile/asset/FundDetailPage.vue#L1-L796)
-- [AssetCard.vue:1-180](file://src/components/mobile/asset/AssetCard.vue#L1-L180)
-- [LiabilityManagement.vue:1-247](file://src/components/mobile/liability/LiabilityManagement.vue#L1-L247)
-- [LiabilityDetailPage.vue:1-607](file://src/components/mobile/liability/LiabilityDetailPage.vue#L1-L607)
-- [MonthlyStats.vue:1-191](file://src/components/mobile/expense/MonthlyStats.vue#L1-L191)
+- [FinancialSandbox.vue:1-156](file://src/components/mobile/sandbox/FinancialSandbox.vue#L1-L156)
+- [SandboxHistory.vue:1-179](file://src/components/mobile/sandbox/SandboxHistory.vue#L1-L179)
+- [SandboxResultDetail.vue:1-334](file://src/components/mobile/sandbox/SandboxResultDetail.vue#L1-L334)
+- [SandboxSimulationPage.vue:1-154](file://src/components/mobile/sandbox/SandboxSimulationPage.vue#L1-L154)
 
 **章节来源**
 - [App.vue:1-223](file://src/App.vue#L1-L223)
@@ -200,10 +212,36 @@ MONTHLYSTATS --> STATOVERVIEW
   - 事件：无（通过action回调触发）
   - 适用：页面内快捷操作，**现已集成到所有主要业务页面中**
 
+- FloatingSwitchButton（浮动切换按钮）
+  - 职责：提供Material Design风格的圆形切换按钮，支持激活/非激活状态切换
+  - 属性：active（布尔值）、activeText（激活文本）、inactiveText（非激活文本）
+  - 事件：update:active（状态变更事件）
+  - 适用：沙盒推演场景中的历史推演与推演情景切换
+
 - StatOverview（财务统计组件）
   - 职责：提供卡片式统计界面，支持渐变覆盖层、响应式设计和自定义颜色方案
   - 属性：background、main、details
   - 适用：资产、负债、收支统计页面的统一展示
+
+- FinancialSandbox（金融沙盒首页）
+  - 职责：提供沙盒推演场景选择界面，支持场景卡片网格布局
+  - 事件：navigate（场景选择导航）
+  - 适用：沙盒推演入口页面
+
+- SandboxHistory（沙盒历史记录）
+  - 职责：展示沙盒推演历史记录，支持查看详情与删除操作
+  - 事件：navigate（详情导航）
+  - 适用：沙盒推演历史管理
+
+- SandboxResultDetail（沙盒结果详情）
+  - 职责：展示沙盒推演详细结果，包含指标卡片、图表和分析说明
+  - 事件：navigate（返回导航）
+  - 适用：沙盒推演结果展示
+
+- SandboxSimulationPage（沙盒仿真页面）
+  - 职责：提供沙盒推演参数配置界面，支持多种输入控件
+  - 事件：navigate（结果详情导航）
+  - 适用：沙盒推演参数配置
 
 **章节来源**
 - [AppHeader.vue:1-135](file://src/components/common/AppHeader.vue#L1-L135)
@@ -214,10 +252,15 @@ MONTHLYSTATS --> STATOVERVIEW
 - [SideMenu.vue:1-255](file://src/components/common/SideMenu.vue#L1-L255)
 - [Calendar.vue:1-477](file://src/components/common/Calendar.vue#L1-L477)
 - [FloatingActionMenu.vue:1-151](file://src/components/common/FloatingActionMenu.vue#L1-L151)
+- [FloatingSwitchButton.vue:1-59](file://src/components/common/FloatingSwitchButton.vue#L1-L59)
 - [StatOverview.vue:1-119](file://src/components/common/StatOverview.vue#L1-L119)
+- [FinancialSandbox.vue:1-156](file://src/components/mobile/sandbox/FinancialSandbox.vue#L1-L156)
+- [SandboxHistory.vue:1-179](file://src/components/mobile/sandbox/SandboxHistory.vue#L1-L179)
+- [SandboxResultDetail.vue:1-334](file://src/components/mobile/sandbox/SandboxResultDetail.vue#L1-L334)
+- [SandboxSimulationPage.vue:1-154](file://src/components/mobile/sandbox/SandboxSimulationPage.vue#L1-L154)
 
 ## 架构总览
-应用通过根组件App.vue集中管理当前页面组件、导航参数与日期状态，并将事件向上/向下分发至通用组件与业务页面。通用组件之间通过事件与属性协作，形成稳定的UI基础设施。新增的StatOverview组件作为通用统计组件，为各个业务模块提供统一的统计展示界面。**FloatingActionMenu组件已成为所有主要业务页面的标准操作入口，提供统一的用户体验。**
+应用通过根组件App.vue集中管理当前页面组件、导航参数与日期状态，并将事件向上/向下分发至通用组件与业务页面。通用组件之间通过事件与属性协作，形成稳定的UI基础设施。新增的FloatingSwitchButton切换按钮组件为沙盒功能提供统一的状态切换入口，所有沙盒相关组件采用Material Design风格设计，确保视觉一致性。**FloatingActionMenu组件已成为所有主要业务页面的标准操作入口，提供统一的用户体验。**
 
 ```mermaid
 sequenceDiagram
@@ -228,7 +271,8 @@ participant AC as "AppContent"
 participant AF as "AppFooter"
 participant SM as "SideMenu"
 participant FAM as "FloatingActionMenu"
-participant SO as "StatOverview"
+participant FSB as "FloatingSwitchButton"
+participant FS as "FinancialSandbox"
 U->>AH : 点击头像
 AH-->>APP : 触发 "toggle-menu"
 APP->>APP : 切换 menuVisible
@@ -242,8 +286,10 @@ AC-->>APP : 事件冒泡
 APP->>APP : 更新状态并重新计算组件映射
 U->>FAM : 点击操作按钮
 FAM-->>U : 执行对应action回调
-U->>SO : 传入统计数据
-SO-->>U : 渲染统计卡片
+U->>FSB : 点击切换按钮
+FSB-->>U : 触发 update : active 事件
+U->>FS : 场景选择
+FS-->>U : 导航到仿真页面
 ```
 
 **图表来源**
@@ -252,7 +298,8 @@ SO-->>U : 渲染统计卡片
 - [AppFooter.vue:3-23](file://src/components/common/AppFooter.vue#L3-L23)
 - [AppContent.vue:3-21](file://src/components/common/AppContent.vue#L3-L21)
 - [FloatingActionMenu.vue:33-58](file://src/components/common/FloatingActionMenu.vue#L33-L58)
-- [StatOverview.vue:29-35](file://src/components/common/StatOverview.vue#L29-L35)
+- [FloatingSwitchButton.vue:19-25](file://src/components/common/FloatingSwitchButton.vue#L19-L25)
+- [FinancialSandbox.vue:52-54](file://src/components/mobile/sandbox/FinancialSandbox.vue#L52-L54)
 
 **章节来源**
 - [App.vue:119-153](file://src/App.vue#L119-L153)
@@ -451,6 +498,47 @@ FloatingActionMenu --> ActionButton : "使用"
 **章节来源**
 - [FloatingActionMenu.vue:1-151](file://src/components/common/FloatingActionMenu.vue#L1-L151)
 
+### FloatingSwitchButton 分析
+- 设计要点
+  - Material Design风格的绿色圆形按钮设计
+  - 支持激活/非激活状态切换
+  - 固定定位，底部80px，左侧20px
+  - 包含开关图标与文本标签
+  - 悬停放大效果，阴影增强立体感
+- 属性配置
+  - active: Boolean - 按钮激活状态，默认false
+  - activeText: String - 激活状态下的显示文本
+  - inactiveText: String - 非激活状态下的显示文本
+- 事件
+  - update:active - 状态变更事件，返回新的激活状态
+- 样式特点
+  - 24px圆角半径，48px直径
+  - 绿色背景色 #67c23a，白色图标
+  - 12px内边距，8px间距
+  - 0.3秒过渡动画，悬停scale(1.05)
+  - 固定z-index 1000，确保层级
+- 适用场景
+  - 沙盒推演场景中的历史推演与推演情景切换
+  - 需要快速状态切换的界面元素
+
+```mermaid
+flowchart TD
+Click["点击按钮"] --> Toggle["切换激活状态"]
+Toggle --> Update["发出 update:active 事件"]
+Update --> Text["更新显示文本"]
+Text --> Style["应用新样式"]
+Style --> Hover["悬停效果"]
+Hover --> Shadow["阴影增强"]
+Shadow --> Output["输出最终状态"]
+```
+
+**图表来源**
+- [FloatingSwitchButton.vue:21-25](file://src/components/common/FloatingSwitchButton.vue#L21-L25)
+- [FloatingSwitchButton.vue:48-51](file://src/components/common/FloatingSwitchButton.vue#L48-L51)
+
+**章节来源**
+- [FloatingSwitchButton.vue:1-59](file://src/components/common/FloatingSwitchButton.vue#L1-L59)
+
 ### StatOverview 组件分析
 - 设计要点
   - 卡片式统计界面，支持背景图片与渐变覆盖层
@@ -486,6 +574,183 @@ Responsive --> Output
 
 **章节来源**
 - [StatOverview.vue:1-119](file://src/components/common/StatOverview.vue#L1-L119)
+
+### FinancialSandbox 组件分析
+- 设计要点
+  - 沙盒推演场景选择界面，采用2列网格布局
+  - 场景卡片包含图标、名称、描述信息
+  - 统一的Material Design风格设计
+  - 固定的切换按钮位置，支持历史推演与推演情景切换
+- 功能特性
+  - 场景卡片点击选择推演场景
+  - 场景图标动态映射，支持多种图标类型
+  - 场景描述支持多行文本显示
+  - 切换按钮支持历史推演与推演情景之间的快速切换
+- 事件
+  - navigate - 场景选择导航事件，传递场景类型参数
+- 样式特点
+  - 12px内边距，12px网格间距
+  - 场景卡片圆角12px，阴影0 2px 8px rgba(0,0,0,0.06)
+  - 场景图标容器圆角50%，背景#ecf5ff
+  - 切换按钮固定定位，底部80px，左侧20px
+- 适用场景
+  - 沙盒推演功能入口页面
+  - 场景选择与导航
+
+```mermaid
+flowchart TD
+Load["加载场景数据"] --> Map["映射图标"] --> Render["渲染场景卡片"]
+Render --> Click{"点击场景？"}
+Click --> |是| Navigate["发出 navigate 事件"]
+Click --> |切换| Toggle["切换视图"]
+Toggle --> History["导航到历史页面"]
+Navigate --> Simulation["导航到仿真页面"]
+```
+
+**图表来源**
+- [FinancialSandbox.vue:48-50](file://src/components/mobile/sandbox/FinancialSandbox.vue#L48-L50)
+- [FinancialSandbox.vue:52-54](file://src/components/mobile/sandbox/FinancialSandbox.vue#L52-L54)
+- [FinancialSandbox.vue:129-143](file://src/components/mobile/sandbox/FinancialSandbox.vue#L129-L143)
+
+**章节来源**
+- [FinancialSandbox.vue:1-156](file://src/components/mobile/sandbox/FinancialSandbox.vue#L1-L156)
+
+### SandboxHistory 组件分析
+- 设计要点
+  - 沙盒推演历史记录展示界面
+  - 历史记录卡片包含场景名称、时间、描述和操作按钮
+  - 支持加载状态与空状态显示
+  - 统一的Material Design风格设计
+  - 固定的切换按钮位置，支持推演情景与历史推演之间的快速切换
+- 功能特性
+  - 历史记录列表支持点击查看详情
+  - 删除操作支持确认对话框
+  - 异步加载历史数据，支持加载状态显示
+  - 空状态显示，支持无记录时的友好提示
+  - 切换按钮支持推演情景与历史推演之间的快速切换
+- 事件
+  - navigate - 导航事件，支持详情导航与视图切换
+- 样式特点
+  - 历史列表垂直排列，12px间距
+  - 历史卡片圆角12px，阴影0 2px 8px rgba(0,0,0,0.06)
+  - 操作按钮右对齐，间距8px
+  - 切换按钮固定定位，底部80px，左侧20px
+- 适用场景
+  - 沙盒推演历史管理页面
+  - 结果查看与管理
+
+```mermaid
+flowchart TD
+Mount["组件挂载"] --> Load["加载历史数据"]
+Load --> Success{"加载成功？"}
+Success --> |是| Render["渲染历史列表"]
+Success --> |否| Empty["显示空状态"]
+Render --> Detail{"查看详情？"}
+Detail --> |是| Navigate["导航到详情页面"]
+Detail --> |删除| Confirm["确认删除"]
+Confirm --> Delete["执行删除操作"]
+Delete --> Reload["重新加载数据"]
+Empty --> Toggle["切换视图"]
+Toggle --> Sandbox["导航到沙盒页面"]
+```
+
+**图表来源**
+- [SandboxHistory.vue:56-65](file://src/components/mobile/sandbox/SandboxHistory.vue#L56-L65)
+- [SandboxHistory.vue:71-73](file://src/components/mobile/sandbox/SandboxHistory.vue#L71-L73)
+- [SandboxHistory.vue:75-82](file://src/components/mobile/sandbox/SandboxHistory.vue#L75-L82)
+- [SandboxHistory.vue:150-170](file://src/components/mobile/sandbox/SandboxHistory.vue#L150-L170)
+
+**章节来源**
+- [SandboxHistory.vue:1-179](file://src/components/mobile/sandbox/SandboxHistory.vue#L1-L179)
+
+### SandboxResultDetail 组件分析
+- 设计要点
+  - 沙盒推演结果详情展示界面
+  - 核心指标卡片展示净资产、月现金流、负债压力等关键指标
+  - ECharts图表展示趋势分析
+  - 参数说明与文字分析
+  - 统一的Material Design风格设计
+- 功能特性
+  - 核心指标卡片支持正负值颜色区分
+  - ECharts图表支持动态渲染
+  - 参数列表支持多种数据类型格式化
+  - 文字分析板块提供详细解释
+  - 负债压力等级支持颜色编码
+- 事件
+  - navigate - 返回导航事件
+- 样式特点
+  - 指标卡片2列网格布局，10px间距
+  - 图表容器240px高度，支持自适应宽度
+  - 参数列表垂直排列，6px间距
+  - 结论卡片背景#f0f9ff，圆角8px
+- 适用场景
+  - 沙盒推演结果详细展示页面
+  - 数据分析与决策支持
+
+```mermaid
+flowchart TD
+Mount["组件挂载"] --> Load["加载历史与结果数据"]
+Load --> Success{"加载成功？"}
+Success --> |是| Init["初始化图表"]
+Success --> |否| Empty["显示空状态"]
+Init --> Chart["渲染趋势图表"]
+Chart --> Params["格式化参数显示"]
+Params --> Analysis["渲染分析内容"]
+Analysis --> Pressure["计算压力等级"]
+Pressure --> Output["输出最终结果"]
+Empty --> Back["返回上一页"]
+Back --> Mount
+```
+
+**图表来源**
+- [SandboxResultDetail.vue:177-190](file://src/components/mobile/sandbox/SandboxResultDetail.vue#L177-L190)
+- [SandboxResultDetail.vue:204-226](file://src/components/mobile/sandbox/SandboxResultDetail.vue#L204-L226)
+- [SandboxResultDetail.vue:159-170](file://src/components/mobile/sandbox/SandboxResultDetail.vue#L159-L170)
+
+**章节来源**
+- [SandboxResultDetail.vue:1-334](file://src/components/mobile/sandbox/SandboxResultDetail.vue#L1-L334)
+
+### SandboxSimulationPage 组件分析
+- 设计要点
+  - 沙盒推演参数配置界面
+  - 根据场景类型动态生成参数表单
+  - 支持多种输入控件：开关、选择框、数字输入、文本输入
+  - 统一的Material Design风格设计
+- 功能特性
+  - 场景信息卡片展示场景描述
+  - 参数表单根据场景定义动态生成
+  - 默认值自动填充
+  - 计算按钮支持异步计算与加载状态
+  - 场景图标动态映射
+- 事件
+  - navigate - 结果详情导航事件
+- 样式特点
+  - 场景信息卡片居中显示，20px内边距
+  - 参数卡片支持16px底部边距
+  - 表单控件宽度100%，右对齐控制按钮
+  - 动作区域支持24px底部边距
+- 适用场景
+  - 沙盒推演参数配置页面
+  - 用户输入与参数设置
+
+```mermaid
+flowchart TD
+Mount["组件挂载"] --> Load["加载场景定义"]
+Load --> Defaults["填充默认值"]
+Defaults --> Form["渲染参数表单"]
+Form --> Input{"用户输入？"}
+Input --> |修改| Update["更新参数值"]
+Input --> |计算| Compute["开始计算"]
+Compute --> Save["保存推演结果"]
+Save --> Navigate["导航到结果详情"]
+```
+
+**图表来源**
+- [SandboxSimulationPage.vue:86-94](file://src/components/mobile/sandbox/SandboxSimulationPage.vue#L86-L94)
+- [SandboxSimulationPage.vue:100-112](file://src/components/mobile/sandbox/SandboxSimulationPage.vue#L100-L112)
+
+**章节来源**
+- [SandboxSimulationPage.vue:1-154](file://src/components/mobile/sandbox/SandboxSimulationPage.vue#L1-L154)
 
 ### 页面模板组件 PageTemplate 的使用
 - 结构
@@ -539,6 +804,48 @@ Responsive --> Output
 
 **章节来源**
 - [FloatingActionMenu.vue:1-151](file://src/components/common/FloatingActionMenu.vue#L1-L151)
+
+### 浮动切换按钮 FloatingSwitchButton 的交互逻辑
+- 状态切换
+  - 点击按钮切换激活/非激活状态
+  - 支持双向数据绑定 update:active 事件
+- 文本更新
+  - 根据状态动态更新显示文本
+  - 支持自定义激活与非激活文本
+- Material Design风格
+  - 绿色圆形设计，24px圆角半径
+  - 固定定位，底部80px，左侧20px
+  - 悬停放大效果，阴影增强立体感
+- **集成优势**
+  - 统一的视觉语言，提升界面专业性
+  - 快速状态切换，提升用户体验
+  - 固定位置设计，确保可用性
+
+**章节来源**
+- [FloatingSwitchButton.vue:1-59](file://src/components/common/FloatingSwitchButton.vue#L1-L59)
+
+### 金融沙盒组件体系的架构设计
+- 组件关系
+  - FinancialSandbox 作为入口页面，提供场景选择
+  - SandboxSimulationPage 负责参数配置与计算
+  - SandboxResultDetail 展示详细结果与分析
+  - SandboxHistory 管理历史记录
+- 数据流
+  - 场景选择 → 参数配置 → 计算推演 → 结果展示 → 历史记录
+- 事件传递
+  - 组件间通过 navigate 事件进行页面导航
+  - 状态变更通过 update:active 事件进行通信
+- **设计优势**
+  - 完整的推演流程闭环
+  - 统一的Material Design风格
+  - 清晰的组件职责分工
+  - 良好的用户体验设计
+
+**章节来源**
+- [FinancialSandbox.vue:1-156](file://src/components/mobile/sandbox/FinancialSandbox.vue#L1-L156)
+- [SandboxHistory.vue:1-179](file://src/components/mobile/sandbox/SandboxHistory.vue#L1-L179)
+- [SandboxResultDetail.vue:1-334](file://src/components/mobile/sandbox/SandboxResultDetail.vue#L1-L334)
+- [SandboxSimulationPage.vue:1-154](file://src/components/mobile/sandbox/SandboxSimulationPage.vue#L1-L154)
 
 ### 资产详情页面 AssetDetailPage 的现代化设计
 - 设计要点
@@ -871,21 +1178,26 @@ ChooseType --> NavigateAdd["导航到新增页面"]
 - 基金服务层
   - fundService：提供专业的基金交易服务，支持锁定期管理
   - 支持加权平均成本、收益计算、锁定期处理等功能
+- 沙盒服务层
+  - sandboxService：提供完整的沙盒推演服务，包括场景定义、参数配置、计算引擎、历史管理等
+  - 支持14种不同的推演场景，每种场景包含参数定义、计算逻辑、结果展示
+  - 提供完整的数据库操作：历史记录查询、结果详情获取、软删除等
 - 类型定义
   - 提供完整的TypeScript类型定义，确保类型安全
-  - 支持资产、股票、基金的完整数据模型
+  - 支持资产、股票、基金、沙盒场景的完整数据模型
 
 **章节来源**
 - [assetService.ts:1-165](file://src/services/asset/assetService.ts#L1-L165)
 - [stockService.ts:1-482](file://src/services/asset/stockService.ts#L1-L482)
 - [fundService.ts:1-508](file://src/services/asset/fundService.ts#L1-L508)
+- [sandboxService.ts:1-730](file://src/services/sandbox/sandboxService.ts#L1-L730)
 - [asset.ts:1-31](file://src/types/asset/asset.ts#L1-L31)
 - [stock.ts:1-95](file://src/types/asset/stock.ts#L1-L95)
 - [fund.ts:1-105](file://src/types/asset/fund.ts#L1-L105)
 
 ## 依赖分析
 - 运行时依赖
-  - Vue 3、Element Plus、Pinia、date-fns、lunar-javascript 等
+  - Vue 3、Element Plus、Pinia、date-fns、lunar-javascript、echarts 等
 - 构建与开发
   - Vite、TypeScript、Sass 等
 - 平台集成
@@ -895,6 +1207,13 @@ ChooseType --> NavigateAdd["导航到新增页面"]
 - **FloatingActionMenu组件依赖**
   - 无外部依赖，仅使用内置样式与Element Plus图标
   - 统一的图标系统，支持多种操作类型的图标
+- **FloatingSwitchButton组件依赖**
+  - Element Plus图标库，使用Switch图标
+  - Material Design风格的绿色主题设计
+- **沙盒组件依赖**
+  - ECharts图表库，用于趋势图展示
+  - Element Plus表单组件，用于参数配置
+  - 统一的Material Design风格设计
 - StatOverview 组件依赖
   - 无外部依赖，仅使用内置样式与图片资源
 
@@ -904,12 +1223,16 @@ VUE["Vue 3"] --> EP["Element Plus"]
 VUE --> PINIA["Pinia"]
 VUE --> DATEFNS["date-fns"]
 VUE --> LUNAR["lunar-javascript"]
+VUE --> ECHARTS["echarts"]
 VITE["Vite"] --> TS["TypeScript"]
 SASS["Sass"] --> VITE
 CAP["Capacitor"] --> KEYBOARD["@capacitor/keyboard"]
 SERVICE["服务层"] --> DB["数据库适配器"]
 SERVICE --> TYPES["TypeScript类型定义"]
 FAM["FloatingActionMenu组件"] --> ICONS["@element-plus/icons-vue"]
+FSB["FloatingSwitchButton组件"] --> SWITCH["Switch图标"]
+SANDBOX["沙盒组件"] --> ECHARTS
+SANDBOX --> FORM["表单组件"]
 STATOVERVIEW["StatOverview组件"] --> IMG["内置图片资源"]
 ```
 
@@ -918,6 +1241,9 @@ STATOVERVIEW["StatOverview组件"] --> IMG["内置图片资源"]
 - [vite.config.ts:1-11](file://vite.config.ts#L1-L11)
 - [tsconfig.json:1-25](file://tsconfig.json#L1-L25)
 - [FloatingActionMenu.vue:35](file://src/components/common/FloatingActionMenu.vue#L35)
+- [FloatingSwitchButton.vue:9](file://src/components/common/FloatingSwitchButton.vue#L9)
+- [SandboxResultDetail.vue:101](file://src/components/mobile/sandbox/SandboxResultDetail.vue#L101)
+- [SandboxSimulationPage.vue:68](file://src/components/mobile/sandbox/SandboxSimulationPage.vue#L68)
 - [StatOverview.vue:27](file://src/components/common/StatOverview.vue#L27)
 
 **章节来源**
@@ -934,6 +1260,14 @@ STATOVERVIEW["StatOverview组件"] --> IMG["内置图片资源"]
 - 浮动菜单
   - 展开动画与阴影会带来一定开销，按钮数量较多时建议合并相似操作或延迟渲染
   - **FloatingActionMenu组件已集成到多个页面，需要注意组件实例的复用与销毁**
+- **FloatingSwitchButton组件**
+  - Material Design风格设计，渲染开销较小
+  - 固定定位，避免频繁重排
+  - 状态切换通过事件触发，性能影响可忽略
+- **沙盒组件体系**
+  - ECharts图表渲染可能带来性能开销，建议在组件卸载时释放图表实例
+  - 异步数据加载采用防抖处理，避免频繁请求
+  - 图表数据序列化存储，减少重复计算
 - StatOverview 组件
   - 卡片式布局，渲染开销较小
   - 响应式样式使用媒体查询，性能影响可忽略
@@ -946,6 +1280,7 @@ STATOVERVIEW["StatOverview组件"] --> IMG["内置图片资源"]
   - 使用Promise.all并行加载多个数据源
   - 实现数据缓存机制，减少重复请求
   - 优化数据库查询，使用索引和适当的查询条件
+  - **沙盒计算采用事务处理，确保数据一致性**
 
 ## 故障排查指南
 - 事件未生效
@@ -960,12 +1295,23 @@ STATOVERVIEW["StatOverview组件"] --> IMG["内置图片资源"]
   - 检查 scoped 样式与 :deep 选择器使用
   - 确认 Element Plus 图标与主题样式加载顺序
   - 检查 StatOverview 组件的渐变覆盖层样式
+  - **检查FloatingSwitchButton组件的Material Design样式**
+  - **检查沙盒组件的ECharts图表渲染**
   - **检查交易记录头部间距样式是否正确应用**
   - **确认标签页样式简化后的兼容性**
 - **FloatingActionMenu操作无效**
   - 确认按钮数组格式正确，包含text、icon、action属性
   - 检查action回调函数是否正确绑定
   - 确认图标组件正确导入
+- **FloatingSwitchButton状态不更新**
+  - 确认update:active事件正确绑定
+  - 检查active属性的双向绑定
+  - 确认文本内容根据状态正确更新
+- **沙盒组件功能异常**
+  - 确认场景定义正确加载
+  - 检查参数表单的动态生成
+  - 确认计算结果的数据库存储
+  - 验证图表数据的正确渲染
 - 资产详情加载失败
   - 检查服务层调用是否正确
   - 确认资产ID参数传递
@@ -987,36 +1333,48 @@ STATOVERVIEW["StatOverview组件"] --> IMG["内置图片资源"]
   - 检查动态标签选择逻辑是否正确
   - 确认标签页样式简化后的显示效果
   - 验证标签切换功能的兼容性
+- **沙盒历史记录删除失败**
+  - 确认软删除SQL语句执行
+  - 检查数据库事务处理
+  - 验证历史记录重新加载
+- **沙盒结果图表不显示**
+  - 确认ECharts实例正确初始化
+  - 检查图表数据格式
+  - 验证图表容器尺寸
+  - 确认图表选项配置正确
 
 **章节来源**
 - [Calendar.vue:88-94](file://src/components/common/Calendar.vue#L88-L94)
 - [Calendar.vue:262-264](file://src/components/common/Calendar.vue#L262-L264)
 - [SideMenu.vue:80-83](file://src/components/common/SideMenu.vue#L80-L83)
 - [FloatingActionMenu.vue:45-50](file://src/components/common/FloatingActionMenu.vue#L45-L50)
+- [FloatingSwitchButton.vue:19-25](file://src/components/common/FloatingSwitchButton.vue#L19-L25)
 - [StatOverview.vue:29-35](file://src/components/common/StatOverview.vue#L29-L35)
 - [AssetDetailPage.vue:189-225](file://src/components/mobile/asset/AssetDetailPage.vue#L189-L225)
 - [StockDetailPage.vue:300-349](file://src/components/mobile/asset/StockDetailPage.vue#L300-L349)
 - [FundDetailPage.vue:327-375](file://src/components/mobile/asset/FundDetailPage.vue#L327-L375)
 - [LiabilityDetailPage.vue:228](file://src/components/mobile/liability/LiabilityDetailPage.vue#L228)
+- [SandboxHistory.vue:75-82](file://src/components/mobile/sandbox/SandboxHistory.vue#L75-L82)
+- [SandboxResultDetail.vue:204-226](file://src/components/mobile/sandbox/SandboxResultDetail.vue#L204-L226)
 
 ## 结论
 本UI组件体系以通用布局组件为核心，结合页面模板与交互组件，形成可复用、可扩展的移动端财务应用界面框架。通过事件与属性的清晰边界、响应式与主题适配策略，以及合理的性能与可维护性设计，能够支撑多样化的业务页面需求。
 
-**更新** 本次现代化升级显著提升了资产相关页面的功能完整性与用户体验，新增的 StatOverview 组件提供了一致的统计展示界面，已在资产、负债、支出和收入管理模块中集成使用。该组件具有卡片式界面、渐变覆盖层、响应式设计和自定义颜色方案等特点，显著提升了用户界面的一致性和美观度。**特别重要的是，FloatingActionMenu浮动操作菜单组件已被集成到所有主要业务页面中，作为统一的操作入口体验，包括资产管理和负债管理页面、账户管理页面、收支页面以及各类详情页面。这一集成大幅提升了用户操作效率，减少了页面间的操作差异，提供了更加一致和便捷的用户体验。**
+**更新** 本次现代化升级显著提升了资产相关页面的功能完整性与用户体验，新增的FloatingSwitchButton浮动切换按钮组件提供Material Design风格的绿色圆形设计，支持历史推演与推演情景之间的快速切换。金融沙盒组件体系得到全面重构，包括FinancialSandbox沙盒首页、SandboxHistory历史记录、SandboxResultDetail结果详情、SandboxSimulationPage仿真页面四个核心组件，形成了完整的沙盒推演功能闭环。所有组件均采用统一的Material Design风格设计，显著提升了用户界面的一致性和专业性。
 
-**样式优化成果**
-- 资产详情页面收益记录头部间距调整，提升了视觉层次感和阅读体验
-- 股票和基金详情页面交易记录头部间距优化，改善了卡片布局的视觉平衡
-- 负债详情页面标签页样式简化，增强了界面简洁性和用户友好性
-- 动态标签选择逻辑改进，提升了标签切换的流畅性和响应速度
+**新增组件成果**
+- **FloatingSwitchButton浮动切换按钮组件**：提供Material Design风格的绿色圆形按钮设计，支持激活/非激活状态切换，统一沙盒功能的视觉语言
+- **金融沙盒组件体系重构**：包括沙盒首页、历史记录、结果详情、仿真页面四个核心组件，形成完整的推演流程闭环
+- **Material Design风格统一**：所有沙盒相关组件采用统一的Material Design设计语言，提升视觉一致性
+- **ECharts图表集成**：沙盒结果详情页面集成图表展示，提供直观的数据可视化
 
-**浮动操作菜单集成成果**
-- **所有主要业务页面均已集成FloatingActionMenu组件**
-- **资产详情页面、股票详情页面、基金详情页面、负债详情页面、账户详情页面、账户管理页面、负债管理页面、支出页面、收入页面均集成了统一的操作入口**
-- **提供统一的操作体验，减少页面间的操作差异**
-- **提升用户操作效率，简化用户的学习成本**
+**组件集成成果**
+- **FloatingActionMenu组件**：已集成到所有主要业务页面，提供统一的操作入口体验
+- **FloatingSwitchButton组件**：集成到沙盒功能中，支持历史推演与推演情景的快速切换
+- **沙盒组件体系**：四个核心组件协同工作，提供完整的推演功能体验
+- **样式优化**：资产详情页面、股票/基金详情页面、负债详情页面的样式优化成果显著
 
-建议在实际使用中遵循事件冒泡规范、合理拆分组件职责，并根据业务场景扩展组件能力。对于新增的StatOverview组件，建议重点关注数据格式标准化与颜色主题的一致性，确保在不同业务模块中提供统一的视觉体验。**对于FloatingActionMenu组件，建议统一按钮图标风格和操作逻辑，确保所有页面的操作入口保持一致的用户体验。**
+建议在实际使用中遵循事件冒泡规范、合理拆分组件职责，并根据业务场景扩展组件能力。对于新增的FloatingSwitchButton组件，建议重点关注Material Design风格的统一性和状态切换的用户体验。对于重构的沙盒组件体系，建议重点关注组件间的通信机制和数据流转的顺畅性，确保提供优质的用户体验。
 
 ## 附录
 
@@ -1042,9 +1400,26 @@ STATOVERVIEW["StatOverview组件"] --> IMG["内置图片资源"]
   - 事件：click(date)
 - FloatingActionMenu
   - 属性：buttons（数组，包含 text、icon、action）
+- FloatingSwitchButton
+  - 属性：active（布尔值）、activeText（字符串）、inactiveText（字符串）
+  - 事件：update:active
 - StatOverview
   - 属性：background、main、details
   - 事件：无
+  - 插槽：无
+- FinancialSandbox
+  - 事件：navigate
+  - 插槽：无
+- SandboxHistory
+  - 事件：navigate
+  - 插槽：无
+- SandboxResultDetail
+  - 属性：historyId（必需）
+  - 事件：navigate
+  - 插槽：无
+- SandboxSimulationPage
+  - 属性：sceneType（必需）
+  - 事件：navigate
   - 插槽：无
 - AssetDetailPage
   - 属性：assetId（必需）
@@ -1099,7 +1474,12 @@ STATOVERVIEW["StatOverview组件"] --> IMG["内置图片资源"]
 - [SideMenu.vue:53-60](file://src/components/common/SideMenu.vue#L53-L60)
 - [Calendar.vue:74-78](file://src/components/common/Calendar.vue#L74-L78)
 - [FloatingActionMenu.vue:45-50](file://src/components/common/FloatingActionMenu.vue#L45-L50)
+- [FloatingSwitchButton.vue:12-16](file://src/components/common/FloatingSwitchButton.vue#L12-L16)
 - [StatOverview.vue:29-35](file://src/components/common/StatOverview.vue#L29-L35)
+- [FinancialSandbox.vue:40](file://src/components/mobile/sandbox/FinancialSandbox.vue#L40)
+- [SandboxHistory.vue:44](file://src/components/mobile/sandbox/SandboxHistory.vue#L44)
+- [SandboxResultDetail.vue:106](file://src/components/mobile/sandbox/SandboxResultDetail.vue#L106)
+- [SandboxSimulationPage.vue:71-72](file://src/components/mobile/sandbox/SandboxSimulationPage.vue#L71-L72)
 - [AssetDetailPage.vue:95-100](file://src/components/mobile/asset/AssetDetailPage.vue#L95-L100)
 - [AssetManagement.vue:99](file://src/components/mobile/asset/AssetManagement.vue#L99)
 - [LiabilityManagement.vue:58](file://src/components/mobile/liability/LiabilityManagement.vue#L58)
@@ -1118,14 +1498,19 @@ STATOVERVIEW["StatOverview组件"] --> IMG["内置图片资源"]
   - 组件广泛使用统一主色，可通过CSS变量或覆盖类名进行主题定制
   - 资产卡片支持自定义颜色主题
   - StatOverview 组件支持自定义颜色方案，支持白色主题
-  - **FloatingActionMenu组件使用统一的蓝色主题，确保视觉一致性**
+  - **FloatingSwitchButton组件采用Material Design绿色主题 #67c23a**
+  - **沙盒组件采用统一的Material Design风格设计**
+  - **FloatingActionMenu组件使用Element Plus蓝色主题 #409eff**
 - 响应式
   - 多处媒体查询适配小屏设备，建议在新增样式时同步考虑断点
   - 资产管理页面支持网格布局的响应式调整
   - StatOverview 组件支持多种屏幕尺寸的自适应
+  - **FloatingSwitchButton组件固定定位，适配各种屏幕尺寸**
+  - **沙盒组件采用flex布局，支持响应式调整**
   - **FloatingActionMenu组件位置固定，适配各种屏幕尺寸**
 - Element Plus
   - 图标与组件样式由 Element Plus 提供，建议统一引入其样式文件
+  - **FloatingSwitchButton组件使用Element Plus Switch图标**
   - **FloatingActionMenu组件使用Element Plus图标库，确保图标一致性**
 - 资产详情页面
   - 支持深色主题适配
@@ -1145,11 +1530,17 @@ STATOVERVIEW["StatOverview组件"] --> IMG["内置图片资源"]
   - 悬停动画效果，提升交互体验
   - 提示标签系统，增强可访问性
   - 固定定位，适配各种屏幕尺寸
+- **沙盒组件样式优化**
+  - 统一的Material Design风格，提升专业性
+  - 场景卡片圆角设计，增强现代感
+  - 图表容器适配，确保数据可视化效果
+  - 固定切换按钮位置，提升可用性
 
 **章节来源**
 - [AppHeader.vue:50-135](file://src/components/common/AppHeader.vue#L50-L135)
 - [AppFooter.vue:34-98](file://src/components/common/AppFooter.vue#L34-L98)
 - [FloatingActionMenu.vue:61-151](file://src/components/common/FloatingActionMenu.vue#L61-L151)
+- [FloatingSwitchButton.vue:30-58](file://src/components/common/FloatingSwitchButton.vue#L30-L58)
 - [AssetCard.vue:68-180](file://src/components/mobile/asset/AssetCard.vue#L68-L180)
 - [AssetDetailPage.vue:232-546](file://src/components/mobile/asset/AssetDetailPage.vue#L232-L546)
 - [AssetManagement.vue:283-414](file://src/components/mobile/asset/AssetManagement.vue#L283-L414)
@@ -1157,52 +1548,70 @@ STATOVERVIEW["StatOverview组件"] --> IMG["内置图片资源"]
 - [StockDetailPage.vue:458-553](file://src/components/mobile/asset/StockDetailPage.vue#L458-L553)
 - [FundDetailPage.vue:697-786](file://src/components/mobile/asset/FundDetailPage.vue#L697-L786)
 - [LiabilityDetailPage.vue:501-607](file://src/components/mobile/liability/LiabilityDetailPage.vue#L501-L607)
+- [FinancialSandbox.vue:69-156](file://src/components/mobile/sandbox/FinancialSandbox.vue#L69-L156)
+- [SandboxHistory.vue:85-179](file://src/components/mobile/sandbox/SandboxHistory.vue#L85-L179)
+- [SandboxResultDetail.vue:229-334](file://src/components/mobile/sandbox/SandboxResultDetail.vue#L229-L334)
+- [SandboxSimulationPage.vue:115-154](file://src/components/mobile/sandbox/SandboxSimulationPage.vue#L115-L154)
 - [main.ts:3-5](file://src/main.ts#L3-L5)
 
 ### 最佳实践与扩展建议
 - 事件命名与参数
   - 保持事件名一致性，如 navigate/key、dateChange/year-month
   - 资产详情页面使用 navigate 事件进行页面跳转
+  - **沙盒组件使用统一的navigate事件进行页面导航**
+  - **FloatingSwitchButton使用update:active事件进行状态通信**
 - 组件职责
   - 通用组件只负责UI与交互，业务逻辑下沉到页面或store
   - 服务层负责数据处理与业务逻辑，页面组件负责展示
   - StatOverview 组件专门负责统计展示，不包含业务逻辑
-  - **FloatingActionMenu组件专门负责操作入口，不包含业务逻辑**
+  - **FloatingSwitchButton组件专门负责状态切换，不包含业务逻辑**
+  - **沙盒组件体系采用分层设计，职责明确**
 - 动态组件
   - 使用 computed 维护组件映射，避免在模板中直接分支过多
   - 资产详情页面使用 props 接收参数，支持灵活的数据传递
+  - **沙盒组件通过sceneType参数动态加载场景定义**
 - 性能
   - 避免在渲染周期内做重计算；及时清理定时器与监听器
   - 资产详情页面使用懒加载优化大数据量展示
   - 服务层使用并行加载提升数据获取效率
   - StatOverview 组件使用轻量级渲染，适合频繁更新
-  - **FloatingActionMenu组件实例较少，性能影响可忽略**
+  - **FloatingSwitchButton组件渲染开销极小，性能影响可忽略**
+  - **沙盒组件采用ECharts图表，注意内存释放**
   - **样式优化减少了不必要的计算，提升了整体性能**
 - 可访问性
   - 为图标与按钮提供语义化文本与键盘可达性
   - 资产卡片支持点击事件，提供明确的视觉反馈
   - StatOverview 组件提供清晰的统计信息层次结构
+  - **FloatingSwitchButton组件提供悬停提示，提升可访问性**
+  - **沙盒组件提供完整的键盘导航支持**
   - **FloatingActionMenu组件提供悬停提示，提升可访问性**
 - 类型安全
   - 使用 TypeScript 类型定义确保数据结构正确性
   - 服务层返回值使用明确的类型注解
   - StatOverview 组件使用严格的 props 类型定义
+  - **FloatingSwitchButton组件使用Boolean类型定义active属性**
+  - **沙盒组件使用SceneDef和SandboxHistory等接口定义数据结构**
   - **FloatingActionMenu组件使用ActionButton接口定义按钮结构**
 - 错误处理
   - 实现完善的错误处理机制，提供友好的用户反馈
   - 资产详情页面支持模拟数据回退，确保页面稳定性
   - StatOverview 组件支持空数据状态的优雅降级
+  - **FloatingSwitchButton组件支持状态异常的默认处理**
+  - **沙盒组件支持计算异常的错误提示**
   - **FloatingActionMenu组件支持按钮失效状态，提升用户体验**
 - 扩展建议
   - StatOverview 组件可扩展为支持更多统计维度
   - 支持动画过渡效果，提升用户体验
   - 可添加统计图表集成，提供更直观的数据展示
   - 支持主题切换，适配深色模式
-  - **FloatingActionMenu组件可扩展为支持更多操作类型，如分享、导出等**
+  - **FloatingSwitchButton组件可扩展为支持更多状态类型**
+  - **沙盒组件可扩展为支持更多推演场景**
   - 统一操作按钮的图标风格和交互效果
   - **交易记录样式可进一步优化，提升视觉一致性**
   - **标签页样式可继续简化，提升界面简洁性**
   - **浮动操作菜单可增加动画效果，提升用户体验**
+  - **沙盒组件可增加更多图表类型，丰富数据可视化**
+  - **FloatingSwitchButton组件可增加更多交互效果**
 
 **章节来源**
 - [App.vue:65-89](file://src/App.vue#L65-L89)
@@ -1211,5 +1620,10 @@ STATOVERVIEW["StatOverview组件"] --> IMG["内置图片资源"]
 - [AssetManagement.vue:189-231](file://src/components/mobile/asset/AssetManagement.vue#L189-L231)
 - [statOverview.vue:29-35](file://src/components/common/StatOverview.vue#L29-L35)
 - [FloatingActionMenu.vue:38-50](file://src/components/common/FloatingActionMenu.vue#L38-L50)
+- [FloatingSwitchButton.vue:12-16](file://src/components/common/FloatingSwitchButton.vue#L12-L16)
+- [SandboxHistory.vue:56-65](file://src/components/mobile/sandbox/SandboxHistory.vue#L56-L65)
+- [SandboxResultDetail.vue:177-190](file://src/components/mobile/sandbox/SandboxResultDetail.vue#L177-L190)
+- [SandboxSimulationPage.vue:86-94](file://src/components/mobile/sandbox/SandboxSimulationPage.vue#L86-L94)
 - [stockService.ts:154-244](file://src/services/asset/stockService.ts#L154-L244)
 - [fundService.ts:169-264](file://src/services/asset/fundService.ts#L169-L264)
+- [sandboxService.ts:280-704](file://src/services/sandbox/sandboxService.ts#L280-L704)

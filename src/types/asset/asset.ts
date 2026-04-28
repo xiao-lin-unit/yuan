@@ -18,7 +18,7 @@ export interface Asset {
   calculation_type?: '无' | '按金额计算' | '按年收益率计算'
   income_amount: number
   annual_yield_rate: number
-  ended: number
+  status: string
   created_at?: dayjs.Dayjs | string
   updated_at?: dayjs.Dayjs | string
 }

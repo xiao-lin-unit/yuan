@@ -164,7 +164,7 @@ const toggleAssetsView = () => {
 // 计算属性：根据ended状态和搜索关键词过滤资产
 const filteredGeneralAssets = computed(() => {
   let list = generalAssets.value.filter(asset => {
-    const isEnded = asset.ended === 1;
+    const isEnded = asset.status === '结束';
     return showEndedAssets.value ? isEnded : !isEnded;
   });
   if (searchKeyword.value.trim()) {

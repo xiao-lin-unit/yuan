@@ -182,7 +182,7 @@ export async function softDeleteSandboxHistory(id: number): Promise<void> {
 // 读取用户真实财务数据
 async function loadUserFinancialData() {
   const accounts = await db.query(`SELECT * FROM accounts WHERE status = '启用'`)
-  const assets = await db.query(`SELECT * FROM assets WHERE ended = 0`)
+  const assets = await db.query(`SELECT * FROM assets WHERE status != '结束'`)
   const stocks = await db.query(`SELECT * FROM stocks WHERE ended = 0`)
   const funds = await db.query(`SELECT * FROM funds WHERE ended = 0`)
   const liabilities = await db.query(`SELECT * FROM liabilities WHERE status = '未结清'`)
@@ -228,8 +228,9 @@ async function loadUserFinancialData() {
 
   const monthlyCashFlow = monthlyIncome - monthlyExpense - monthlyRepayment
 
-  // 被动收入（资产收益）
+  // 被动收入（资产收益），排除暂停状态的资产
   const passiveIncome = assets.reduce((s: number, a: any) => {
+    if (a.status === '暂停') return s
     if (a.income_amount) return s + a.income_amount
     if (a.annual_yield_rate && a.amount) return s + a.amount * (a.annual_yield_rate / 100) / 12
     return s
@@ -241,7 +242,7 @@ async function loadUserFinancialData() {
   return {
     totalAssets, totalLiabilities, netWorth, liquidBalance,
     monthlyIncome, monthlyExpense, monthlyRepayment, monthlyCashFlow,
-    passiveIncome, debtIncomeRatio, stockValue, fundValue, liabilities
+    passiveIncome, debtIncomeRatio, stockValue, fundValue, liabilities, assets
   }
 }
 
@@ -306,7 +307,14 @@ export async function computeSandbox(sceneType: number, params: any): Promise<{ 
       const retainPassive = params.retain_passive_income !== false
       const suspendExpense = params.suspend_expense === true
       const monthlySpend = suspendExpense ? data.monthlyExpense * 0.7 + data.monthlyRepayment : data.monthlyExpense + data.monthlyRepayment
-      const monthlyIn = retainPassive ? data.passiveIncome : 0
+      // 失业情景下不计算社保和公积金类型的资产收益
+      const monthlyIn = retainPassive ? data.assets.reduce((s: number, a: any) => {
+        if (a.status === '暂停') return s
+        if (a.type === '社保' || a.type === '公积金') return s
+        if (a.income_amount) return s + a.income_amount
+        if (a.annual_yield_rate && a.amount) return s + a.amount * (a.annual_yield_rate / 100) / 12
+        return s
+      }, 0) : 0
       const monthlyGap = monthlyIn - monthlySpend
       survivalMonths = monthlyGap >= 0 ? 999 : Math.floor(data.liquidBalance / Math.abs(monthlyGap))
       if (survivalMonths > 120) survivalMonths = 120
