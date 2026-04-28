@@ -23,6 +23,9 @@ import FinancialDashboard from './components/mobile/dashboard/FinancialDashboard
 import FinancialGoal from './components/mobile/goal/FinancialGoal.vue'
 import FinancialSandbox from './components/mobile/sandbox/FinancialSandbox.vue'
 import FinancialKnowledge from './components/mobile/knowledge/FinancialKnowledge.vue'
+import SandboxSimulationPage from './components/mobile/sandbox/SandboxSimulationPage.vue'
+import SandboxHistory from './components/mobile/sandbox/SandboxHistory.vue'
+import SandboxResultDetail from './components/mobile/sandbox/SandboxResultDetail.vue'
 import MoreFeatures from './components/mobile/more/MoreFeatures.vue'
 import ExpensePage from './components/mobile/expense/ExpensePage.vue'
 import AddAccountPage from './components/mobile/account/AddAccountPage.vue'
@@ -80,6 +83,9 @@ const componentMap: Record<string, any> = {
       dashboard: FinancialDashboard,
       goal: FinancialGoal,
       sandbox: FinancialSandbox,
+      sandboxSimulation: SandboxSimulationPage,
+      sandboxHistory: SandboxHistory,
+      sandboxResultDetail: SandboxResultDetail,
       knowledge: FinancialKnowledge,
       more: MoreFeatures, // 映射到更多功能组件
       databaseViewer: DatabaseViewer // 数据库查看页面
@@ -108,40 +114,40 @@ const appCurrentComponent = (key: string) => {
   return componentMap[key] || ExpensePage;
 }
 
-const appComponentProps = ({key, params}) => {
+const appComponentProps = ({key, params}: {key: string, params: any}) => {
   const props: Record<string, any> = {};
-  
+
   // 为支出相关组件传递年月参数
   if (key === 'expense' || key === 'expenseStats') {
     props.year = params.year;
     props.month = params.month;
   }
-  
+
   // 为基金详情页面传递fundId参数
   if (key === 'fundDetail' && params.fundId) {
     props.fundId = params.fundId;
   }
-  
+
   // 为基金二次买入页面传递fundId参数
   if (key === 'buyFund' && params.fundId) {
     props.fundId = params.fundId;
   }
-  
+
   // 为基金卖出页面传递fundId参数
   if (key === 'sellFund' && params.fundId) {
     props.fundId = params.fundId;
   }
-  
+
   // 为股票详情页面传递stockId参数
   if (key === 'stockDetail' && params.stockId) {
     props.stockId = params.stockId;
   }
-  
+
   // 为股票买入页面传递stockId参数
   if (key && params.stockId) {
     props.stockId = params.stockId;
   }
-  
+
   // 为股票卖出页面传递stockId参数
   if (key && params.stockId) {
     props.stockId = params.stockId;
@@ -161,7 +167,17 @@ const appComponentProps = ({key, params}) => {
   if (key && params.accountId) {
     props.accountId = params.accountId;
   }
-  
+
+  // 为沙盘推演页面传递sceneType参数
+  if (key === 'sandboxSimulation' && params.sceneType) {
+    props.sceneType = params.sceneType;
+  }
+
+  // 为沙盘结果详情页面传递historyId参数
+  if (key === 'sandboxResultDetail' && params.historyId) {
+    props.historyId = params.historyId;
+  }
+
   return props;
 };
 

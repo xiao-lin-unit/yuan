@@ -423,7 +423,7 @@ class DatabaseManager {
       {
         sql: `
           CREATE TABLE IF NOT EXISTS accounts (
-            id TEXT PRIMARY KEY,
+            id VARCHAR(64) PRIMARY KEY,
             name TEXT NOT NULL UNIQUE,
             type TEXT NOT NULL,
             balance REAL DEFAULT 0,
@@ -438,11 +438,11 @@ class DatabaseManager {
           )
         `
       },
-      // 创建流水表
+      // 创建流水表（仅记录账户支出和收入）
       {
         sql: `
           CREATE TABLE IF NOT EXISTS transactions (
-            id TEXT PRIMARY KEY,
+            id VARCHAR(64) PRIMARY KEY,
             type TEXT NOT NULL,
             sub_type TEXT,
             amount REAL NOT NULL,
@@ -456,11 +456,11 @@ class DatabaseManager {
           )
         `
       },
-      // 创建账户交易流水表（记录账户余额变动）
+      // 创建账户交易流水表（记录账户余额变动，包括转账和现金操作）
       {
         sql: `
           CREATE TABLE IF NOT EXISTS account_transactions (
-            id TEXT PRIMARY KEY,
+            id VARCHAR(64) PRIMARY KEY,
             account_id TEXT NOT NULL,
             type TEXT NOT NULL,
             amount REAL NOT NULL,
@@ -476,7 +476,7 @@ class DatabaseManager {
       {
         sql: `
           CREATE TABLE IF NOT EXISTS assets (
-            id TEXT PRIMARY KEY,
+            id VARCHAR(64) PRIMARY KEY,
             type TEXT NOT NULL,
             name TEXT NOT NULL,
             amount REAL DEFAULT 0,
@@ -499,7 +499,7 @@ class DatabaseManager {
       {
         sql: `
           CREATE TABLE IF NOT EXISTS stocks (
-            id TEXT PRIMARY KEY,
+            id VARCHAR(64) PRIMARY KEY,
             name TEXT NOT NULL,
             code TEXT,
             quantity INTEGER DEFAULT 0,
@@ -519,7 +519,7 @@ class DatabaseManager {
       {
         sql: `
           CREATE TABLE IF NOT EXISTS stock_holdings (
-            id TEXT PRIMARY KEY,
+            id VARCHAR(64) PRIMARY KEY,
             stock_id TEXT NOT NULL,
             price REAL NOT NULL,
             quantity INTEGER NOT NULL,
@@ -538,7 +538,7 @@ class DatabaseManager {
       {
         sql: `
           CREATE TABLE IF NOT EXISTS stock_transactions (
-            id TEXT PRIMARY KEY,
+            id VARCHAR(64) PRIMARY KEY,
             stock_id TEXT NOT NULL,
             price REAL NOT NULL,
             quantity INTEGER NOT NULL,
@@ -557,7 +557,7 @@ class DatabaseManager {
       {
         sql: `
           CREATE TABLE IF NOT EXISTS funds (
-            id TEXT PRIMARY KEY,
+            id VARCHAR(64) PRIMARY KEY,
             name TEXT NOT NULL,
             code TEXT,
             shares REAL DEFAULT 0,
@@ -580,7 +580,7 @@ class DatabaseManager {
       {
         sql: `
           CREATE TABLE IF NOT EXISTS fund_holdings (
-            id TEXT PRIMARY KEY,
+            id VARCHAR(64) PRIMARY KEY,
             fund_id TEXT NOT NULL,
             nav REAL NOT NULL,
             shares REAL NOT NULL,
@@ -601,7 +601,7 @@ class DatabaseManager {
       {
         sql: `
           CREATE TABLE IF NOT EXISTS fund_transactions (
-            id TEXT PRIMARY KEY,
+            id VARCHAR(64) PRIMARY KEY,
             fund_id TEXT NOT NULL,
             transaction_nav REAL NOT NULL,
             shares REAL NOT NULL,
@@ -620,7 +620,7 @@ class DatabaseManager {
       {
         sql: `
           CREATE TABLE IF NOT EXISTS liabilities (
-            id TEXT PRIMARY KEY,
+            id VARCHAR(64) PRIMARY KEY,
             name TEXT NOT NULL,
             type TEXT NOT NULL,
             principal REAL NOT NULL,
@@ -645,7 +645,7 @@ class DatabaseManager {
       {
         sql: `
           CREATE TABLE IF NOT EXISTS repayments (
-            id TEXT PRIMARY KEY,
+            id VARCHAR(64) PRIMARY KEY,
             liability_id TEXT NOT NULL,
             period_number INTEGER,
             amount REAL NOT NULL,
@@ -663,7 +663,7 @@ class DatabaseManager {
       {
         sql: `
           CREATE TABLE IF NOT EXISTS pending_repayments (
-            id TEXT PRIMARY KEY,
+            id VARCHAR(64) PRIMARY KEY,
             liability_id TEXT NOT NULL,
             period_number INTEGER NOT NULL,
             due_date DATE NOT NULL,
@@ -681,7 +681,7 @@ class DatabaseManager {
       {
         sql: `
           CREATE TABLE IF NOT EXISTS financial_goals (
-            id TEXT PRIMARY KEY,
+            id VARCHAR(64) PRIMARY KEY,
             name TEXT NOT NULL,
             type TEXT NOT NULL,
             target_amount REAL NOT NULL,
@@ -699,7 +699,7 @@ class DatabaseManager {
       {
         sql: `
           CREATE TABLE IF NOT EXISTS financial_health (
-            id TEXT PRIMARY KEY,
+            id VARCHAR(64) PRIMARY KEY,
             liabilities_income_ratio REAL,
             emergency_fund_ratio REAL,
             asset_liability_ratio REAL,
@@ -715,7 +715,7 @@ class DatabaseManager {
       {
         sql: `
           CREATE TABLE IF NOT EXISTS categories (
-            id TEXT PRIMARY KEY,
+            id VARCHAR(64) PRIMARY KEY,
             name TEXT NOT NULL,
             icon TEXT,
             iconText TEXT,
@@ -729,7 +729,7 @@ class DatabaseManager {
       {
         sql: `
           CREATE TABLE IF NOT EXISTS asset_income_records (
-            id TEXT PRIMARY KEY,
+            id VARCHAR(64) PRIMARY KEY,
             asset_id TEXT NOT NULL,
             income_amount REAL NOT NULL,
             record_time TIMESTAMP NOT NULL,
@@ -743,7 +743,7 @@ class DatabaseManager {
       {
         sql: `
           CREATE TABLE IF NOT EXISTS asset_monthly_snapshots (
-            id TEXT PRIMARY KEY,
+            id VARCHAR(64) PRIMARY KEY,
             year INTEGER NOT NULL,
             month INTEGER NOT NULL,
             total_assets REAL DEFAULT 0,
@@ -753,6 +753,49 @@ class DatabaseManager {
             confirmed_profit_funds REAL DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(year, month)
+          )
+        `
+      },
+      // 沙盘推演历史表
+      {
+        sql: `
+          CREATE TABLE IF NOT EXISTS sandbox_history (
+            id VARCHAR(64) PRIMARY KEY NOT NULL,
+            scene_type INTEGER NOT NULL,
+            scene_name VARCHAR(64) NOT NULL,
+            user_title VARCHAR(100),
+            simulate_time VARCHAR(20) NOT NULL,
+            params TEXT NOT NULL,
+            result_desc VARCHAR(255),
+            created_at VARCHAR(20) NOT NULL,
+            is_deleted INTEGER DEFAULT 0 NOT NULL,
+            remark VARCHAR(255)
+          )
+        `
+      },
+      // 沙盘推演结果表
+      {
+        sql: `
+          CREATE TABLE IF NOT EXISTS sandbox_result (
+            id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+            history_id INTEGER NOT NULL,
+            net_assets DECIMAL(16,2),
+            net_assets_change TEXT,
+            cash_flow_monthly DECIMAL(16,2),
+            cash_flow_change TEXT,
+            debt_pressure_level INTEGER,
+            debt_pressure_desc TEXT,
+            survival_months INTEGER,
+            interest_save DECIMAL(16,2),
+            monthly_payment_change DECIMAL(16,2),
+            total_interest_change DECIMAL(16,2),
+            chart_x TEXT NOT NULL,
+            chart_net_assets TEXT NOT NULL,
+            chart_cash_flow TEXT NOT NULL,
+            chart_debt TEXT NOT NULL,
+            conclusion TEXT NOT NULL,
+            created_at VARCHAR(20) NOT NULL,
+            FOREIGN KEY (history_id) REFERENCES sandbox_history(id)
           )
         `
       },
@@ -775,7 +818,10 @@ class DatabaseManager {
       { sql: 'CREATE INDEX IF NOT EXISTS idx_financial_goals_status ON financial_goals(status)' },
       { sql: 'CREATE INDEX IF NOT EXISTS idx_categories_type ON categories(type)' },
       { sql: 'CREATE INDEX IF NOT EXISTS idx_asset_income_records_asset_id ON asset_income_records(asset_id)' },
-      { sql: 'CREATE INDEX IF NOT EXISTS idx_asset_monthly_snapshots_year_month ON asset_monthly_snapshots(year, month)' }
+      { sql: 'CREATE INDEX IF NOT EXISTS idx_asset_monthly_snapshots_year_month ON asset_monthly_snapshots(year, month)' },
+      { sql: 'CREATE INDEX IF NOT EXISTS idx_sandbox_history_scene_type ON sandbox_history(scene_type)' },
+      { sql: 'CREATE INDEX IF NOT EXISTS idx_sandbox_history_is_deleted ON sandbox_history(is_deleted)' },
+      { sql: 'CREATE INDEX IF NOT EXISTS idx_sandbox_result_history_id ON sandbox_result(history_id)' }
     ]
   }
 

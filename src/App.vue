@@ -37,10 +37,13 @@ import AssetManagement from './components/mobile/asset/AssetManagement.vue'
 import LiabilityManagement from './components/mobile/liability/LiabilityManagement.vue'
 import AddLiabilityPage from './components/mobile/liability/AddLiabilityPage.vue'
 import LiabilityDetailPage from './components/mobile/liability/LiabilityDetailPage.vue'
-import FinancialDashboard from './components/mobile/dashboard/FinancialDashboard.vue/index.ts'
-import FinancialGoal from './components/mobile/goal/FinancialGoal.vue/index.ts'
-import FinancialSandbox from './components/mobile/sandbox/FinancialSandbox.vue/index.ts'
-import FinancialKnowledge from './components/mobile/knowledge/FinancialKnowledge.vue/index.ts'
+import FinancialDashboard from './components/mobile/dashboard/FinancialDashboard.vue'
+import FinancialGoal from './components/mobile/goal/FinancialGoal.vue'
+import FinancialSandbox from './components/mobile/sandbox/FinancialSandbox.vue'
+import FinancialKnowledge from './components/mobile/knowledge/FinancialKnowledge.vue'
+import SandboxSimulationPage from './components/mobile/sandbox/SandboxSimulationPage.vue'
+import SandboxHistory from './components/mobile/sandbox/SandboxHistory.vue'
+import SandboxResultDetail from './components/mobile/sandbox/SandboxResultDetail.vue'
 import MoreFeatures from './components/mobile/more/MoreFeatures.vue'
 import ExpensePage from './components/mobile/expense/ExpensePage.vue'
 import IncomePage from './components/mobile/income/IncomePage.vue'
@@ -99,6 +102,9 @@ const navParams = ref<any>({});
       dashboard: FinancialDashboard,
       goal: FinancialGoal,
       sandbox: FinancialSandbox,
+      sandboxSimulation: SandboxSimulationPage,
+      sandboxHistory: SandboxHistory,
+      sandboxResultDetail: SandboxResultDetail,
       knowledge: FinancialKnowledge,
       more: MoreFeatures, // 映射到更多功能组件
       databaseViewer: DatabaseViewer // 数据库查看页面
@@ -170,6 +176,16 @@ const componentProps = computed(() => {
   // 为负债详情页面传递liabilityId参数
   if (activeMenu.value === 'liabilityDetail' && navParams.value.liabilityId) {
     props.liabilityId = navParams.value.liabilityId;
+  }
+
+  // 为沙盘推演页面传递sceneType参数
+  if (activeMenu.value === 'sandboxSimulation' && navParams.value.sceneType) {
+    props.sceneType = navParams.value.sceneType;
+  }
+
+  // 为沙盘结果详情页面传递historyId参数
+  if (activeMenu.value === 'sandboxResultDetail' && navParams.value.historyId) {
+    props.historyId = navParams.value.historyId;
   }
 
   return props;
