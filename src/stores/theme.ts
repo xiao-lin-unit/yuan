@@ -49,7 +49,7 @@ export const themePresets: Record<string, ThemePreset> = {
   },
   orange: {
     name: 'orange',
-    label: '活力橙',
+    label: '浪荡橙',
     primary: '#e6a23c',
     primaryRgb: '230, 162, 60',
   },
