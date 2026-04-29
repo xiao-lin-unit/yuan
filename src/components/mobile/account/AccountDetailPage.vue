@@ -67,7 +67,7 @@
               <div v-for="transaction in incomeTransactions" :key="transaction.id" class="transaction-card">
                 <div class="transaction-header">
                   <div class="transaction-type income">入账</div>
-                  <div class="transaction-date">{{ formatDate(transaction.transaction_time) }}</div>
+                  <div class="transaction-date">{{ formatDate(transaction.transaction_time, 'YYYY/MM/DD HH:mm') }}</div>
                 </div>
                 <div class="transaction-content">
                   <div class="transaction-item">
@@ -98,7 +98,7 @@
               <div v-for="transaction in expenseTransactions" :key="transaction.id" class="transaction-card">
                 <div class="transaction-header">
                   <div class="transaction-type expense">出账</div>
-                  <div class="transaction-date">{{ formatDate(transaction.transaction_time) }}</div>
+                  <div class="transaction-date">{{ formatDate(transaction.transaction_time, 'YYYY/MM/DD HH:mm') }}</div>
                 </div>
                 <div class="transaction-content">
                   <div class="transaction-item">
@@ -132,7 +132,7 @@
               <div v-for="transaction in borrowTransactions" :key="transaction.id" class="transaction-card">
                 <div class="transaction-header">
                   <div class="transaction-type expense">借款</div>
-                  <div class="transaction-date">{{ formatDate(transaction.transaction_time) }}</div>
+                  <div class="transaction-date">{{ formatDate(transaction.transaction_time, 'YYYY/MM/DD HH:mm') }}</div>
                 </div>
                 <div class="transaction-content">
                   <div class="transaction-item">
@@ -163,7 +163,7 @@
               <div v-for="transaction in repayTransactions" :key="transaction.id" class="transaction-card">
                 <div class="transaction-header">
                   <div class="transaction-type income">还款</div>
-                  <div class="transaction-date">{{ formatDate(transaction.transaction_time) }}</div>
+                  <div class="transaction-date">{{ formatDate(transaction.transaction_time, 'YYYY/MM/DD HH:mm') }}</div>
                 </div>
                 <div class="transaction-content">
                   <div class="transaction-item">
@@ -218,7 +218,6 @@
 
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue';
-import dayjs from 'dayjs';
 import { ArrowLeft, CircleClose, Money, Edit } from '@element-plus/icons-vue';
 import { ElMessageBox, ElMessage } from 'element-plus';
 import FloatingActionMenu from '../../../components/common/FloatingActionMenu.vue';
@@ -231,6 +230,7 @@ import {
   updateAccountBalance
 } from '../../../services/account/accountService';
 import type { Account, AccountTransaction } from '../../../types/account/account';
+import { formatDate } from '../../../utils/timezone';
 
 const props = defineProps({
   accountId: {
@@ -291,9 +291,9 @@ const goBack = () => {
 };
 
 // 格式化日期函数
-const formatDate = (dateString: string | dayjs.Dayjs) => {
-  return dayjs(dateString).format('YYYY/MM/DD HH:mm');
-};
+// const formatDate = (dateString: string | dayjs.Dayjs) => {
+//   return getDate(dateString).format('YYYY/MM/DD HH:mm');
+// };
 
 // 加载账户详情数据
 const loadAccountDetail = async () => {

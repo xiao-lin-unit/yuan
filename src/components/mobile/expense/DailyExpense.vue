@@ -24,7 +24,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, defineProps, watch } from 'vue';
-import dayjs from 'dayjs';
+import { getCurrentDate } from '../../../utils/timezone';
 import db from '../../../database';
 import { expenseCategories } from '../../../data/categories';
 
@@ -61,8 +61,8 @@ const loadDailyExpenses = async () => {
     const year = props.year;
     
     // 构建当天的开始和结束时间
-    const startDate = dayjs().year(year).month(month - 1).date(day).startOf('day').toISOString();
-    const endDate = dayjs().year(year).month(month - 1).date(day).endOf('day').toISOString();
+    const startDate = getCurrentDate().year(year).month(month - 1).date(day).startOf('day').toISOString();
+    const endDate = getCurrentDate().year(year).month(month - 1).date(day).endOf('day').toISOString();
     
     // 从流水表中查询当天的账户支出记录
     const transactions = await db.query(

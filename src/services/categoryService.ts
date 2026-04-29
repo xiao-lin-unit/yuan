@@ -1,5 +1,5 @@
-import dayjs from 'dayjs'
 import db from '../database'
+import { getCurrentDate } from '../utils/timezone'
 import { Category, expenseCategories, incomeCategories } from '../data/categories'
 
 /**
@@ -101,7 +101,7 @@ export class CategoryService {
    */
   static async createCategory(category: Omit<Category, 'id'>): Promise<boolean> {
     try {
-      const id = `cat_${dayjs().valueOf()}_${Math.floor(Math.random() * 1000)}`
+      const id = `cat_${getCurrentDate().valueOf()}_${Math.floor(Math.random() * 1000)}`
       await db.run(
         'INSERT INTO categories (id, name, icon, iconText, type) VALUES (?, ?, ?, ?, ?)',
         [id, category.name, category.icon, category.iconText, category.type]

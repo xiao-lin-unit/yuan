@@ -21,6 +21,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import dayjs from 'dayjs';
+import { getCurrentDate, getDate } from '../../../utils/timezone';
 import db from '../../../database';
 
 interface DayData {
@@ -57,7 +58,7 @@ const getBarHeight = (amount: number): string => {
 
 // 获取本周的开始和结束日期
 const getWeekRange = (): { start: dayjs.Dayjs; end: dayjs.Dayjs } => {
-  const now = dayjs();
+  const now = getCurrentDate();
   const dayOfWeek = now.day(); // 0-6，0表示周日
 
   // 计算本周一的日期（如果今天是周日，则上周日为一周的开始）
@@ -92,7 +93,7 @@ const loadWeeklyExpenses = async () => {
     transactions.forEach(transaction => {
       console.log('处理流水记录:', transaction);
       if (transaction.created_at) {
-        const date = dayjs(transaction.created_at);
+        const date = getDate(transaction.created_at);
         const dateStr = date.format('YYYY-MM-DD'); // YYYY-MM-DD格式
         
         if (dailyExpenses.has(dateStr)) {
@@ -126,13 +127,13 @@ const loadWeeklyExpenses = async () => {
     console.error('加载本周支出数据失败:', error);
     // 出错时使用默认数据
     weeklyData.value = [
-      { date: dayjs(), label: '周一', amount: 0 },
-      { date: dayjs(), label: '周二', amount: 0 },
-      { date: dayjs(), label: '周三', amount: 0 },
-      { date: dayjs(), label: '周四', amount: 0 },
-      { date: dayjs(), label: '周五', amount: 0 },
-      { date: dayjs(), label: '周六', amount: 0 },
-      { date: dayjs(), label: '周日', amount: 0 }
+      { date: getCurrentDate(), label: '周一', amount: 0 },
+      { date: getCurrentDate(), label: '周二', amount: 0 },
+      { date: getCurrentDate(), label: '周三', amount: 0 },
+      { date: getCurrentDate(), label: '周四', amount: 0 },
+      { date: getCurrentDate(), label: '周五', amount: 0 },
+      { date: getCurrentDate(), label: '周六', amount: 0 },
+      { date: getCurrentDate(), label: '周日', amount: 0 }
     ];
   }
 };

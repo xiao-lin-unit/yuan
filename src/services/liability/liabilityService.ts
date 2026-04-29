@@ -5,6 +5,7 @@
 
 import dayjs from 'dayjs'
 import db from '../../database/index.js'
+import { getCurrentDate, getDate } from '../../utils/timezone.js'
 import type { Liability, Repayment, PendingRepayment, LiabilityInput, RepaymentInput } from '../../types/liability/liability.js'
 import { createDebitTransaction, createCreditTransaction, getAccountById } from '../../services/account/accountService'
 
@@ -77,13 +78,13 @@ export function generatePendingRepayment(
   }
 
   // Due date: start_date + periodNumber months
-  let dueDate = dayjs(liability.start_date).add(periodNumber, 'month')
+  let dueDate = getDate(liability.start_date).add(periodNumber, 'month')
   if (liability.repayment_day && liability.repayment_day >= 1 && liability.repayment_day <= 31) {
     dueDate = dueDate.date(Math.min(liability.repayment_day, dueDate.daysInMonth()))
   }
 
   return {
-    id: dayjs().valueOf().toString(),
+    id: getCurrentDate().valueOf().toString(),
     liability_id: liability.id,
     period_number: periodNumber,
     due_date: dueDate.format('YYYY-MM-DD'),
@@ -98,7 +99,7 @@ export function generatePendingRepayment(
  * Executes liability insert and first pending repayment generation in a transaction
  */
 export async function addLiability(liabilityData: LiabilityInput): Promise<void> {
-  const id = dayjs().valueOf().toString()
+  const id = getCurrentDate().valueOf().toString()
 
   // Calculate total interest
   const totalInterest = liabilityData.is_interest && liabilityData.period
@@ -333,7 +334,7 @@ export async function makeRepayment(input: RepaymentInput): Promise<void> {
     throw new Error('该负债已结清')
   }
 
-  const repaymentId = dayjs().valueOf().toString()
+  const repaymentId = getCurrentDate().valueOf().toString()
   let principalAmount = 0
   let interestAmount = 0
   let periodNumber: number | null = null
@@ -364,7 +365,7 @@ export async function makeRepayment(input: RepaymentInput): Promise<void> {
 
     statements.push({
       statement: `UPDATE pending_repayments SET status = '已还', paid_date = ? WHERE id = ?`,
-      values: [dayjs().format('YYYY-MM-DD'), pending.id]
+      values: [getCurrentDate().format('YYYY-MM-DD'), pending.id]
     })
     statements.push({statement: `UPDATE liabilities SET remaining_principal = ?, remaining_total_interest = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
       values: [newRemainingPrincipal, newRemainingTotalInterest, newStatus, input.liabilityId]
@@ -403,7 +404,7 @@ export async function makeRepayment(input: RepaymentInput): Promise<void> {
           interestAmount,
           input.type,
           input.remark || '',
-          dayjs().toISOString()
+          getCurrentDate().toISOString()
         ]
     })
 
@@ -472,7 +473,7 @@ export async function makeRepayment(input: RepaymentInput): Promise<void> {
           interestAmount,
           input.type,
           input.remark || '',
-          dayjs().toISOString()
+          getCurrentDate().toISOString()
         ]
     })
   }
@@ -483,7 +484,7 @@ export async function makeRepayment(input: RepaymentInput): Promise<void> {
     throw new Error('关联账户不存在')
   }
 
-  const accountTxId = (dayjs().valueOf() + 1).toString()
+  const accountTxId = (getCurrentDate().valueOf() + 1).toString()
   if (account.type === '信用卡') {
     // 信用卡还款：减少已用额度（入账）
     const creditResult = await createCreditTransaction(

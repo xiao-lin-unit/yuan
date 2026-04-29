@@ -70,7 +70,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, computed, watch } from 'vue'
-import dayjs from 'dayjs'
+import { getCurrentDate } from '../../../utils/timezone'
 import PageTemplate from '../../common/PageTemplate.vue'
 import { liabilityTypes, repaymentMethods } from '../../../utils/dictionaries'
 import { addLiability as addLiabilityService, calculateTotalInterest } from '../../../services/liability/liabilityService'
@@ -86,7 +86,7 @@ const liabilityForm = ref({
   principal: 0,
   is_interest: true,
   interest_rate: 0,
-  start_date: dayjs(),
+  start_date: getCurrentDate(),
   repayment_method: '等额本息',
   repayment_day: 1,
   period: 12,

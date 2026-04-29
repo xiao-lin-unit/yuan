@@ -3,10 +3,11 @@
  * Handles general asset operations
  */
 
-import dayjs from 'dayjs'
 import db from '../../database/index.js'
 import type { Asset, AssetInput } from '../../types/asset/asset.js'
 import { createDebitTransaction } from '../account/accountService.js'
+import { getCurrentDate } from '../../utils/timezone.js'
+
 
 /**
  * Calculate next income date based on period and income date
@@ -14,7 +15,7 @@ import { createDebitTransaction } from '../account/accountService.js'
 function calculateNextIncomeDate(period: string, incomeDate: string): string {
   if (!period) return ''
 
-  const now = dayjs()
+  const now = getCurrentDate()
 
   if (period === '日') {
     // 每日：下一个收益日是明天
@@ -23,7 +24,7 @@ function calculateNextIncomeDate(period: string, incomeDate: string): string {
     // 每年：income_date format is MM-DD, next income date is this year or next year
     if (!incomeDate) return ''
     const [month, day] = incomeDate.split('-')
-    let nextDate = dayjs().year(now.year()).month(parseInt(month) - 1).date(parseInt(day))
+    let nextDate = getCurrentDate().year(now.year()).month(parseInt(month) - 1).date(parseInt(day))
 
     // If this year's income date has passed, next year
     if (nextDate.isBefore(now) || nextDate.isSame(now, 'day')) {
@@ -35,7 +36,7 @@ function calculateNextIncomeDate(period: string, incomeDate: string): string {
     // 每月：income_date format is DD, next income date is this month or next month
     if (!incomeDate) return ''
     const [day] = incomeDate.split('-')
-    let nextDate = dayjs().year(now.year()).month(now.month()).date(parseInt(day))
+    let nextDate = getCurrentDate().year(now.year()).month(now.month()).date(parseInt(day))
 
     // If this month's income date has passed, next month
     if (nextDate.isBefore(now) || nextDate.isSame(now, 'day')) {
@@ -86,7 +87,7 @@ export function calculatePerAssetIncome(asset: Asset): number {
  * Add a new general asset
  */
 export async function addAsset(assetData: AssetInput, deductFromAccount: boolean = true): Promise<void> {
-  const id = dayjs().valueOf().toString()
+  const id = getCurrentDate().valueOf().toString()
 
   // Calculate next income date
   let nextIncomeDate = ''
@@ -272,7 +273,7 @@ export async function recordAssetIncome(
   recordTime: string,
   remark?: string
 ): Promise<void> {
-  const id = dayjs().valueOf().toString()
+  const id = getCurrentDate().valueOf().toString()
   await db.run(
     'INSERT INTO asset_income_records (id, asset_id, income_amount, record_time, remark) VALUES (?, ?, ?, ?, ?)',
     [id, assetId, incomeAmount, recordTime, remark || '']

@@ -7,12 +7,13 @@
  */
 import dayjs from 'dayjs'
 import db from '../../database'
+import { getCurrentDate } from '../../utils/timezone'
 import { registerTask } from '../index'
 
 registerTask('monthlyFinancialSnapshot', async () => {
   await db.connect()
 
-  const now = dayjs()
+  const now = getCurrentDate()  
   const year = now.year()
   const month = now.month() + 1
 

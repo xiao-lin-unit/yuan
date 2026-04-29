@@ -27,7 +27,7 @@
             :class="{
               rest: date.rest,
               active: currentDateObj.dateStr == date.dateStr, 
-              toDay: date.dateStr == dayjs().format('YYYY-MM-DD'),
+              toDay: date.dateStr == getCurrentDate().format('YYYY-MM-DD'),
               'has-amount': amount[date.dateStr]
             }"
             @click="selectDate(date)"
@@ -66,17 +66,17 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, computed, onBeforeUnmount, watch } from 'vue';
-import dayjs from 'dayjs';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addDays } from 'date-fns';
 // https://6tail.cn/calendar/api.html  农历信息
 import { Solar, Lunar, HolidayUtil } from 'lunar-javascript';
 import { Clock } from '@element-plus/icons-vue';
+import { getCurrentDate } from '../../utils/timezone';
 
 const props = defineProps({
   width: { type: String, default: '500px' },
   height: { type: String, default: '600px' },
-  year: { type: Number, default: dayjs().year() },
-  month: { type: Number, default: dayjs().month() + 1 },
+  year: { type: Number, default: getCurrentDate().year() },
+  month: { type: Number, default: getCurrentDate().month() + 1 },
   amount: { type: Object, default: () => ({}) },
   type: { type: String, default: 'expense' },
 });
@@ -99,13 +99,13 @@ onBeforeUnmount(() => {
 const daysOfWeek = ['一', '二', '三', '四', '五', '六', '日'];
 
 // 初始化当前日期
-const currentDate = dayjs();
+const currentDate = getCurrentDate();
 const currentDateObj = ref(makeDate(currentDate.toDate(), true));
 const year = ref(currentDate.year());
 const month = ref(currentDate.month());
 const day = ref(currentDate.date());
 const calendarPage = ref([]);
-const timeShow = ref(dayjs().format('HH:mm:ss'));
+const timeShow = ref(getCurrentDate().format('HH:mm:ss'));
 var daysUntilNextYear = null;
 const formDay = ref({
   year: year.value + '',
@@ -133,11 +133,11 @@ function makeDate(date, isCurrentMonth) {
 // 定义一个函数来计算当前时间距离下一年1月1日的天数
 function daysUntilNextYearJanuaryFirst() {
   // 获取当前日期
-  const now = dayjs();
+  const now = getCurrentDate();
 
   // 计算下一年1月1日的日期
   const nextYear = now.year() + 1;
-  const nextYearJanuaryFirst = dayjs().year(nextYear).month(0).date(1);
+  const nextYearJanuaryFirst = getCurrentDate().year(nextYear).month(0).date(1);
 
   // 计算当前日期和下一年1月1日之间的毫秒差
   const timeDifference = nextYearJanuaryFirst.valueOf() - now.valueOf();
@@ -158,13 +158,13 @@ function fillNongLi(date) {
     date.favorable = nongli.getDayYi()?.join(', ');
     date.adverse = nongli.getDayJi()?.join(', ');
     date.star = xingzuo.getXingZuo();
-    date.desc = '距离 ' + (dayjs().year() + 1) + ' 年元旦 还有' + daysUntilNextYear + '天';
+    date.desc = '距离 ' + (getCurrentDate().year() + 1) + ' 年元旦 还有' + daysUntilNextYear + '天';
     return date;
 }
 function getCalendarDates(year, month) {
   // 获取指定月份的第一天和最后一天
-  const firstDayOfMonth = startOfMonth(dayjs().year(year).month(month).toDate());
-  const lastDayOfMonth = endOfMonth(dayjs().year(year).month(month).toDate());
+  const firstDayOfMonth = startOfMonth(getCurrentDate().year(year).month(month).toDate());
+  const lastDayOfMonth = endOfMonth(getCurrentDate().year(year).month(month).toDate());
 
   // 计算当月的日期数组
   const daysInMonth = eachDayOfInterval({ start: firstDayOfMonth, end: lastDayOfMonth });
@@ -204,7 +204,7 @@ function getCalendarDates(year, month) {
     // 节假日
     let d = HolidayUtil.getHoliday(Number(date.year), Number(date.month), Number(date.day));
     // 今天不做处理
-    if (!(date.dateStr == dayjs().format('YYYY-MM-DD'))) {
+    if (!(date.dateStr == getCurrentDate().format('YYYY-MM-DD'))) {
       // 默认周末 
       date.rest = (index % 7 === 5 || index % 7 === 6);
       if (d && d.getName()) {
@@ -242,13 +242,13 @@ const selectDate = (date) => {
     currentDateObj.value = date;
     emits('click', currentDateObj.value);
   } else {
-    emits('click', makeDate(dayjs().toDate(), true));
+    emits('click', makeDate(getCurrentDate().toDate(), true));
   }
 }
 
 // 恢复当前日期
 const toNowEvent = () => {
-  currentDateObj.value = makeDate(dayjs().toDate(), true);
+  currentDateObj.value = makeDate(getCurrentDate().toDate(), true);
   calendarPage.value = getCalendarDates(year.value, month.value);
   formDay.value.year = year.value + '';
   formDay.value.month = (month.value + 1) + '';
@@ -260,7 +260,7 @@ onMounted(() => {
   // 当组件加载时执行的操作
   toNowEvent();
   // 时间定时器
-  intervalId = setInterval(() => timeShow.value = dayjs().format('HH:mm:ss'), 1000); // 每秒更新时间
+  intervalId = setInterval(() => timeShow.value = getCurrentDate().format('HH:mm:ss'), 1000); // 每秒更新时间
 });
 // 清除定时器
 onUnmounted(() => {

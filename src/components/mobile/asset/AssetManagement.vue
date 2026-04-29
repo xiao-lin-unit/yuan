@@ -98,7 +98,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue';
-import dayjs from 'dayjs';
+import { getCurrentDate } from '../../../utils/timezone';
 import { More, Goods, TrendCharts, DataAnalysis, Switch, Search } from '@element-plus/icons-vue';
 import AssetCard from './AssetCard.vue';
 import StatOverview from '../../../components/common/StatOverview.vue';
@@ -250,7 +250,7 @@ const stockForm = ref({
   price: 0,
   quantity: 0,
   fee: 0,
-  transaction_time: dayjs(),
+  transaction_time: getCurrentDate(),
   type: '买入',
   account_id: ''
 });
@@ -263,7 +263,7 @@ const fundForm = ref({
   shares: 0,
   fee: 0,
   has_lock: false,
-  transaction_time: dayjs(),
+  transaction_time: getCurrentDate(),
   type: '买入',
   account_id: ''
 });
@@ -322,7 +322,7 @@ const loadMockData = () => {
       price: 10,
       quantity: 100,
       fee: 0,
-      transaction_time: dayjs(),
+      transaction_time: getCurrentDate(),
       type: '买入',
       account_id: '1'
     },
@@ -333,7 +333,7 @@ const loadMockData = () => {
       price: 20,
       quantity: 200,
       fee: 0,
-      transaction_time: dayjs(),
+      transaction_time: getCurrentDate(),
       type: '卖出',
       account_id: '1'
     }

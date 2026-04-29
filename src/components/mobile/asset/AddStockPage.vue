@@ -41,7 +41,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import dayjs from 'dayjs'
+import { getCurrentDate } from '../../../utils/timezone'
 import PageTemplate from '../../common/PageTemplate.vue'
 import {
   validateStockCode,
@@ -62,7 +62,7 @@ const stockForm = ref({
   price: 0,
   quantity: 0,
   fee: 0,
-  transaction_time: dayjs(),
+  transaction_time: getCurrentDate(),
   account_id: '',
   deduct_from_account: true
 })

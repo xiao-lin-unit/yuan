@@ -8,7 +8,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
-import dayjs from 'dayjs';
+import { getCurrentDate } from '../../../utils/timezone';
 import db from '../../../database';
 import StatOverview from '../../../components/common/StatOverview.vue';
 import image from '@/assets/img/r1.jpg';
@@ -31,8 +31,8 @@ const balance = computed(() => {
 
 // 获取指定月份的开始和结束日期
 const getMonthRange = (year: number, month: number) => {
-  const start = dayjs().year(year).month(month - 1).startOf('month');
-  const end = dayjs().year(year).month(month - 1).endOf('month');
+  const start = getCurrentDate().year(year).month(month - 1).startOf('month');
+  const end = getCurrentDate().year(year).month(month - 1).endOf('month');
   
   return { start, end };
 };

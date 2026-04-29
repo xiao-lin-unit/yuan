@@ -24,7 +24,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue';
-import dayjs from 'dayjs';
+import { getCurrentDate } from '../../../utils/timezone';
 import db from '../../../database';
 import { incomeCategories } from '../../../data/categories';
 
@@ -61,8 +61,8 @@ const loadDailyIncomes = async () => {
     const year = props.year;
     
     // 构建当天的开始和结束时间
-    const startDate = dayjs().year(year).month(month - 1).date(day).startOf('day').format('YYYY-MM-DDTHH:mm:ss');
-    const endDate = dayjs().year(year).month(month - 1).date(day).endOf('day').format('YYYY-MM-DDTHH:mm:ss');
+    const startDate = getCurrentDate().year(year).month(month - 1).date(day).startOf('day').format('YYYY-MM-DDTHH:mm:ss');
+    const endDate = getCurrentDate().year(year).month(month - 1).date(day).endOf('day').format('YYYY-MM-DDTHH:mm:ss');
     console.log("开始时间", startDate, "结束时间", endDate);
     
     // 从流水表中查询当天的账户收入记录

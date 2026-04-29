@@ -108,6 +108,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onActivated, computed } from 'vue'
 import dayjs from 'dayjs'
+import { getCurrentDate, getDate } from '../../../utils/timezone'
 import { Close } from '@element-plus/icons-vue'
 import PageHeader from '../../common/PageHeader.vue'
 import NumberKeypad from '../../common/NumberKeypad.vue'
@@ -183,8 +184,8 @@ const initDateTime = () => {
 
 // 更新日期时间格式
 const updateDateTime = () => {
-  const date = dayjs(selectedDateTime.value)
-  const now = dayjs(getCurrentISOString())
+  const date = getDate(selectedDateTime.value)
+  const now = getCurrentDate()
   const isToday = date.isSame(now, 'day')
 
   if (isToday) {
@@ -406,7 +407,7 @@ const saveIncome = async () => {
   try {
     await db.connect()
 
-    const transactionId = dayjs().valueOf().toString()
+    const transactionId = getCurrentDate().valueOf().toString()
     const relatedId = transactionId
     
     // 使用账户入账接口 - 自动处理余额更新
@@ -415,7 +416,7 @@ const saveIncome = async () => {
       amountNumber,
       `收入：${selectedCategory.value?.name || ' '}${remark.value ? '：' + remark.value : ''}`,
       transactionId,
-      dayjs(selectedDateTime.value).toDate()
+      getDate(selectedDateTime.value)
     )
     
     const statements = []

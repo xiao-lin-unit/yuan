@@ -3,8 +3,8 @@
  * Handles all stock-related business logic and database operations
  */
 
-import dayjs from 'dayjs'
 import db from '../../database/index.js'
+import { getCurrentDate } from '../../utils/timezone.js'
 import type {
   Stock,
   StockHolding,
@@ -68,7 +68,7 @@ export async function checkAccountBalance(accountId: string, requiredAmount: num
  * Add a new stock with initial buy transaction
  */
 export async function addStock(stockData: StockInput, deductFromAccount: boolean = true): Promise<void> {
-  const stockId = dayjs().valueOf().toString()
+  const stockId = getCurrentDate().valueOf().toString()
   const totalCost = calculateTotalCost(stockData.price, stockData.quantity, stockData.fee)
 
   // Calculate cost price
@@ -92,8 +92,8 @@ export async function addStock(stockData: StockInput, deductFromAccount: boolean
     ]
   })
 
-  const holdingId = dayjs().valueOf().toString() + '_hold'
-  const transactionId = dayjs().valueOf().toString()
+  const holdingId = getCurrentDate().valueOf().toString() + '_hold'
+  const transactionId = getCurrentDate().valueOf().toString()
 
   // Create stock holding record
   statements.push({
@@ -170,8 +170,8 @@ export async function buyStock(stockId: string, buyData: StockBuyInput): Promise
   const newQuantity = currentStock.quantity + buyData.quantity
 
   // Prepare transaction statements
-  const holdingId = dayjs().valueOf().toString() + '_hold'
-  const transactionId = dayjs().valueOf().toString()
+  const holdingId = getCurrentDate().valueOf().toString() + '_hold'
+  const transactionId = getCurrentDate().valueOf().toString()
 
   const statements = [
     // Create stock holding record
@@ -280,7 +280,7 @@ export async function sellStock(stockId: string, sellData: StockSellInput): Prom
   }
 
   // Create stock transaction record (sell)
-  const transactionId = dayjs().valueOf().toString()
+  const transactionId = getCurrentDate().valueOf().toString()
   statements.push({
     statement: `INSERT INTO stock_transactions (id, stock_id, price, quantity, type, hold_ids, fee, transaction_time, account_id) 
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,

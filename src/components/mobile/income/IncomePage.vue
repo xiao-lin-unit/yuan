@@ -20,7 +20,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { Plus } from '@element-plus/icons-vue';
-import dayjs from 'dayjs';
+import { getCurrentDate } from '../../../utils/timezone';
 import TopNav from '../../common/TopNav.vue';
 import MonthlyStats from './MonthlyStats.vue';
 import WeeklyIncome from './WeeklyIncome.vue';
@@ -30,13 +30,13 @@ import FloatingActionMenu from '../../common/FloatingActionMenu.vue';
 const emit = defineEmits(['navigate']);
 
 // 日期选择状态 - 默认为当前年月
-const now = dayjs();
+const now = getCurrentDate();
 const selectedYear = ref(now.year());
 const selectedMonth = ref(now.month() + 1);
 
 // 计算是否是当前月份
 const isCurrentMonth = computed(() => {
-  const now = dayjs();
+  const now = getCurrentDate();
   return selectedYear.value === now.year() && selectedMonth.value === now.month() + 1;
 });
 

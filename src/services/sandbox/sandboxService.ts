@@ -1,5 +1,5 @@
 import db from '../../database'
-import dayjs from 'dayjs'
+import { getCurrentDate } from '../../utils/timezone'
 
 export interface SceneDef {
   sceneType: number
@@ -280,7 +280,7 @@ function calcTotalInterest(principal: number, annualRate: number, months: number
 export async function computeSandbox(sceneType: number, params: any): Promise<{ history: SandboxHistory; result: SandboxResult }> {
   const data = await loadUserFinancialData()
   const scene = getSceneByType(sceneType)!
-  const now = dayjs()
+  const now = getCurrentDate()
   const simulateTime = `${now.year()}-${String(now.month() + 1).padStart(2, '0')}-${String(now.date()).padStart(2, '0')} ${String(now.hour()).padStart(2, '0')}:${String(now.minute()).padStart(2, '0')}:${String(now.second()).padStart(2, '0')}`
 
   let netAssets = data.netWorth

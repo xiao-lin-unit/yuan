@@ -48,7 +48,7 @@
         </div>
         <div v-if="assetInfo.calculation_type && assetInfo.calculation_type !== '无'" class="meta-item">
           <div class="meta-label">下一收益日</div>
-          <div class="meta-value">{{ formatDate(assetInfo.next_income_date) }}</div>
+          <div class="meta-value">{{ formatDate(assetInfo.next_income_date, 'YYYY/MM/DD HH:mm') }}</div>
         </div>
       </div>
     </div>
@@ -65,7 +65,7 @@
               <div v-for="record in incomeRecords" :key="record.id" class="income-card">
                 <div class="income-header">
                   <div class="income-type">收益</div>
-                  <div class="income-date">{{ formatDate(record.record_time) }}</div>
+                  <div class="income-date">{{ formatDate(record.record_time, 'YYYY/MM/DD HH:mm') }}</div>
                 </div>
                 <div class="income-content">
                   <div class="income-item">
@@ -148,6 +148,7 @@ import FloatingActionMenu from '../../../components/common/FloatingActionMenu.vu
 import { getAssetById, endAsset, pauseAsset, resumeAsset, updateAsset, getAssetIncomeRecords } from '../../../services/asset/assetService';
 import { getAccounts } from '../../../services/account/accountService';
 import { calculationTypes, periodTypes } from '../../../utils/dictionaries';
+import { formatDate } from '../../../utils/timezone';
 
 interface AssetIncomeRecord {
   id: string
@@ -198,10 +199,10 @@ const goBack = () => {
   emit('navigate', 'asset');
 };
 
-const formatDate = (dateString: string | dayjs.Dayjs | undefined) => {
-  if (!dateString) return '-';
-  return dayjs(dateString).format('YYYY/MM/DD HH:mm');
-};
+// const formatDate = (dateString: string | dayjs.Dayjs | undefined) => {
+//   if (!dateString) return '-';
+//   return getDate(dateString).format('YYYY/MM/DD HH:mm');
+// };
 
 const handleEndAsset = async () => {
   try {

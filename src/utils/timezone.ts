@@ -1,5 +1,12 @@
 import dayjs from 'dayjs'
+import utc from 'dayjs/plugin/utc'
+import timezone from 'dayjs/plugin/timezone'
 
+dayjs.extend(utc)
+dayjs.extend(timezone)
+
+// 设置默认东八区
+dayjs.tz.setDefault('Asia/Shanghai')
 /**
  * Timezone utility - All times are in UTC+8 (China Standard Time)
  */
@@ -8,7 +15,7 @@ import dayjs from 'dayjs'
  * Get current date/time in UTC+8
  */
 export function getCurrentDate(): dayjs.Dayjs {
-  return dayjs().add(8, 'hour')
+  return dayjs().tz()
 }
 
 /**
@@ -22,21 +29,21 @@ export function getCurrentISOString(): string {
  * Convert a date to UTC+8 ISO string
  */
 export function toUTC8ISOString(date: dayjs.Dayjs | string | Date): string {
-  return dayjs(date as any).add(8, 'hour').toISOString()
+  return dayjs(date as any).tz().toISOString()
 }
 
 /**
  * Get current timestamp in milliseconds (UTC+8)
  */
 export function getCurrentTimestamp(): number {
-  return dayjs().valueOf() + (8 * 60 * 60 * 1000)
+  return getCurrentDate().valueOf()
 }
 
 /**
  * Format date for database storage (UTC+8)
  */
 export function formatForDB(date: dayjs.Dayjs | string | Date = dayjs()): string {
-  return dayjs(date as any).add(8, 'hour').toISOString()
+  return dayjs(date as any).tz().toISOString()
 }
 
 /**
@@ -52,4 +59,13 @@ export function createDate(): dayjs.Dayjs {
  */
 export function dateNow(): number {
   return getCurrentTimestamp()
+}
+
+export function getDate(date: dayjs.Dayjs | string | Date): dayjs.Dayjs {
+  return dayjs(date as any).tz()
+}
+
+export function formatDate(date: dayjs.Dayjs | string | Date, format: string = 'YYYY-MM-DD HH:mm:ss'): string {
+  if (!date) return '-'
+  return getDate(date).format(format)
 }

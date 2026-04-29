@@ -76,7 +76,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, onActivated } from 'vue';
-import dayjs from 'dayjs';
+import { getCurrentDate } from '../../../utils/timezone';
 import { ArrowLeft, ArrowDown, House, Grid } from '@element-plus/icons-vue';
 import { use } from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
@@ -99,7 +99,7 @@ const props = defineProps<{
 const emit = defineEmits(['navigate']);
 
 // 日期选择状态 - 使用传入值或当前年月
-const now = dayjs();
+const now = getCurrentDate();
 const selectedYear = ref(props.year ?? now.year());
 const selectedMonth = ref(props.month ?? now.month() + 1);
 const showDatePicker = ref(false);
@@ -120,9 +120,9 @@ const dailyChartOption = ref({});
 const categoryChartOption = ref({});
 
 // 日历相关状态
-const currentDate = ref(dayjs());
-const startDate = ref(dayjs().year(selectedYear.value).month(selectedMonth.value - 1).startOf('month'));
-const endDate = ref(dayjs().year(selectedYear.value).month(selectedMonth.value - 1).endOf('month'));
+const currentDate = ref(getCurrentDate());
+const startDate = ref(getCurrentDate().year(selectedYear.value).month(selectedMonth.value - 1).startOf('month'));
+const endDate = ref(getCurrentDate().year(selectedYear.value).month(selectedMonth.value - 1).endOf('month'));
 
 // 每日支出数据
 const dailyExpenses = ref(new Map<string, number>());
@@ -134,8 +134,8 @@ const loadDailyExpenses = async () => {
     await db.connect();
     
     // 获取本月的开始和结束日期
-    const start = dayjs().year(selectedYear.value).month(selectedMonth.value - 1).startOf('month').toISOString();
-    const end = dayjs().year(selectedYear.value).month(selectedMonth.value - 1).endOf('month').toISOString();
+    const start = getCurrentDate().year(selectedYear.value).month(selectedMonth.value - 1).startOf('month').toISOString();
+    const end = getCurrentDate().year(selectedYear.value).month(selectedMonth.value - 1).endOf('month').toISOString();
     
     // 从流水表中查询类型为账户支出的记录
     const transactions = await db.query(
@@ -153,30 +153,30 @@ const loadDailyExpenses = async () => {
     dailyExpenses.value = expensesMap;
     
     // 更新日历的开始和结束日期
-    startDate.value = dayjs().year(selectedYear.value).month(selectedMonth.value - 1).startOf('month');
-    endDate.value = dayjs().year(selectedYear.value).month(selectedMonth.value - 1).endOf('month');
-    currentDate.value = dayjs().year(selectedYear.value).month(selectedMonth.value - 1).startOf('month');
+    startDate.value = getCurrentDate().year(selectedYear.value).month(selectedMonth.value - 1).startOf('month');
+    endDate.value = getCurrentDate().year(selectedYear.value).month(selectedMonth.value - 1).endOf('month');
+    currentDate.value = getCurrentDate().year(selectedYear.value).month(selectedMonth.value - 1).startOf('month');
   } catch (error) {
     console.error('加载每日支出数据失败:', error);
   }
 };
 
 // 根据日期获取支出金额
-const getExpenseByDate = (date: dayjs.Dayjs): number => {
+const getExpenseByDate = (date: any): number => {
   const dateStr = date.format('YYYY-MM-DD');
   return dailyExpenses.value.get(dateStr) || 0;
 };
 
 // 判断是否是当天
-const isCurrentDay = (date: dayjs.Dayjs): boolean => {
-  const today = dayjs();
+const isCurrentDay = (date: any): boolean => {
+  const today = getCurrentDate();
   return date.date() === today.date() &&
          date.month() === today.month() &&
          date.year() === today.year();
 };
 
 // 处理月份变化
-const handleMonthChange = (date: dayjs.Dayjs) => {
+const handleMonthChange = (date: any) => {
   selectedYear.value = date.year();
   selectedMonth.value = date.month() + 1;
   loadDailyExpenses();
@@ -190,8 +190,8 @@ const loadCategoryExpenses = async () => {
     await db.connect();
     
     // 获取本月的开始和结束日期
-    const startDate = dayjs().year(selectedYear.value).month(selectedMonth.value - 1).startOf('month').toISOString();
-    const endDate = dayjs().year(selectedYear.value).month(selectedMonth.value - 1).endOf('month').toISOString();
+    const startDate = getCurrentDate().year(selectedYear.value).month(selectedMonth.value - 1).startOf('month').toISOString();
+    const endDate = getCurrentDate().year(selectedYear.value).month(selectedMonth.value - 1).endOf('month').toISOString();
     
     // 从流水表中查询类型为账户支出的记录，按subType分组
     const transactions = await db.query(
@@ -222,8 +222,8 @@ const loadDailyChartData = async () => {
     await db.connect();
     
     // 获取本月的开始和结束日期
-    const startDate = dayjs().year(selectedYear.value).month(selectedMonth.value - 1).startOf('month').toISOString();
-    const endDate = dayjs().year(selectedYear.value).month(selectedMonth.value - 1).endOf('month').toISOString();
+    const startDate = getCurrentDate().year(selectedYear.value).month(selectedMonth.value - 1).startOf('month').toISOString();
+    const endDate = getCurrentDate().year(selectedYear.value).month(selectedMonth.value - 1).endOf('month').toISOString();
     
     // 从流水表中查询类型为账户支出的记录，按日期分组
     const transactions = await db.query(
@@ -232,7 +232,7 @@ const loadDailyChartData = async () => {
     );
     
     // 生成当月所有日期
-    const daysInMonth = dayjs().year(selectedYear.value).month(selectedMonth.value - 1).daysInMonth();
+    const daysInMonth = getCurrentDate().year(selectedYear.value).month(selectedMonth.value - 1).daysInMonth();
     const labels: string[] = [];
     const data: number[] = [];
     

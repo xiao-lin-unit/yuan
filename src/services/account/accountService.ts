@@ -6,7 +6,7 @@
 import dayjs from 'dayjs'
 import db from '../../database/index.js'
 import type { Account, AccountTransaction, AccountInput, BalanceAdjustInput, TransferInput, RepayCreditCardInput } from '../../types/account/account.js'
-import { getCurrentISOString, dateNow } from '../../utils/timezone'
+import { getCurrentISOString, dateNow, getDate, getCurrentDate } from '../../utils/timezone'
 
 /**
  * Add a new account
@@ -84,7 +84,7 @@ export async function addAccount(accountData: AccountInput): Promise<void> {
 
   // 4. 为特定账户类型自动创建对应资产
   if (assetType && assetId) {
-    const tomorrow = dayjs(getCurrentISOString()).add(1, 'day').format('YYYY-MM-DD')
+    const tomorrow = getCurrentDate().add(1, 'day').format('YYYY-MM-DD')
     statements.push({
       statement: `INSERT INTO assets (id, type, name, amount, account_id, period, calculation_type, annual_yield_rate, next_income_date, created_at, updated_at)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
@@ -229,7 +229,7 @@ export async function createDebitTransaction(
   }
 
   const txId = transactionId || dateNow().toString()
-  const txTime = transactionTime || dayjs(getCurrentISOString())
+  const txTime = transactionTime || getCurrentDate()
   let balanceAfter: number
   let accountUpdateStatement: { statement: string; values: any[] }
 
@@ -330,7 +330,7 @@ export async function createCreditTransaction(
 
   const isCreditCard = account.type === '信用卡'
   const txId = transactionId || dateNow().toString()
-  const txTime = transactionTime || dayjs(getCurrentISOString())
+  const txTime = transactionTime || getCurrentDate()
   let balanceAfter: number
   let accountUpdateStatement: { statement: string; values: any[] }
 
@@ -448,7 +448,7 @@ export async function transfer(input: TransferInput): Promise<void> {
   }
 
   const transactionId = dateNow().toString()
-  const transactionTime = dayjs(getCurrentISOString())
+  const transactionTime = getCurrentDate()
 
   // 使用新的出账入账接口（现在已包含交易记录创建）
   const debitResult = await createDebitTransaction(
@@ -578,7 +578,7 @@ export async function repayCreditCard(input: RepayCreditCardInput): Promise<void
     throw new Error(`还款金额不能超过已用额度 ¥${usedLimit.toFixed(2)}`)
   }
 
-  const txTime = dayjs(transaction_time)
+  const txTime = getDate(transaction_time)
 
   // 使用标准入账/出账接口，确保事务一致性
   const creditResult = await createCreditTransaction(

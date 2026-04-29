@@ -49,11 +49,11 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { DataAnalysis, ArrowDown } from '@element-plus/icons-vue';
-import dayjs from 'dayjs';
+import { getCurrentDate } from '../../utils/timezone';
 
 // 日期选择状态 - 默认为当前年月
 const showDatePicker = ref(false);
-const now = dayjs();
+const now = getCurrentDate();
 const selectedYear = ref(now.year());
 const selectedMonth = ref(now.month() + 1);
 

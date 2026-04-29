@@ -56,7 +56,7 @@
         </div>
         <div class="meta-item">
           <div class="meta-label">借款日期</div>
-          <div class="meta-value">{{ formatDate(liabilityInfo.start_date) }}</div>
+          <div class="meta-value">{{ formatDate(liabilityInfo.start_date, 'YYYY/MM/DD') }}</div>
         </div>
       </div>
       <div class="progress-section" v-if="liabilityInfo.principal > 0">
@@ -83,7 +83,7 @@
               <div v-for="pending in pendingRepayments" :key="pending.id" class="transaction-card">
                 <div class="transaction-header">
                   <div class="transaction-type pending">第{{ pending.period_number }}期</div>
-                  <div class="transaction-date">{{ formatDate(pending.due_date) }}到期</div>
+                  <div class="transaction-date">{{ formatDate(pending.due_date, 'YYYY/MM/DD') }}到期</div>
                 </div>
                 <div class="transaction-content">
                   <div class="transaction-item">
@@ -100,7 +100,7 @@
                   </div>
                   <div class="transaction-item">
                     <span class="item-label">到期日</span>
-                    <span class="item-value">{{ formatDate(pending.due_date) }}</span>
+                    <span class="item-value">{{ formatDate(pending.due_date, 'YYYY/MM/DD') }}</span>
                   </div>
                   <div class="transaction-item">
                     <span class="item-label">状态</span>
@@ -124,7 +124,7 @@
                   <div class="transaction-type" :class="repayment.type === '提前还款' ? 'early' : 'normal'">
                     {{ repayment.type }}
                   </div>
-                  <div class="transaction-date">{{ formatDate(repayment.repayment_time) }}</div>
+                  <div class="transaction-date">{{ formatDate(repayment.repayment_time, 'YYYY/MM/DD') }}</div>
                 </div>
                 <div class="transaction-content">
                   <div class="transaction-item">
@@ -181,7 +181,6 @@
 
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue';
-import dayjs from 'dayjs';
 import { ArrowLeft, Money, Delete } from '@element-plus/icons-vue';
 import { ElMessageBox, ElMessage } from 'element-plus';
 import FloatingActionMenu from '../../../components/common/FloatingActionMenu.vue';
@@ -194,6 +193,7 @@ import {
 } from '../../../services/liability/liabilityService';
 import { repaymentTypes } from '../../../utils/dictionaries';
 import type { Liability, Repayment, PendingRepayment } from '../../../types/liability/liability';
+import { formatDate } from '../../../utils/timezone';
 
 const props = defineProps({
   liabilityId: {
@@ -244,10 +244,10 @@ const goBack = () => {
   emit('navigate', 'liability');
 };
 
-const formatDate = (dateValue: string | dayjs.Dayjs | undefined) => {
-  if (!dateValue) return '-';
-  return dayjs(dateValue).format('YYYY/MM/DD');
-};
+// const formatDate = (dateValue: string | dayjs.Dayjs | undefined) => {
+//   if (!dateValue) return '-';
+//   return getDate(dateValue).format('YYYY/MM/DD');
+// };
 
 const openRepayDialog = () => {
   repayForm.value = {

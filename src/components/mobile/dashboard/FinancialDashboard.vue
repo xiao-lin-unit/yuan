@@ -66,9 +66,10 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
-import dayjs from 'dayjs'
 import * as echarts from 'echarts'
 import db from '../../../database'
+import { getCurrentDate } from '../../../utils/timezone'
+
 
 // ============ 图表相关 ============
 const chartRef = ref<HTMLElement | null>(null)
@@ -99,7 +100,7 @@ const loadSnapshot = async (year: number, month: number) => {
 }
 
 const getSnapshotHistory = async (months: number) => {
-  const now = dayjs()
+  const now = getCurrentDate()
   const endYear = now.year()
   const endMonth = now.month() + 1
   const start = now.subtract(months - 1, 'month')
@@ -126,7 +127,7 @@ const getSnapshotHistory = async (months: number) => {
 const loadAllData = async () => {
   try {
     await db.connect()
-    const now = dayjs()
+    const now = getCurrentDate()
     const monthStart = now.startOf('month').toISOString()
     const monthEnd = now.endOf('month').toISOString()
     const monthStartDate = now.startOf('month').format('YYYY-MM-DD')

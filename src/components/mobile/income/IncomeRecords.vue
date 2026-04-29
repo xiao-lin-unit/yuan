@@ -14,6 +14,7 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue';
 import dayjs from 'dayjs';
+import { getCurrentDate, getDate } from '../../../utils/timezone';
 import DailyIncome from './DailyIncome.vue';
 
 // 接收年月参数
@@ -32,8 +33,8 @@ const generateDays = () => {
   const monthVal = month.value - 1; // 转换为0-11的月份格式
 
   // 获取当月最后一天
-  let lastDay = dayjs().year(yearVal).month(monthVal).endOf('month');
-  const now = dayjs();
+  let lastDay = getCurrentDate().year(yearVal).month(monthVal).endOf('month');
+  const now = getCurrentDate();
   // 如果当前年份大于展示年份，则展示到月份的最后一天
   if (now.year() > yearVal) {
 
@@ -59,7 +60,7 @@ const generateDays = () => {
     
     // 标记今天、昨天、前天
     let displayDate = dateStr;
-    const today = dayjs();
+    const today = getCurrentDate();
     const yesterday = today.subtract(1, 'day');
     const dayBeforeYesterday = today.subtract(2, 'day');
     
@@ -87,8 +88,8 @@ const generateDays = () => {
   
   // 按日期倒序排序
   daysArray.sort((a, b) => {
-    const dateA = dayjs(`${year.value}-${a.dateStr.replace('.', '-')}`);
-    const dateB = dayjs(`${year.value}-${b.dateStr.replace('.', '-')}`);
+    const dateA = getDate(`${year.value}-${a.dateStr.replace('.', '-')}`);
+    const dateB = getDate(`${year.value}-${b.dateStr.replace('.', '-')}`);
     return dateB.valueOf() - dateA.valueOf();
   });
   

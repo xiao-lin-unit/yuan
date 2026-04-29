@@ -52,7 +52,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import dayjs from 'dayjs'
+import { getCurrentDate } from '../../../utils/timezone'
 import PageTemplate from '../../common/PageTemplate.vue'
 import { validateFundCode, checkFundExists, addFund as addFundService, checkAccountBalance } from '../../../services/asset/fundService'
 import { getNonCreditCardAccounts } from '../../../services/account/accountService'
@@ -72,7 +72,7 @@ const fundForm = ref({
   fee: 0,
   has_lock: false,
   lock_period: 0,
-  transaction_time: dayjs(),
+  transaction_time: getCurrentDate(),
   type: '买入',
   account_id: '',
   deduct_from_account: true

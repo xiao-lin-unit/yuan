@@ -70,7 +70,7 @@
               <div v-for="holding in holdings" :key="holding.id" class="transaction-card">
                 <div class="transaction-header">
                   <div class="transaction-type buy">持有</div>
-                  <div class="transaction-date">{{ formatDate(holding.transaction_time) }}</div>
+                  <div class="transaction-date">{{ formatDate(holding.transaction_time, 'YYYY/MM/DD HH:mm') }}</div>
                 </div>
                 <div class="transaction-content">
                   <div class="transaction-item">
@@ -99,7 +99,7 @@
                   </div>
                   <div v-if="holding.lock_end_date" class="transaction-item">
                     <span class="item-label">锁定结束日期</span>
-                    <span class="item-value">{{ formatDate(holding.lock_end_date) }}</span>
+                    <span class="item-value">{{ formatDate(holding.lock_end_date, 'YYYY/MM/DD HH:mm') }}</span>
                   </div>
                 </div>
               </div>
@@ -117,7 +117,7 @@
               <div v-for="transaction in buyTransactions" :key="transaction.id" class="transaction-card">
                 <div class="transaction-header">
                   <div class="transaction-type buy">买入</div>
-                  <div class="transaction-date">{{ formatDate(transaction.transaction_time) }}</div>
+                  <div class="transaction-date">{{ formatDate(transaction.transaction_time, 'YYYY/MM/DD HH:mm') }}</div>
                 </div>
                 <div class="transaction-content">
                   <div class="transaction-item">
@@ -152,7 +152,7 @@
               <div v-for="transaction in sellTransactions" :key="transaction.id" class="transaction-card">
                 <div class="transaction-header">
                   <div class="transaction-type sell">卖出</div>
-                  <div class="transaction-date">{{ formatDate(transaction.transaction_time) }}</div>
+                  <div class="transaction-date">{{ formatDate(transaction.transaction_time, 'YYYY/MM/DD HH:mm') }}</div>
                 </div>
                 <div class="transaction-content">
                   <div class="transaction-item">
@@ -186,7 +186,6 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import dayjs from 'dayjs';
 import { ArrowLeft, Plus, Minus, More, Switch, Edit } from '@element-plus/icons-vue';
 import { ElMessageBox, ElMessage } from 'element-plus';
 import FloatingActionMenu from '../../../components/common/FloatingActionMenu.vue';
@@ -197,6 +196,7 @@ import {
   updateFundNav
 } from '../../../services/asset/fundService';
 import type { FundHolding, FundTransaction } from '../../../types/asset/fund';
+import { formatDate } from '../../../utils/timezone';
 
 const props = defineProps({
   fundId: {
@@ -307,9 +307,9 @@ const goBack = () => {
 };
 
 // 格式化日期函数
-const formatDate = (dateString: string | dayjs.Dayjs) => {
-  return dayjs(dateString).format('YYYY/MM/DD HH:mm');
-};
+// const formatDate = (dateString: string | dayjs.Dayjs) => {
+//   return getDate(dateString).format('YYYY/MM/DD HH:mm');
+// };
 
 // 加载基金详情数据
 const loadFundDetail = async () => {

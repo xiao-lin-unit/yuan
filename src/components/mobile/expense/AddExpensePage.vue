@@ -117,7 +117,7 @@ import { useAccountStore } from '../../../stores/account'
 import db from '../../../database'
 import { expenseCategories } from '../../../data/categories'
 import { createDebitTransaction } from '../../../services/account/accountService'
-import { getCurrentISOString, formatForDB } from '../../../utils/timezone'
+import { getCurrentISOString, formatForDB, getCurrentDate, getDate } from '../../../utils/timezone'
 
 const emit = defineEmits(['navigate'])
 
@@ -191,8 +191,8 @@ const initDateTime = () => {
 
 // 更新日期时间格式
 const updateDateTime = () => {
-  const date = dayjs(selectedDateTime.value)
-  const now = dayjs(getCurrentISOString())
+  const date = getDate(selectedDateTime.value)
+  const now = getCurrentDate()
   const isToday = date.isSame(now, 'day')
 
   if (isToday) {
@@ -414,7 +414,7 @@ const saveExpense = async () => {
   try {
     await db.connect()
 
-    const transactionId = dayjs().valueOf().toString()
+    const transactionId = getCurrentDate().valueOf().toString()
     const relatedId = transactionId
     
     // 使用账户出账接口 - 自动处理余额检查和账户更新
@@ -423,7 +423,7 @@ const saveExpense = async () => {
       amountNumber,
       `支出：${selectedCategory.value?.name || ' '}${remark.value ? '：' + remark.value : ''}`, // 支出类型作为描述，如果不存在则使用空字符串
       transactionId,
-      dayjs(selectedDateTime.value).toDate()
+      getDate(selectedDateTime.value)
     )
     
     const statements = []
