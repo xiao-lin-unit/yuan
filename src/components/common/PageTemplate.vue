@@ -4,14 +4,14 @@
     <PageHeader :title="title" @back="$emit('back')" />
     
     <!-- 中间内容区域（插槽） -->
-    <div class="content-area">
+    <div class="content-area" ref="scrollWrap" @scroll="onScroll">
       <slot></slot>
     </div>
-    
+
     <!-- 底部确认按钮（可选） -->
     <div v-if="showConfirmButton" class="confirm-section">
-      <button 
-        class="confirm-btn" 
+      <button
+        class="confirm-btn"
         :disabled="confirmDisabled"
         @click="$emit('confirm')"
       >
@@ -22,7 +22,9 @@
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
 import PageHeader from './PageHeader.vue'
+const scrollWrap = ref<HTMLDivElement>()
 
 defineProps<{
   title: string
@@ -31,16 +33,30 @@ defineProps<{
   confirmDisabled?: boolean
 }>()
 
-defineEmits<{
+const emit = defineEmits<{
   (e: 'back'): void
   (e: 'confirm'): void
+  (e: 'scroll', scrollTop: number): void
 }>()
+
+const onScroll = () => {
+  emit('scroll', scrollWrap.value?.scrollTop || 0)
+}
+
+const scrollToTop = (top: number = 0, behavior: ScrollBehavior = 'smooth') => {
+  scrollWrap.value?.scrollTo({ top, behavior })
+}
+
+defineExpose({
+  scrollToTop
+})
+
 </script>
 
 <style scoped>
 .page-template {
   padding: 0;
-  min-height: 100%;
+  height: 100%;
   background-color: #f5f5f5;
   display: flex;
   flex-direction: column;

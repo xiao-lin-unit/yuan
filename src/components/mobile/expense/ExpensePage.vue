@@ -28,7 +28,7 @@ import MonthlyStats from './MonthlyStats.vue';
 import WeeklyExperse from './WeeklyExperse.vue';
 import ExpenseRecords from './ExpenseRecords.vue';
 import FloatingActionMenu from '../../common/FloatingActionMenu.vue';
-import { getCurrentDate } from '../../utils/timezone';
+import { getCurrentDate } from '../../../utils/timezone';
 
 const emit = defineEmits(['navigate']);
 

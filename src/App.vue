@@ -40,7 +40,10 @@ import LiabilityDetailPage from './components/mobile/liability/LiabilityDetailPa
 import FinancialDashboard from './components/mobile/dashboard/FinancialDashboard.vue'
 import FinancialGoal from './components/mobile/goal/FinancialGoal.vue'
 import FinancialSandbox from './components/mobile/sandbox/FinancialSandbox.vue'
-import FinancialKnowledge from './components/mobile/knowledge/FinancialKnowledge.vue'
+import KnowledgeHome from './components/mobile/knowledge/KnowledgeHome.vue'
+import KnowledgeCategory from './components/mobile/knowledge/KnowledgeCategory.vue'
+import KnowledgeArticle from './components/mobile/knowledge/KnowledgeArticle.vue'
+import KnowledgeProfile from './components/mobile/knowledge/KnowledgeProfile.vue'
 import SandboxSimulationPage from './components/mobile/sandbox/SandboxSimulationPage.vue'
 import SandboxHistory from './components/mobile/sandbox/SandboxHistory.vue'
 import SandboxResultDetail from './components/mobile/sandbox/SandboxResultDetail.vue'
@@ -105,7 +108,10 @@ const navParams = ref<any>({});
       sandboxSimulation: SandboxSimulationPage,
       sandboxHistory: SandboxHistory,
       sandboxResultDetail: SandboxResultDetail,
-      knowledge: FinancialKnowledge,
+      knowledge: KnowledgeHome,
+      knowledgeCategory: KnowledgeCategory,
+      knowledgeArticle: KnowledgeArticle,
+      knowledgeProfile: KnowledgeProfile,
       more: MoreFeatures, // 映射到更多功能组件
       databaseViewer: DatabaseViewer // 数据库查看页面
     }
@@ -185,9 +191,19 @@ const componentProps = computed(() => {
 
   // 为沙盘结果详情页面传递historyId参数
   if (activeMenu.value === 'sandboxResultDetail' && navParams.value.historyId) {
-    props.historyId = navParams.value.historyId;
+    props.historyId = navParams.value.historyId
   }
-
+  
+  // 为知识分类页面传递categoryId参数
+  if (activeMenu.value === 'knowledgeCategory' && navParams.value.categoryId) {
+    props.categoryId = navParams.value.categoryId
+  }
+  
+  // 为知识文章页面传递articleId参数
+  if (activeMenu.value === 'knowledgeArticle' && navParams.value.articleId) {
+    props.articleId = navParams.value.articleId
+  }
+  
   return props;
 });
 

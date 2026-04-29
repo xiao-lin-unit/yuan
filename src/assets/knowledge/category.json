@@ -1,0 +1,38 @@
+[
+  {
+    "id": "finance_basic_manage",
+    "name": "基础管理",
+    "icon": "basic",
+    "description": "财务入门核心，梳理财务现状、管控基础收支，建立正确金钱观，管好当下的钱"
+  },
+  {
+    "id": "finance_risk_control",
+    "name": "风险管控",
+    "icon": "risk",
+    "description": "防御家庭财务风险，解读社保、保险配置，规避因病、意外导致的财务崩塌，守住已有财富"
+  },
+  {
+    "id": "finance_invest_intro",
+    "name": "投资入门",
+    "icon": "invest",
+    "description": "面向新手的投资科普，解析投资逻辑与常见工具，传授基础资产配置技巧，赚取未来的钱"
+  },
+  {
+    "id": "finance_major_decision",
+    "name": "重大决策",
+    "icon": "decision",
+    "description": "聚焦房产、教育、养老等人生关键节点，提供专项财务分析与规划，规避决策失误"
+  },
+  {
+    "id": "finance_trap_avoid",
+    "name": "陷阱规避",
+    "icon": "trap",
+    "description": "守护财产安全，解读信用管理、揭秘金融骗局，规避网贷、高利贷等各类财务陷阱"
+  },
+  {
+    "id": "finance_book_share",
+    "name": "书籍分享",
+    "icon": "book",
+    "description": "精选财务经典书籍，提炼核心实操观点，结合APP功能落地，提升财商思维"
+  }
+]

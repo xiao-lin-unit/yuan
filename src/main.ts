@@ -14,7 +14,10 @@ import LiabilityManagement from './components/mobile/liability/LiabilityManageme
 import FinancialDashboard from './components/mobile/dashboard/FinancialDashboard.vue'
 import FinancialGoal from './components/mobile/goal/FinancialGoal.vue'
 import FinancialSandbox from './components/mobile/sandbox/FinancialSandbox.vue'
-import FinancialKnowledge from './components/mobile/knowledge/FinancialKnowledge.vue'
+import KnowledgeHome from './components/mobile/knowledge/KnowledgeHome.vue'
+import KnowledgeCategory from './components/mobile/knowledge/KnowledgeCategory.vue'
+import KnowledgeArticle from './components/mobile/knowledge/KnowledgeArticle.vue'
+import KnowledgeProfile from './components/mobile/knowledge/KnowledgeProfile.vue'
 import SandboxSimulationPage from './components/mobile/sandbox/SandboxSimulationPage.vue'
 import SandboxHistory from './components/mobile/sandbox/SandboxHistory.vue'
 import SandboxResultDetail from './components/mobile/sandbox/SandboxResultDetail.vue'
@@ -78,7 +81,10 @@ const componentMap: Record<string, any> = {
       sandboxSimulation: SandboxSimulationPage,
       sandboxHistory: SandboxHistory,
       sandboxResultDetail: SandboxResultDetail,
-      knowledge: FinancialKnowledge,
+      knowledge: KnowledgeHome,
+      knowledgeCategory: KnowledgeCategory,
+      knowledgeArticle: KnowledgeArticle,
+      knowledgeProfile: KnowledgeProfile,
       more: MoreFeatures, // 映射到更多功能组件
       databaseViewer: DatabaseViewer // 数据库查看页面
     }
@@ -168,6 +174,16 @@ const appComponentProps = ({key, params}: {key: string, params: any}) => {
   // 为沙盘结果详情页面传递historyId参数
   if (key === 'sandboxResultDetail' && params.historyId) {
     props.historyId = params.historyId;
+  }
+
+  // 为知识分类页面传递categoryId参数
+  if (key === 'knowledgeCategory' && params.categoryId) {
+    props.categoryId = params.categoryId;
+  }
+
+  // 为知识文章页面传递articleId参数
+  if (key === 'knowledgeArticle' && params.articleId) {
+    props.articleId = params.articleId;
   }
 
   return props;

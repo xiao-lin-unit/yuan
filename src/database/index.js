@@ -820,6 +820,25 @@ class DatabaseManager {
           )
         `
       },
+      // 知识收藏表
+      {
+        sql: `
+          CREATE TABLE IF NOT EXISTS knowledge_favorite (
+            article_id TEXT PRIMARY KEY,
+            create_time TEXT NOT NULL
+          )
+        `
+      },
+      // 阅读历史表
+      {
+        sql: `
+          CREATE TABLE IF NOT EXISTS knowledge_read_history (
+            article_id TEXT PRIMARY KEY,
+            read_time TEXT NOT NULL,
+            is_read INTEGER DEFAULT 1
+          )
+        `
+      },
       // 创建索引（性能优化）
       { sql: 'CREATE INDEX IF NOT EXISTS idx_accounts_type ON accounts(type)' },
       { sql: 'CREATE INDEX IF NOT EXISTS idx_accounts_is_liquid ON accounts(is_liquid)' },
@@ -842,8 +861,13 @@ class DatabaseManager {
       { sql: 'CREATE INDEX IF NOT EXISTS idx_asset_monthly_snapshots_year_month ON asset_monthly_snapshots(year, month)' },
       { sql: 'CREATE INDEX IF NOT EXISTS idx_sandbox_history_scene_type ON sandbox_history(scene_type)' },
       { sql: 'CREATE INDEX IF NOT EXISTS idx_sandbox_history_is_deleted ON sandbox_history(is_deleted)' },
-      { sql: 'CREATE INDEX IF NOT EXISTS idx_sandbox_result_history_id ON sandbox_result(history_id)' }
+      { sql: 'CREATE INDEX IF NOT EXISTS idx_sandbox_result_history_id ON sandbox_result(history_id)' },
+      { sql: 'CREATE INDEX IF NOT EXISTS idx_knowledge_read_history_read_time ON knowledge_read_history(read_time)' }
     ]
+  }
+
+  updateSchema() {
+
   }
 
   /**
@@ -867,16 +891,7 @@ class DatabaseManager {
       // 批量执行
       await this.batch(createStatements)
 
-      // 迁移：assets表 ended -> status
-      try {
-        const assetColumns = await this.getColumns('assets')
-        if (assetColumns.includes('ended') && !assetColumns.includes('status')) {
-          await this.run(`ALTER TABLE assets ADD COLUMN status TEXT DEFAULT '开启'`)
-          await this.run(`UPDATE assets SET status = CASE WHEN ended = 1 THEN '结束' ELSE '开启' END`)
-        }
-      } catch (migrateErr) {
-        console.log('Assets migration warning:', migrateErr)
-      }
+      await this.updateSchema();
 
       this.initialized = true
 
@@ -951,7 +966,7 @@ class DatabaseManager {
    * 清空所有数据（使用事务提高性能）
    */
   async clearAllData() {
-    const tables = ['accounts', 'transactions', 'assets', 'stocks', 'funds', 'liabilities', 'repayments', 'pending_repayments', 'financial_goals', 'categories']
+    const tables = ['accounts', 'transactions', 'assets', 'stocks', 'funds', 'liabilities', 'repayments', 'pending_repayments', 'financial_goals', 'categories', 'knowledge_favorite', 'knowledge_read_history']
     
     try {
       // 事务状态

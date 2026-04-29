@@ -70,7 +70,7 @@ import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addDays } 
 // https://6tail.cn/calendar/api.html  农历信息
 import { Solar, Lunar, HolidayUtil } from 'lunar-javascript';
 import { Clock } from '@element-plus/icons-vue';
-import { getCurrentDate } from '../../utils/timezone';
+import { getCurrentDate } from '../../../utils/timezone';
 
 const props = defineProps({
   width: { type: String, default: '500px' },
