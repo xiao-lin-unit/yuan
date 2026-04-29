@@ -35,12 +35,12 @@
         </div>
         <span>知识</span>
       </div>
-      <div class="feature-item" @click="navigateTo('goal')">
+      <!-- <div class="feature-item" @click="navigateTo('goal')">
         <div class="feature-icon" style="background-color: #E6A23C;">
           <el-icon :size="24"><Flag /></el-icon>
         </div>
         <span>目标</span>
-      </div>
+      </div> -->
       <div class="feature-item" @click="navigateTo('sandbox')">
         <div class="feature-icon" style="background-color: #909399;">
           <el-icon :size="24"><PieChart /></el-icon>
