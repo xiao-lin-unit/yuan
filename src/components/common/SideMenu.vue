@@ -31,27 +31,23 @@
             <el-icon v-if="themeStore.currentThemeName === theme.name" class="check-icon"><Check /></el-icon>
           </div>
         </div>
-        <div class="menu-item">
+        <div class="menu-item" @click="alertMessage('要什么设置！啊！Look in my eyes!')">
           <el-icon class="menu-icon"><Setting /></el-icon>
           <span>设置</span>
         </div>
-        <div class="menu-item">
-          <el-icon class="menu-icon"><InfoFilled /></el-icon>
-          <span>关于</span>
-        </div>
-        <div class="menu-item">
-          <el-icon class="menu-icon"><Star /></el-icon>
-          <span>收藏</span>
-        </div>
-        <div class="menu-item">
+        <div class="menu-item" @click="alertMessage('要什么帮助！随便点，点坏了重装！')">
           <el-icon class="menu-icon"><HelpFilled /></el-icon>
           <span>帮助</span>
         </div>
-        <div class="menu-item">
+        <div class="menu-item" @click="alertMessage('都免费给你用了，你还有啥不满！？')">
           <el-icon class="menu-icon"><ChatLineRound /></el-icon>
           <span>反馈</span>
         </div>
-        <div class="menu-item">
+        <div class="menu-item" @click="alertMessage('邮箱：xiao_lin_unit@163.com。别乱发消息！')">
+          <el-icon class="menu-icon"><InfoFilled /></el-icon>
+          <span>关于</span>
+        </div>
+        <div class="menu-item" @click="alertMessage('自己手动调节手机屏幕亮度😈')">
           <el-icon class="menu-icon"><Moon /></el-icon>
           <span>夜间模式</span>
         </div>
@@ -117,6 +113,11 @@ const navigateTo = (key: string) => {
   emit('navigate', key);
   closeMenu();
 };
+
+const alertMessage = (msg: string) => {
+  alert(msg);
+};
+
 </script>
 
 <style scoped>
