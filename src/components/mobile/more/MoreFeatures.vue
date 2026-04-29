@@ -54,9 +54,9 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue';
 import { DataAnalysis, Document, Flag, PieChart } from '@element-plus/icons-vue';
-import m4 from '@/assets/images/m4.png';
-import m5 from '@/assets/images/m5.png';
-import m6 from '@/assets/images/m6.png';
+import m4 from '@/assets/img/m4.jpg';
+import m5 from '@/assets/img/m5.jpg';
+import m3 from '@/assets/img/m3.jpg';
 
 const emit = defineEmits<{
   (e: 'navigate', key: string): void
@@ -74,7 +74,7 @@ const carouselItems = [
     description: '财务知识分享与学习'
   },
   {
-    image: m6,
+    image: m3,
     title: '沙盒模拟',
     description: '模拟未来财务状况'
   }
