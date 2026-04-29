@@ -13,9 +13,23 @@
           <el-icon class="menu-icon"><User /></el-icon>
           <span>账户</span>
         </div>
-        <div class="menu-item">
+        <div class="menu-item" @click="toggleThemePanel">
           <el-icon class="menu-icon"><Sunny /></el-icon>
           <span>主题</span>
+          <el-icon class="expand-icon" :class="{ expanded: showThemePanel }"><ArrowRight /></el-icon>
+        </div>
+        <div class="theme-panel" v-if="showThemePanel">
+          <div
+            v-for="theme in allThemes"
+            :key="theme.name"
+            class="theme-option"
+            :class="{ active: themeStore.currentThemeName === theme.name }"
+            @click="switchTheme(theme.name)"
+          >
+            <span class="theme-color-dot" :style="{ backgroundColor: theme.primary }"></span>
+            <span class="theme-label">{{ theme.label }}</span>
+            <el-icon v-if="themeStore.currentThemeName === theme.name" class="check-icon"><Check /></el-icon>
+          </div>
         </div>
         <div class="menu-item">
           <el-icon class="menu-icon"><Setting /></el-icon>
@@ -48,7 +62,8 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import { User, Sunny, Setting, InfoFilled, Star, HelpFilled, ChatLineRound, Moon } from '@element-plus/icons-vue';
+import { User, Sunny, Setting, InfoFilled, Star, HelpFilled, ChatLineRound, Moon, ArrowRight, Check } from '@element-plus/icons-vue';
+import { useThemeStore } from '../../stores/theme'
 
 const props = defineProps<{
   visible: boolean;
@@ -58,6 +73,11 @@ const emit = defineEmits<{
   (e: 'close'): void;
   (e: 'navigate', key: string): void;
 }>();
+
+// Theme store
+const themeStore = useThemeStore()
+const allThemes = themeStore.getAllPresets()
+const showThemePanel = ref(false)
 
 // 用户名称和修改状态
 const userName = ref<string>('user');
@@ -76,6 +96,16 @@ onMounted(() => {
     hasModifiedName.value = savedModified === 'true';
   }
 });
+
+// Toggle theme panel
+const toggleThemePanel = () => {
+  showThemePanel.value = !showThemePanel.value
+}
+
+// Switch theme
+const switchTheme = (name: string) => {
+  themeStore.setTheme(name)
+}
 
 // 关闭菜单
 const closeMenu = () => {
@@ -143,7 +173,7 @@ const navigateTo = (key: string) => {
   width: 60px;
   height: 60px;
   border-radius: 50%;
-  border: 2px solid #409EFF;
+  border: 2px solid var(--app-primary-color, #409EFF);
 }
 
 .user-info h3 {
@@ -168,12 +198,12 @@ const navigateTo = (key: string) => {
 
 .menu-item:hover {
   background-color: #f5f7fa;
-  color: #409EFF;
+  color: var(--app-primary-color, #409EFF);
 }
 
 .menu-item :deep(.menu-icon) {
   font-size: 20px;
-  color: #409EFF;
+  color: var(--app-primary-color, #409EFF);
   margin-right: 15px;
   width: 20px;
   text-align: center;
@@ -185,7 +215,81 @@ const navigateTo = (key: string) => {
 }
 
 .menu-item:hover span {
-  color: #409EFF;
+  color: var(--app-primary-color, #409EFF);
+}
+
+.expand-icon {
+  margin-left: auto;
+  font-size: 14px;
+  color: #999;
+  transition: transform 0.3s ease;
+}
+
+.expand-icon.expanded {
+  transform: rotate(90deg);
+}
+
+/* Theme panel */
+.theme-panel {
+  padding: 8px 20px 8px 55px;
+  animation: fadeInPanel 0.2s ease;
+}
+
+@keyframes fadeInPanel {
+  from {
+    opacity: 0;
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    max-height: 300px;
+  }
+}
+
+.theme-option {
+  display: flex;
+  align-items: center;
+  padding: 5px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-bottom: 4px;
+}
+
+.theme-option:hover {
+  background-color: #f5f7fa;
+}
+
+.theme-option.active {
+  background-color: var(--app-primary-color, #409EFF);
+}
+
+.theme-option.active .theme-label {
+  color: white;
+}
+
+.theme-color-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  margin-right: 10px;
+  flex-shrink: 0;
+  border: 2px solid rgba(0, 0, 0, 0.1);
+}
+
+.theme-label {
+  font-size: 14px;
+  color: #333;
+}
+
+.theme-option.active .theme-color-dot {
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.check-icon {
+  margin-left: auto;
+  font-size: 16px;
+  color: white;
 }
 
 /* 响应式调整 */

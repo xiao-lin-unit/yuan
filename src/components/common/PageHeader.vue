@@ -51,6 +51,6 @@ defineEmits<{
 }
 
 .page-header :deep(.el-icon):hover {
-  color: #409eff;
+  color: var(--app-primary-color, #409eff);
 }
 </style>

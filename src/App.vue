@@ -23,6 +23,7 @@ import { ref, computed, onMounted } from 'vue'
 import { Capacitor } from '@capacitor/core'
 import { Keyboard } from '@capacitor/keyboard'
 import { appNavigateTo, appCurrentComponent, appComponentProps } from './main.ts'
+import { useThemeStore } from './stores/theme'
 
 
 // 导入组件
@@ -71,6 +72,9 @@ import AssetDetailPage from './components/mobile/asset/AssetDetailPage.vue'
 
 const activeMenu = ref('expense')
 const menuVisible = ref<boolean>(false)
+
+// Initialize theme store (applies CSS variables to DOM)
+const themeStore = useThemeStore()
 
 // 导航参数
 const navParams = ref<any>({});
@@ -256,6 +260,12 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* Default CSS variables for theme (fallback values) */
+:global(:root) {
+  --app-primary-color: #409EFF;
+  --app-primary-rgb: 64, 158, 255;
+}
+
 /* 关键：固定整个容器，键盘永远无法顶起页面 */
 :global(body),
 :global(html) {

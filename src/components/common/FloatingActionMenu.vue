@@ -70,11 +70,11 @@ const toggleMenu = () => {
   width: 48px;
   height: 48px;
   border-radius: 50%;
-  background-color: #409eff;
+  background-color: var(--app-primary-color, #409eff);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.5);
+  box-shadow: 0 4px 12px rgba(var(--app-primary-rgb, 64, 158, 255), 0.5);
   cursor: pointer;
   opacity: 0.7;
   transition: all 0.3s ease;
@@ -82,7 +82,7 @@ const toggleMenu = () => {
 
 .floating-action-button:hover {
   transform: scale(1.1);
-  box-shadow: 0 6px 16px rgba(64, 158, 255, 0.5);
+  box-shadow: 0 6px 16px rgba(var(--app-primary-rgb, 64, 158, 255), 0.5);
   opacity: 1;
 }
 
@@ -101,11 +101,11 @@ const toggleMenu = () => {
   width: 48px;
   height: 48px;
   border-radius: 50%;
-  background-color: #409eff;
+  background-color: var(--app-primary-color, #409eff);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.5);
+  box-shadow: 0 4px 12px rgba(var(--app-primary-rgb, 64, 158, 255), 0.5);
   cursor: pointer;
   opacity: 0.8;
   transition: all 0.3s ease;
@@ -114,7 +114,7 @@ const toggleMenu = () => {
 
 .floating-menu-item:hover {
   transform: scale(1.1);
-  box-shadow: 0 6px 16px rgba(64, 158, 255, 0.5);
+  box-shadow: 0 6px 16px rgba(var(--app-primary-rgb, 64, 158, 255), 0.5);
   opacity: 1;
 }
 

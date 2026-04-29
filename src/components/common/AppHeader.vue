@@ -49,7 +49,7 @@ const toggleMenu = () => {
 
 <style scoped>
 .app-header {
-  background-color: #409EFF;
+  background-color: var(--app-primary-color, #409EFF);
   color: white;
   padding: 15px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);

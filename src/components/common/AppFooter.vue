@@ -60,7 +60,7 @@ defineEmits<{
 }
 
 .nav-item:hover {
-  color: #409EFF;
+  color: var(--app-primary-color, #409EFF);
 }
 
 .nav-item :deep(el-icon) {
@@ -74,7 +74,7 @@ defineEmits<{
 }
 
 .nav-item:hover span {
-  color: #409EFF;
+  color: var(--app-primary-color, #409EFF);
 }
 
 /* 响应式调整 */
