@@ -54,6 +54,9 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue';
 import { DataAnalysis, Document, Flag, PieChart } from '@element-plus/icons-vue';
+import m4 from '@/assets/images/m4.png';
+import m5 from '@/assets/images/m5.png';
+import m6 from '@/assets/images/m6.png';
 
 const emit = defineEmits<{
   (e: 'navigate', key: string): void
@@ -61,19 +64,19 @@ const emit = defineEmits<{
 
 const carouselItems = [
   {
-    image: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=finance%20app%20banner%20savings%20goals&image_size=landscape_16_9',
-    title: '财务目标',
-    description: '设定并追踪您的财务目标'
+    image: m4,
+    title: '健康评估',
+    description: '个人财务健康状况评估'
   },
   {
-    image: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=finance%20app%20banner%20budgeting&image_size=landscape_16_9',
-    title: '预算管理',
-    description: '智能预算规划与分析'
+    image: m5,
+    title: '知识分享',
+    description: '财务知识分享与学习'
   },
   {
-    image: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=finance%20app%20banner%20investment&image_size=landscape_16_9',
-    title: '投资分析',
-    description: '资产配置与投资建议'
+    image: m6,
+    title: '沙盒模拟',
+    description: '模拟未来财务状况'
   }
 ];
 

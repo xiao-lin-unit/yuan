@@ -13,6 +13,7 @@
     "cap:init": "npx cap init",
     "cap:add:android": "npx cap add android",
     "cap:sync": "npx cap sync",
+    "generate:icons": "node scripts/generate-android-icons.js",
     "cap:open:android": "npx cap open android",
     "postinstall": "node scripts/postinstall.js",
     "test": "npx vitest run --reporter=verbose 2>&1"
@@ -47,6 +48,7 @@
     "electron-builder": "^24.13.3",
     "jsdom": "^29.1.0",
     "sass-embedded": "^1.99.0",
+    "sharp": "^0.34.5",
     "typescript": "^5.2.2",
     "vite": "^5.3.1",
     "vitest": "^4.1.5",

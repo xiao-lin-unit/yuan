@@ -4,7 +4,7 @@
       <img src="@/assets/img/user_icon.png" alt="用户头像" />
     </div>
     <div class="app-logo">
-      <img src="https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=finance%20app%20logo%20minimalist%20design&image_size=square" alt="裕安" />
+      <img src="@/assets/logo/app_logo.png" alt="裕安" />
       <h1>裕安</h1>
     </div>
   </div>
