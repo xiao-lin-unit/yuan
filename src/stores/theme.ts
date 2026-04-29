@@ -13,7 +13,7 @@ export interface ThemePreset {
 export const themePresets: Record<string, ThemePreset> = {
   blue: {
     name: 'blue',
-    label: '经典蓝',
+    label: '装逼蓝',
     primary: '#409EFF',
     primaryRgb: '64, 158, 255',
   },
