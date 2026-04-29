@@ -1,3 +1,4 @@
+import { readUsedSize } from 'chart.js/helpers'
 import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
 
@@ -28,23 +29,29 @@ export const themePresets: Record<string, ThemePreset> = {
     primary: '#7c3aed',
     primaryRgb: '124, 58, 237',
   },
-  orange: {
-    name: 'orange',
-    label: '活力橙',
-    primary: '#e6a23c',
-    primaryRgb: '230, 162, 60',
-  },
   pink: {
     name: 'pink',
     label: '猛男粉',
     primary: '#ec88e7ff',
     primaryRgb: '245, 136, 231',
   },
+  red: {
+    name: 'red',
+    label: '姨妈红',
+    primary: '#ff4d4f',
+    primaryRgb: '255, 77, 79',
+  },
   dark: {
     name: 'dark',
-    label: '沉稳黑',
+    label: '良心黑',
     primary: '#303133',
     primaryRgb: '48, 49, 51',
+  },
+  orange: {
+    name: 'orange',
+    label: '活力橙',
+    primary: '#e6a23c',
+    primaryRgb: '230, 162, 60',
   },
 }
 
