@@ -4,6 +4,7 @@
 **本文档引用的文件**
 - [App.vue](file://src/App.vue)
 - [main.ts](file://src/main.ts)
+- [theme.ts](file://src/stores/theme.ts)
 - [AppHeader.vue](file://src/components/common/AppHeader.vue)
 - [AppContent.vue](file://src/components/common/AppContent.vue)
 - [AppFooter.vue](file://src/components/common/AppFooter.vue)
@@ -42,9 +43,15 @@
 
 ## 更新摘要
 **变更内容**
-- AppHeader组件中的logo资源从远程API动态生成改为本地静态资源（@/assets/logo/app_logo.png）
-- 移动端MoreFeatures组件的轮播图内容更新为本地图片资源（m3.jpg, m4.jpg, m5.jpg）
-- 更换了对应的中文描述内容，提升了资源加载性能和应用稳定性
+- 新增主题系统全面集成：所有UI组件都已更新以使用新的主题变量系统
+- **主题标签更新**：蓝色主题标签从'经典蓝'更新为'装逼蓝'，橙色主题标签从'活力橙'更新为'浪荡橙'
+- AppHeader组件采用CSS变量主题色替代硬编码颜色
+- AppFooter组件集成主题色变量，支持主题切换
+- SideMenu组件新增主题面板，支持主题选择与切换
+- FloatingActionMenu组件使用主题变量实现统一的主色调
+- FloatingSwitchButton组件保持独立的绿色主题设计
+- PageHeader组件集成主题色变量
+- 所有组件通过CSS变量实现主题适配，支持动态主题切换
 
 ## 目录
 1. [简介](#简介)
@@ -52,38 +59,40 @@
 3. [核心组件](#核心组件)
 4. [架构总览](#架构总览)
 5. [详细组件分析](#详细组件分析)
-6. [依赖分析](#依赖分析)
-7. [性能考虑](#性能考虑)
-8. [故障排查指南](#故障排查指南)
-9. [结论](#结论)
-10. [附录](#附录)
+6. [主题系统集成](#主题系统集成)
+7. [依赖分析](#依赖分析)
+8. [性能考虑](#性能考虑)
+9. [故障排查指南](#故障排查指南)
+10. [结论](#结论)
+11. [附录](#附录)
 
 ## 简介
 本文件面向财务应用程序的UI组件体系，系统性梳理通用布局组件（头部导航、页面内容、底部栏）、页面模板组件、侧边菜单、日历组件、浮动操作菜单以及新增的FloatingSwitchButton切换按钮组件的设计与实现要点。文档同时覆盖组件属性、事件、插槽、样式与主题适配、最佳实践与性能优化建议，并给出扩展与自定义指导，帮助开发者快速理解与高效使用这些组件。
 
-**更新** 本次更新反映了应用的UI组件现代化升级，新增了FloatingSwitchButton浮动切换按钮组件，提供Material Design风格的绿色圆形按钮设计，支持历史推演与推演情景之间的快速切换。金融沙盒组件体系得到全面重构，包括FinancialSandbox沙盒首页、SandboxHistory历史记录、SandboxResultDetail结果详情、SandboxSimulationPage仿真页面四个核心组件，形成了完整的沙盒推演功能闭环。所有组件均采用统一的Material Design风格设计，显著提升了用户界面的一致性和专业性。
+**更新** 本次更新反映了应用的主题系统全面集成，所有UI组件都已更新以使用新的主题变量系统。**最新的主题标签变更包括蓝色主题从'经典蓝'更新为'装逼蓝'，橙色主题从'活力橙'更新为'浪荡橙'，这些变更已在theme.ts文件中完成，文档需要同步更新以保持准确性。** 新增的主题系统包括主题预设定义、主题存储管理、动态主题切换等功能，实现了真正的主题化UI组件体系。所有组件通过CSS变量实现主题适配，支持动态主题切换，显著提升了应用的个性化能力和用户体验。
 
 ## 项目结构
 应用采用"根组件 + 通用组件 + 移动端页面"的分层组织方式：
-- 根组件负责全局布局与路由/状态协调
-- 通用组件提供跨页面的基础UI能力，包括新增的FloatingSwitchButton切换按钮组件和重构的金融沙盒组件
+- 根组件负责全局布局与路由/状态协调，集成主题系统初始化
+- 通用组件提供跨页面的基础UI能力，全部支持主题系统
 - 移动端页面聚焦业务场景，组合通用组件完成具体页面
 
 ```mermaid
 graph TB
 subgraph "应用入口"
 MAIN["main.ts<br/>初始化应用与插件"]
-APP["App.vue<br/>全局布局与路由调度"]
+APP["App.vue<br/>全局布局与路由调度<br/>主题系统初始化"]
+THEME["theme.ts<br/>主题存储与管理<br/>主题标签：装逼蓝/浪荡橙"]
 end
 subgraph "通用组件"
-HEADER["AppHeader.vue<br/>头部导航"]
+HEADER["AppHeader.vue<br/>头部导航<br/>主题色集成"]
 CONTENT["AppContent.vue<br/>内容区容器"]
-FOOTER["AppFooter.vue<br/>底部导航"]
-PHEADER["PageHeader.vue<br/>页面标题栏"]
+FOOTER["AppFooter.vue<br/>底部导航<br/>主题色集成"]
+PHEADER["PageHeader.vue<br/>页面标题栏<br/>主题色集成"]
 PTEMPLATE["PageTemplate.vue<br/>页面模板"]
-SIDEMENU["SideMenu.vue<br/>侧边菜单"]
+SIDEMENU["SideMenu.vue<br/>侧边菜单<br/>主题面板<br/>主题标签：装逼蓝/浪荡橙"]
 CALENDAR["Calendar.vue<br/>日历"]
-FAM["FloatingActionMenu.vue<br/>浮动操作菜单"]
+FAM["FloatingActionMenu.vue<br/>浮动操作菜单<br/>主题色集成"]
 FSB["FloatingSwitchButton.vue<br/>浮动切换按钮"]
 STATOVERVIEW["StatOverview.vue<br/>财务统计组件"]
 MOREFEATURES["MoreFeatures.vue<br/>更多功能页面"]
@@ -106,6 +115,7 @@ LIABILITYDETAIL["LiabilityDetailPage.vue<br/>负债详情页"]
 MONTHLYSTATS["MonthlyStats.vue<br/>月度统计页"]
 end
 MAIN --> APP
+APP --> THEME
 APP --> HEADER
 APP --> CONTENT
 APP --> FOOTER
@@ -135,13 +145,14 @@ SANDBOXSIMULATIONPAGE --> SANDBOXRESULTDETAIL
 
 **图表来源**
 - [main.ts:1-16](file://src/main.ts#L1-L16)
-- [App.vue:1-223](file://src/App.vue#L1-L223)
+- [App.vue:1-299](file://src/App.vue#L1-L299)
+- [theme.ts:1-104](file://src/stores/theme.ts#L1-L104)
 - [AppHeader.vue:1-135](file://src/components/common/AppHeader.vue#L1-L135)
 - [AppContent.vue:1-51](file://src/components/common/AppContent.vue#L1-L51)
-- [AppFooter.vue:1-98](file://src/components/common/AppFooter.vue#L1-L98)
+- [AppFooter.vue:1-104](file://src/components/common/AppFooter.vue#L1-L104)
 - [PageHeader.vue:1-57](file://src/components/common/PageHeader.vue#L1-L57)
 - [PageTemplate.vue:1-103](file://src/components/common/PageTemplate.vue#L1-L103)
-- [SideMenu.vue:1-255](file://src/components/common/SideMenu.vue#L1-L255)
+- [SideMenu.vue:1-360](file://src/components/common/SideMenu.vue#L1-L360)
 - [Calendar.vue:1-477](file://src/components/common/Calendar.vue#L1-L477)
 - [FloatingActionMenu.vue:1-151](file://src/components/common/FloatingActionMenu.vue#L1-L151)
 - [FloatingSwitchButton.vue:1-59](file://src/components/common/FloatingSwitchButton.vue#L1-L59)
@@ -153,8 +164,9 @@ SANDBOXSIMULATIONPAGE --> SANDBOXRESULTDETAIL
 - [SandboxSimulationPage.vue:1-154](file://src/components/mobile/sandbox/SandboxSimulationPage.vue#L1-L154)
 
 **章节来源**
-- [App.vue:1-223](file://src/App.vue#L1-L223)
+- [App.vue:1-299](file://src/App.vue#L1-L299)
 - [main.ts:1-16](file://src/main.ts#L1-L16)
+- [theme.ts:1-104](file://src/stores/theme.ts#L1-L104)
 
 ## 核心组件
 本节对通用组件进行概览式说明，涵盖职责、关键属性/事件/插槽及典型用法。
@@ -164,7 +176,7 @@ SANDBOXSIMULATIONPAGE --> SANDBOXRESULTDETAIL
   - 事件：toggle-menu
   - 交互：点击头像触发事件；支持响应式尺寸
   - 适用：与App.vue配合实现侧边菜单开关
-  - **更新**：Logo资源从远程API改为本地静态资源@/assets/logo/app_logo.png，提升加载性能和稳定性
+  - **主题集成**：背景色使用CSS变量--app-primary-color，支持主题切换
 
 - AppContent（页面内容容器）
   - 职责：动态渲染当前页面组件，透传导航与日期变更事件
@@ -176,11 +188,13 @@ SANDBOXSIMULATIONPAGE --> SANDBOXRESULTDETAIL
   - 职责：提供底部快捷导航（支出/收入/资产/负债/更多）
   - 事件：navigate(key)
   - 适用：移动端底部Tab式导航
+  - **主题集成**：图标和文字颜色使用CSS变量--app-primary-color，支持主题切换
 
 - PageHeader（页面标题栏）
   - 职责：返回按钮 + 标题
   - 事件：back
   - 适用：页面级返回
+  - **主题集成**：返回按钮图标颜色使用CSS变量--app-primary-color
 
 - PageTemplate（页面模板）
   - 职责：提供带标题与可选确认按钮的页面骨架
@@ -189,10 +203,12 @@ SANDBOXSIMULATIONPAGE --> SANDBOXRESULTDETAIL
   - 适用：快速搭建页面结构
 
 - SideMenu（侧边菜单）
-  - 职责：抽屉式菜单，支持用户信息展示与导航
+  - 职责：抽屉式菜单，支持用户信息展示与导航，**新增主题面板**
   - 属性：visible
   - 事件：close、navigate(key)
   - 适用：全局菜单
+  - **主题集成**：用户头像边框、菜单项悬停颜色使用CSS变量--app-primary-color
+  - **主题面板**：支持主题选择与切换，包含多种主题预设，**主题标签：装逼蓝/浪荡橙**
 
 - Calendar（日历）
   - 职责：月视图日历，支持农历、节假日、周末/节假日标记、今日高亮、费用标注
@@ -205,12 +221,14 @@ SANDBOXSIMULATIONPAGE --> SANDBOXRESULTDETAIL
   - 属性：buttons（数组，包含text、icon、action）
   - 事件：无（通过action回调触发）
   - 适用：页面内快捷操作，**现已集成到所有主要业务页面中**
+  - **主题集成**：按钮背景色和阴影使用CSS变量--app-primary-color和--app-primary-rgb
 
 - FloatingSwitchButton（浮动切换按钮）
   - 职责：提供Material Design风格的圆形切换按钮，支持激活/非激活状态切换
   - 属性：active（布尔值）、activeText（激活文本）、inactiveText（非激活文本）
   - 事件：update:active（状态变更事件）
   - 适用：沙盒推演场景中的历史推演与推演情景切换
+  - **主题特色**：保持独立的绿色主题设计，不随全局主题变化
 
 - StatOverview（财务统计组件）
   - 职责：提供卡片式统计界面，支持渐变覆盖层、响应式设计和自定义颜色方案
@@ -246,10 +264,10 @@ SANDBOXSIMULATIONPAGE --> SANDBOXRESULTDETAIL
 **章节来源**
 - [AppHeader.vue:1-135](file://src/components/common/AppHeader.vue#L1-L135)
 - [AppContent.vue:1-51](file://src/components/common/AppContent.vue#L1-L51)
-- [AppFooter.vue:1-98](file://src/components/common/AppFooter.vue#L1-L98)
+- [AppFooter.vue:1-104](file://src/components/common/AppFooter.vue#L1-L104)
 - [PageHeader.vue:1-57](file://src/components/common/PageHeader.vue#L1-L57)
 - [PageTemplate.vue:1-103](file://src/components/common/PageTemplate.vue#L1-L103)
-- [SideMenu.vue:1-255](file://src/components/common/SideMenu.vue#L1-L255)
+- [SideMenu.vue:1-360](file://src/components/common/SideMenu.vue#L1-L360)
 - [Calendar.vue:1-477](file://src/components/common/Calendar.vue#L1-L477)
 - [FloatingActionMenu.vue:1-151](file://src/components/common/FloatingActionMenu.vue#L1-L151)
 - [FloatingSwitchButton.vue:1-59](file://src/components/common/FloatingSwitchButton.vue#L1-L59)
@@ -261,11 +279,12 @@ SANDBOXSIMULATIONPAGE --> SANDBOXRESULTDETAIL
 - [SandboxSimulationPage.vue:1-154](file://src/components/mobile/sandbox/SandboxSimulationPage.vue#L1-L154)
 
 ## 架构总览
-应用通过根组件App.vue集中管理当前页面组件、导航参数与日期状态，并将事件向上/向下分发至通用组件与业务页面。通用组件之间通过事件与属性协作，形成稳定的UI基础设施。新增的FloatingSwitchButton切换按钮组件为沙盒功能提供统一的状态切换入口，所有沙盒相关组件采用Material Design风格设计，确保视觉一致性。**FloatingActionMenu组件已成为所有主要业务页面的标准操作入口，提供统一的用户体验。**
+应用通过根组件App.vue集中管理当前页面组件、导航参数与日期状态，并将事件向上/向下分发至通用组件与业务页面。通用组件之间通过事件与属性协作，形成稳定的UI基础设施。**主题系统通过Pinia状态管理，使用CSS变量实现全局主题控制，所有组件通过var(--app-primary-color)和var(--app-primary-rgb)变量实现主题适配。** 新增的FloatingSwitchButton切换按钮组件为沙盒功能提供统一的状态切换入口，所有沙盒相关组件采用Material Design风格设计，确保视觉一致性。**FloatingActionMenu组件已成为所有主要业务页面的标准操作入口，提供统一的用户体验。**
 
 ```mermaid
 sequenceDiagram
 participant U as "用户"
+participant THEME as "主题系统"
 participant AH as "AppHeader"
 participant APP as "App.vue"
 participant AC as "AppContent"
@@ -275,6 +294,12 @@ participant FAM as "FloatingActionMenu"
 participant FSB as "FloatingSwitchButton"
 participant MF as "MoreFeatures"
 participant FS as "FinancialSandbox"
+U->>THEME : 选择主题
+THEME-->>U : 应用主题变量
+THEME-->>AH : 更新CSS变量
+THEME-->>AF : 更新CSS变量
+THEME-->>SM : 更新CSS变量
+THEME-->>FAM : 更新CSS变量
 U->>AH : 点击头像
 AH-->>APP : 触发 "toggle-menu"
 APP->>APP : 切换 menuVisible
@@ -297,7 +322,12 @@ FS-->>U : 导航到仿真页面
 ```
 
 **图表来源**
-- [App.vue:119-153](file://src/App.vue#L119-L153)
+- [App.vue:75-77](file://src/App.vue#L75-L77)
+- [theme.ts:60-85](file://src/stores/theme.ts#L60-L85)
+- [AppHeader.vue:52](file://src/components/common/AppHeader.vue#L52)
+- [AppFooter.vue:62](file://src/components/common/AppFooter.vue#L62)
+- [SideMenu.vue:176](file://src/components/common/SideMenu.vue#L176)
+- [FloatingActionMenu.vue:72](file://src/components/common/FloatingActionMenu.vue#L72)
 - [AppHeader.vue:45-47](file://src/components/common/AppHeader.vue#L45-L47)
 - [AppFooter.vue:3-23](file://src/components/common/AppFooter.vue#L3-L23)
 - [AppContent.vue:3-21](file://src/components/common/AppContent.vue#L3-L21)
@@ -307,7 +337,8 @@ FS-->>U : 导航到仿真页面
 - [FinancialSandbox.vue:52-54](file://src/components/mobile/sandbox/FinancialSandbox.vue#L52-L54)
 
 **章节来源**
-- [App.vue:119-153](file://src/App.vue#L119-L153)
+- [App.vue:75-77](file://src/App.vue#L75-L77)
+- [theme.ts:60-85](file://src/stores/theme.ts#L60-L85)
 
 ## 详细组件分析
 
@@ -316,6 +347,7 @@ FS-->>U : 导航到仿真页面
   - 左侧用户头像区域，点击触发菜单开关
   - 中央Logo与应用名称，**更新为本地静态资源@/assets/logo/app_logo.png**
   - 支持响应式字体与尺寸
+  - **主题集成**：背景色使用CSS变量--app-primary-color，支持主题切换
 - 状态与持久化
   - 使用本地存储保存用户名与修改状态，便于后续扩展
 - 事件
@@ -365,6 +397,7 @@ AC-->>P : 冒泡事件
 - 设计要点
   - 底部导航项：支出、收入、资产、负债、更多
   - 图标与文字组合，支持响应式
+  - **主题集成**：图标和文字颜色使用CSS变量--app-primary-color
 - 事件
   - 触发 navigate(key)，由父组件路由分发
 
@@ -378,12 +411,13 @@ Emit --> Route["父组件路由分发"]
 - [AppFooter.vue:3-23](file://src/components/common/AppFooter.vue#L3-L23)
 
 **章节来源**
-- [AppFooter.vue:1-98](file://src/components/common/AppFooter.vue#L1-L98)
+- [AppFooter.vue:1-104](file://src/components/common/AppFooter.vue#L1-L104)
 
 ### PageHeader 分析
 - 设计要点
   - 返回按钮 + 标题
   - 事件：back
+  - **主题集成**：返回按钮图标颜色使用CSS变量--app-primary-color
 - 适用场景
   - 页面级返回，常与 PageTemplate 搭配使用
 
@@ -419,17 +453,23 @@ Btn --> End
 - 设计要点
   - 抽屉式菜单，支持遮罩层与滑入动画
   - 用户信息展示与菜单项点击
+  - **主题面板**：支持主题选择与切换，包含多种主题预设，**主题标签：装逼蓝/浪荡橙**
 - 状态与事件
   - visible 控制显示/隐藏
   - close、navigate(key) 事件
 - 本地存储
   - 加载/保存用户名与修改状态
+- **主题集成**
+  - 用户头像边框颜色使用CSS变量--app-primary-color
+  - 菜单项悬停颜色使用CSS变量--app-primary-color
+  - 主题选项激活状态使用CSS变量--app-primary-color
 
 ```mermaid
 sequenceDiagram
 participant APP as "App.vue"
 participant SM as "SideMenu"
 APP->>SM : visible=true
+SM->>SM : 展示主题面板
 SM-->>APP : emit('navigate', key)
 SM-->>APP : emit('close')
 APP->>APP : 更新 menuVisible=false
@@ -440,7 +480,7 @@ APP->>APP : 更新 menuVisible=false
 - [App.vue:150-153](file://src/App.vue#L150-L153)
 
 **章节来源**
-- [SideMenu.vue:1-255](file://src/components/common/SideMenu.vue#L1-L255)
+- [SideMenu.vue:1-360](file://src/components/common/SideMenu.vue#L1-L360)
 
 ### Calendar 分析
 - 功能特性
@@ -478,6 +518,7 @@ Select --> |否| Wait["等待交互"]
   - 单按钮直显或展开多按钮菜单
   - 悬停显示提示标签
   - 动画与阴影增强交互体验
+  - **主题集成**：按钮背景色和阴影使用CSS变量--app-primary-color和--app-primary-rgb
 - 事件
   - 通过按钮 action 回调触发，组件不直接发出事件
 - 使用建议
@@ -514,6 +555,7 @@ FloatingActionMenu --> ActionButton : "使用"
   - 固定定位，底部80px，左侧20px
   - 包含开关图标与文本标签
   - 悬停放大效果，阴影增强立体感
+  - **主题特色**：保持独立的绿色主题设计，不随全局主题变化
 - 属性配置
   - active: Boolean - 按钮激活状态，默认false
   - activeText: String - 激活状态下的显示文本
@@ -825,9 +867,12 @@ Save --> Navigate["导航到结果详情"]
   - 关闭菜单时发出 close 事件
 - 导航
   - 点击菜单项发出 navigate(key)，随后关闭菜单
+- **主题面板**
+  - 支持主题选择与切换，包含多种主题预设，**主题标签：装逼蓝/浪荡橙**
+  - 主题选项激活状态使用CSS变量--app-primary-color
 
 **章节来源**
-- [SideMenu.vue:1-255](file://src/components/common/SideMenu.vue#L1-L255)
+- [SideMenu.vue:1-360](file://src/components/common/SideMenu.vue#L1-L360)
 
 ### 日历组件 Calendar 的功能详解
 - 日期选择
@@ -851,6 +896,9 @@ Save --> Navigate["导航到结果详情"]
   - more 按钮展开菜单，逐项悬停显示提示
 - 动画与样式
   - 滑入动画、阴影、缩放与透明度过渡
+- **主题集成**
+  - 按钮背景色使用CSS变量--app-primary-color
+  - 阴影颜色使用CSS变量--app-primary-rgb
 - **集成优势**
   - 统一的用户体验，所有页面操作入口一致
   - 减少页面间的操作差异，提升学习成本
@@ -865,8 +913,9 @@ Save --> Navigate["导航到结果详情"]
 - 文本更新
   - 根据状态动态更新显示文本
   - 支持自定义激活与非激活文本
-- Material Design风格
-  - 绿色圆形设计，24px圆角半径
+- **主题特色**
+  - 独立的绿色主题设计，不随全局主题变化
+  - 绿色背景色 #67c23a，白色图标
   - 固定定位，底部80px，左侧20px
   - 悬停放大效果，阴影增强立体感
 - **集成优势**
@@ -1006,25 +1055,8 @@ Interact --> |返回| Back
 - **FloatingActionMenu集成**
   - 提供新增普通资产、股票、基金的操作入口
   - 统一的新增操作体验
-
-```mermaid
-flowchart TD
-Init["初始化页面"] --> LoadData["加载资产数据"]
-LoadData --> ProcessAssets["处理资产数据"]
-ProcessAssets --> FilterAssets["根据ended状态过滤"]
-FilterAssets --> RenderCards["渲染资产卡片"]
-RenderCards --> UserAction{"用户操作？"}
-UserAction --> |切换视图| ToggleView["切换当前/历史资产"]
-ToggleView --> RenderStat["渲染StatOverview"]
-UserAction --> |点击卡片| NavigateDetail["导航到详情页面"]
-UserAction --> |新增资产| OpenMenu["打开浮动菜单"]
-OpenMenu --> ChooseType["选择资产类型"]
-ChooseType --> NavigateAdd["导航到新增页面"]
-```
-
-**图表来源**
-- [AssetManagement.vue:189-231](file://src/components/mobile/asset/AssetManagement.vue#L189-L231)
-- [AssetManagement.vue:249-262](file://src/components/mobile/asset/AssetManagement.vue#L249-L262)
+- **主题集成**
+  - 统一的主色调设计，提升视觉一致性
 
 **章节来源**
 - [AssetManagement.vue:1-414](file://src/components/mobile/asset/AssetManagement.vue#L1-L414)
@@ -1049,7 +1081,9 @@ ChooseType --> NavigateAdd["导航到新增页面"]
   - 模拟数据回退机制
 - **FloatingActionMenu集成**
   - 提供新增负债的操作入口
-  - 统一的新增操作体验
+  - 统一的操作体验
+- **主题集成**
+  - 统一的主色调设计，提升视觉一致性
 
 **章节来源**
 - [LiabilityManagement.vue:1-247](file://src/components/mobile/liability/LiabilityManagement.vue#L1-L247)
@@ -1176,6 +1210,8 @@ ChooseType --> NavigateAdd["导航到新增页面"]
 - **FloatingActionMenu集成**
   - 提供新增账户、编辑账户、余额调整等操作入口
   - 统一的操作体验，提升用户效率
+- **主题集成**
+  - 统一的主色调设计，提升视觉一致性
 
 **章节来源**
 - [AccountManagement.vue:1-689](file://src/components/mobile/account/AccountManagement.vue#L1-L689)
@@ -1197,6 +1233,10 @@ ChooseType --> NavigateAdd["导航到新增页面"]
 - **FloatingActionMenu集成**
   - 提供停用、编辑、还款等操作入口
   - 根据账户类型动态调整操作按钮
+- **样式优化**
+  - 标签页样式简化，提升界面简洁性
+  - 动态标签选择逻辑改进，优化用户体验
+  - 交易记录头部间距调整，改善视觉层次
 
 **章节来源**
 - [AccountDetailPage.vue:1-587](file://src/components/mobile/account/AccountDetailPage.vue#L1-L587)
@@ -1216,6 +1256,8 @@ ChooseType --> NavigateAdd["导航到新增页面"]
 - **FloatingActionMenu集成**
   - 提供新增支出等操作入口
   - 简化用户的操作流程
+- **主题集成**
+  - 统一的主色调设计，提升视觉一致性
 
 **章节来源**
 - [ExpensePage.vue:1-88](file://src/components/mobile/expense/ExpensePage.vue#L1-L88)
@@ -1235,6 +1277,8 @@ ChooseType --> NavigateAdd["导航到新增页面"]
 - **FloatingActionMenu集成**
   - 提供新增收入等操作入口
   - 统一的操作体验
+- **主题集成**
+  - 统一的主色调设计，提升视觉一致性
 
 **章节来源**
 - [IncomePage.vue:1-15](file://src/components/mobile/income/IncomePage.vue#L1-L15)
@@ -1260,6 +1304,8 @@ ChooseType --> NavigateAdd["导航到新增页面"]
   - 标签页样式简化，提升界面简洁性
   - 动态标签选择逻辑改进，优化用户体验
   - 交易记录头部间距调整，改善视觉层次
+- **主题集成**
+  - 统一的主色调设计，提升视觉一致性
 
 **章节来源**
 - [LiabilityDetailPage.vue:1-607](file://src/components/mobile/liability/LiabilityDetailPage.vue#L1-L607)
@@ -1291,6 +1337,94 @@ ChooseType --> NavigateAdd["导航到新增页面"]
 - [stock.ts:1-95](file://src/types/asset/stock.ts#L1-L95)
 - [fund.ts:1-105](file://src/types/asset/fund.ts#L1-L105)
 
+## 主题系统集成
+
+### 主题系统概述
+应用采用全新的主题系统，通过CSS变量实现全局主题控制，所有UI组件都已更新以使用新的主题变量。**最新的主题标签变更包括蓝色主题从'经典蓝'更新为'装逼蓝'，橙色主题从'活力橙'更新为'浪荡橙'，这些变更已在theme.ts文件中完成。** 主题系统基于Pinia状态管理，支持多种主题预设和动态切换。
+
+### 主题存储与管理
+- **主题存储**：使用Pinia状态管理，支持主题预设定义和持久化存储
+- **主题预设**：包含7种预设主题，支持蓝色、绿色、紫色、粉色、红色、黑色、橙色
+- **CSS变量**：通过document.documentElement.style.setProperty设置CSS变量
+- **持久化**：使用localStorage保存用户选择的主题
+
+### 主题变量定义
+- `--app-primary-color`：主色调颜色值
+- `--app-primary-rgb`：主色调RGB值
+- **默认值**：蓝色主题（#409EFF, 64, 158, 255）
+
+### 主题组件集成
+所有通用组件都已集成主题系统：
+
+#### AppHeader 主题集成
+- 背景色：使用CSS变量--app-primary-color
+- 支持响应式主题切换
+- 保持原有布局和交互功能
+
+#### AppFooter 主题集成
+- 图标颜色：使用CSS变量--app-primary-color
+- 文字颜色：使用CSS变量--app-primary-color
+- 支持主题切换时的平滑过渡
+
+#### SideMenu 主题集成
+- 用户头像边框：使用CSS变量--app-primary-color
+- 菜单项悬停颜色：使用CSS变量--app-primary-color
+- 主题面板激活状态：使用CSS变量--app-primary-color
+- **新增主题面板功能，主题标签：装逼蓝/浪荡橙**
+
+#### FloatingActionMenu 主题集成
+- 按钮背景色：使用CSS变量--app-primary-color
+- 阴影颜色：使用CSS变量--app-primary-rgb
+- 支持主题切换时的动态更新
+
+#### PageHeader 主题集成
+- 返回按钮图标颜色：使用CSS变量--app-primary-color
+- 保持原有布局和交互功能
+
+### 主题标签更新详情
+**最新主题标签变更**：
+- 蓝色主题标签：从'经典蓝'更新为'装逼蓝'
+- 橙色主题标签：从'活力橙'更新为'浪荡橙'
+
+这些变更体现在theme.ts文件中：
+- 第16行：蓝色主题label从'经典蓝'更新为'装逼蓝'
+- 第52行：橙色主题label从'活力橙'更新为'浪荡橙'
+
+**主题标签预设**：
+- 蓝色：装逼蓝 (#409EFF)
+- 绿色：原谅绿 (#67c23a)
+- 紫色：韵味紫 (#7c3aed)
+- 粉色：猛男粉 (#ec88e7ff)
+- 红色：姨妈红 (#ff4d4f)
+- 黑色：良心黑 (#303133)
+- 橙色：浪荡橙 (#e6a23c)
+
+### 主题切换流程
+```mermaid
+flowchart TD
+User["用户选择主题"] --> Store["更新主题存储"]
+Store --> Apply["应用CSS变量"]
+Apply --> Header["更新AppHeader"]
+Apply --> Footer["更新AppFooter"]
+Apply --> Menu["更新SideMenu"]
+Apply --> FAM["更新FloatingActionMenu"]
+Apply --> PHeader["更新PageHeader"]
+Apply --> Components["更新其他组件"]
+Components --> Success["主题切换完成"]
+```
+
+**图表来源**
+- [theme.ts:78-85](file://src/stores/theme.ts#L78-L85)
+- [App.vue:75-77](file://src/App.vue#L75-L77)
+
+**章节来源**
+- [theme.ts:1-104](file://src/stores/theme.ts#L1-L104)
+- [AppHeader.vue:50-61](file://src/components/common/AppHeader.vue#L50-L61)
+- [AppFooter.vue:62-78](file://src/components/common/AppFooter.vue#L62-L78)
+- [SideMenu.vue:176](file://src/components/common/SideMenu.vue#L176)
+- [FloatingActionMenu.vue:72-118](file://src/components/common/FloatingActionMenu.vue#L72-L118)
+- [PageHeader.vue:53-55](file://src/components/common/PageHeader.vue#L53-L55)
+
 ## 依赖分析
 - 运行时依赖
   - Vue 3、Element Plus、Pinia、date-fns、lunar-javascript、echarts 等
@@ -1300,12 +1434,18 @@ ChooseType --> NavigateAdd["导航到新增页面"]
   - Capacitor（原生平台键盘插件）
 - 服务层依赖
   - 数据库适配器、事务处理、类型安全
+- **主题系统依赖**
+  - Pinia状态管理，用于主题状态持久化
+  - CSS变量系统，实现全局主题控制
+  - localStorage存储，持久化用户主题偏好
 - **FloatingActionMenu组件依赖**
   - 无外部依赖，仅使用内置样式与Element Plus图标
   - 统一的图标系统，支持多种操作类型的图标
+  - **主题变量集成，支持动态主题切换**
 - **FloatingSwitchButton组件依赖**
   - Element Plus图标库，使用Switch图标
   - Material Design风格的绿色主题设计
+  - **独立主题设计，不随全局主题变化**
 - **沙盒组件依赖**
   - ECharts图表库，用于趋势图展示
   - Element Plus表单组件，用于参数配置
@@ -1316,6 +1456,10 @@ ChooseType --> NavigateAdd["导航到新增页面"]
   - 统一的Material Design风格设计
 - StatOverview 组件依赖
   - 无外部依赖，仅使用内置样式与图片资源
+- **主题系统组件依赖**
+  - **CSS变量系统，实现全局主题控制**
+  - **Pinia状态管理，支持主题状态持久化**
+  - **localStorage存储，持久化用户主题偏好**
 
 ```mermaid
 graph LR
@@ -1329,8 +1473,13 @@ SASS["Sass"] --> VITE
 CAP["Capacitor"] --> KEYBOARD["@capacitor/keyboard"]
 SERVICE["服务层"] --> DB["数据库适配器"]
 SERVICE --> TYPES["TypeScript类型定义"]
+THEME["主题系统"] --> CSSVARS["CSS变量"]
+THEME --> PINIATHEME["Pinia状态管理"]
+THEME --> LOCALSTORAGE["localStorage"]
 FAM["FloatingActionMenu组件"] --> ICONS["@element-plus/icons-vue"]
+FAM --> THEMEVARS["主题变量集成"]
 FSB["FloatingSwitchButton组件"] --> SWITCH["Switch图标"]
+FSB --> GREEN["独立绿色主题"]
 MF["MoreFeatures组件"] --> LOCALIMAGES["本地图片资源"]
 MF --> ICONS
 SANDBOX["沙盒组件"] --> ECHARTS
@@ -1342,6 +1491,7 @@ STATOVERVIEW["StatOverview组件"] --> IMG["内置图片资源"]
 - [package.json:19-36](file://package.json#L19-L36)
 - [vite.config.ts:1-11](file://vite.config.ts#L1-L11)
 - [tsconfig.json:1-25](file://tsconfig.json#L1-L25)
+- [theme.ts:60-85](file://src/stores/theme.ts#L60-L85)
 - [FloatingActionMenu.vue:35](file://src/components/common/FloatingActionMenu.vue#L35)
 - [FloatingSwitchButton.vue:9](file://src/components/common/FloatingSwitchButton.vue#L9)
 - [MoreFeatures.vue:57-59](file://src/components/mobile/more/MoreFeatures.vue#L57-L59)
@@ -1353,6 +1503,7 @@ STATOVERVIEW["StatOverview组件"] --> IMG["内置图片资源"]
 - [package.json:1-72](file://package.json#L1-L72)
 - [vite.config.ts:1-11](file://vite.config.ts#L1-L11)
 - [tsconfig.json:1-25](file://tsconfig.json#L1-L25)
+- [theme.ts:1-104](file://src/stores/theme.ts#L1-L104)
 
 ## 性能考虑
 - 日历组件
@@ -1363,13 +1514,15 @@ STATOVERVIEW["StatOverview组件"] --> IMG["内置图片资源"]
 - 浮动菜单
   - 展开动画与阴影会带来一定开销，按钮数量较多时建议合并相似操作或延迟渲染
   - **FloatingActionMenu组件已集成到多个页面，需要注意组件实例的复用与销毁**
+  - **主题变量使用CSS变量，性能开销极小，无需额外计算**
 - **FloatingSwitchButton组件**
   - Material Design风格设计，渲染开销较小
   - 固定定位，避免频繁重排
   - 状态切换通过事件触发，性能影响可忽略
+  - **独立主题设计，不参与全局主题切换**
 - **MoreFeatures组件**
   - **本地图片资源加载更快，无需网络请求，提升应用启动速度**
-  - 自动轮播定时器需在组件卸载时清理，防止内存泄漏
+  - 自动轮播定时器需在卸载时清理，防止内存泄漏
   - 轮播图容器高度固定，避免布局抖动
 - **沙盒组件体系**
   - ECharts图表渲染可能带来性能开销，建议在组件卸载时释放图表实例
@@ -1388,6 +1541,11 @@ STATOVERVIEW["StatOverview组件"] --> IMG["内置图片资源"]
   - 实现数据缓存机制，减少重复请求
   - 优化数据库查询，使用索引和适当的查询条件
   - **沙盒计算采用事务处理，确保数据一致性**
+- **主题系统性能**
+  - **CSS变量主题切换性能优异，无需重新渲染DOM**
+  - **Pinia状态管理轻量级，主题切换开销极小**
+  - **localStorage存储主题偏好，无需网络请求**
+  - **主题标签更新不影响性能，仅涉及字符串替换**
 
 ## 故障排查指南
 - 事件未生效
@@ -1407,14 +1565,19 @@ STATOVERVIEW["StatOverview组件"] --> IMG["内置图片资源"]
   - **检查交易记录头部间距样式是否正确应用**
   - **确认标签页样式简化后的兼容性**
   - **检查MoreFeatures组件的轮播图资源加载**
+  - **检查主题CSS变量是否正确应用**
+  - **确认主题切换功能正常工作**
+  - **检查主题标签显示是否正确：装逼蓝/浪荡橙**
 - **FloatingActionMenu操作无效**
   - 确认按钮数组格式正确，包含text、icon、action属性
   - 检查action回调函数是否正确绑定
   - 确认图标组件正确导入
+  - **检查主题变量是否正确应用到按钮样式**
 - **FloatingSwitchButton状态不更新**
   - 确认update:active事件正确绑定
   - 检查active属性的双向绑定
   - 确认文本内容根据状态正确更新
+  - **确认组件使用独立的绿色主题设计**
 - **MoreFeatures轮播图不显示**
   - **确认本地图片资源m3.jpg、m4.jpg、m5.jpg存在且路径正确**
   - 检查图片导入语句是否正确
@@ -1455,6 +1618,17 @@ STATOVERVIEW["StatOverview组件"] --> IMG["内置图片资源"]
   - 检查图表数据格式
   - 验证图表容器尺寸
   - 确认图表选项配置正确
+- **主题系统故障**
+  - **确认CSS变量--app-primary-color和--app-primary-rgb正确设置**
+  - **检查Pinia主题存储状态是否正确更新**
+  - **验证localStorage中主题偏好是否正确保存**
+  - **确认主题切换动画和过渡效果正常**
+  - **检查主题标签显示是否正确：装逼蓝/浪荡橙**
+- **组件主题样式问题**
+  - **检查组件中var(--app-primary-color)变量是否正确应用**
+  - **确认主题面板中的主题选项样式正常显示**
+  - **验证主题切换时的视觉反馈是否正确**
+  - **确认主题标签更新后的显示效果**
 
 **章节来源**
 - [Calendar.vue:88-94](file://src/components/common/Calendar.vue#L88-L94)
@@ -1471,11 +1645,19 @@ STATOVERVIEW["StatOverview组件"] --> IMG["内置图片资源"]
 - [LiabilityDetailPage.vue:228](file://src/components/mobile/liability/LiabilityDetailPage.vue#L228)
 - [SandboxHistory.vue:75-82](file://src/components/mobile/sandbox/SandboxHistory.vue#L75-L82)
 - [SandboxResultDetail.vue:204-226](file://src/components/mobile/sandbox/SandboxResultDetail.vue#L204-L226)
+- [theme.ts:60-85](file://src/stores/theme.ts#L60-L85)
 
 ## 结论
 本UI组件体系以通用布局组件为核心，结合页面模板与交互组件，形成可复用、可扩展的移动端财务应用界面框架。通过事件与属性的清晰边界、响应式与主题适配策略，以及合理的性能与可维护性设计，能够支撑多样化的业务页面需求。
 
-**更新** 本次现代化升级显著提升了资产相关页面的功能完整性与用户体验，新增的FloatingSwitchButton浮动切换按钮组件提供Material Design风格的绿色圆形设计，支持历史推演与推演情景之间的快速切换。金融沙盒组件体系得到全面重构，包括FinancialSandbox沙盒首页、SandboxHistory历史记录、SandboxResultDetail结果详情、SandboxSimulationPage仿真页面四个核心组件，形成了完整的沙盒推演功能闭环。所有组件均采用统一的Material Design风格设计，显著提升了用户界面的一致性和专业性。
+**更新** 本次现代化升级显著提升了资产相关页面的功能完整性与用户体验，新增的FloatingSwitchButton浮动切换按钮组件提供Material Design风格的绿色圆形设计，支持历史推演与推演情景之间的快速切换。金融沙盒组件体系得到全面重构，包括FinancialSandbox沙盒首页、SandboxHistory历史记录、SandboxResultDetail结果详情、SandboxSimulationPage仿真页面四个核心组件，形成了完整的沙盒推演功能闭环。**最重要的更新是主题系统的全面集成，所有UI组件都已更新以使用新的主题变量系统，最新的主题标签变更包括蓝色主题从'经典蓝'更新为'装逼蓝'，橙色主题从'活力橙'更新为'浪荡橙'，这些变更已在theme.ts文件中完成。**
+
+**主题系统成果**
+- **CSS变量主题系统**：通过--app-primary-color和--app-primary-rgb变量实现全局主题控制
+- **Pinia状态管理**：主题状态持久化，支持用户偏好记忆
+- **多种主题预设**：蓝色、绿色、紫色、粉色、红色、黑色、橙色七种主题，**主题标签：装逼蓝/浪荡橙**
+- **动态主题切换**：支持运行时主题切换，无需刷新页面
+- **组件全面适配**：AppHeader、AppFooter、SideMenu、FloatingActionMenu、PageHeader等全部支持主题系统
 
 **新增组件成果**
 - **FloatingSwitchButton浮动切换按钮组件**：提供Material Design风格的绿色圆形按钮设计，支持激活/非激活状态切换，统一沙盒功能的视觉语言
@@ -1489,22 +1671,30 @@ STATOVERVIEW["StatOverview组件"] --> IMG["内置图片资源"]
 - **FloatingSwitchButton组件**：集成到沙盒功能中，支持历史推演与推演情景的快速切换
 - **沙盒组件体系**：四个核心组件协同工作，提供完整的推演功能体验
 - **MoreFeatures组件**：本地图片资源优化，提升应用启动速度和离线可用性
-- **样式优化**：资产详情页面、股票/基金详情页面、负债详情页面的样式优化成果显著
+- **主题系统集成**：所有通用组件支持主题系统，实现真正的主题化UI
 
-建议在实际使用中遵循事件冒泡规范、合理拆分组件职责，并根据业务场景扩展组件能力。对于新增的FloatingSwitchButton组件，建议重点关注Material Design风格的统一性和状态切换的用户体验。对于重构的沙盒组件体系，建议重点关注组件间的通信机制和数据流转的顺畅性，确保提供优质的用户体验。对于更新的MoreFeatures组件，建议重点关注本地资源的加载性能和离线可用性。
+**主题标签更新成果**
+- **蓝色主题标签更新**：从'经典蓝'更新为'装逼蓝'，提升主题的个性化表达
+- **橙色主题标签更新**：从'活力橙'更新为'浪荡橙'，增强主题的独特性
+- **主题标签一致性**：所有主题标签均已完成更新，确保用户界面的一致性
+
+建议在实际使用中遵循事件冒泡规范、合理拆分组件职责，并根据业务场景扩展组件能力。对于新增的FloatingSwitchButton组件，建议重点关注Material Design风格的统一性和状态切换的用户体验。对于重构的沙盒组件体系，建议重点关注组件间的通信机制和数据流转的顺畅性，确保提供优质的用户体验。对于更新的MoreFeatures组件，建议重点关注本地资源的加载性能和离线可用性。**对于主题系统，建议重点关注CSS变量的应用和Pinia状态管理的正确使用，确保主题切换的流畅性和一致性，同时关注主题标签更新后的显示效果。**
 
 ## 附录
 
 ### 组件属性、事件与插槽清单
 - AppHeader
   - 事件：toggle-menu
+  - **主题集成**：使用CSS变量--app-primary-color
 - AppContent
   - 属性：currentComponent、componentProps
   - 事件：navigate、dateChange
 - AppFooter
   - 事件：navigate(key)
+  - **主题集成**：使用CSS变量--app-primary-color
 - PageHeader
   - 事件：back
+  - **主题集成**：使用CSS变量--app-primary-color
 - PageTemplate
   - 属性：title、showConfirmButton、confirmText、confirmDisabled
   - 事件：back、confirm
@@ -1512,14 +1702,18 @@ STATOVERVIEW["StatOverview组件"] --> IMG["内置图片资源"]
 - SideMenu
   - 属性：visible
   - 事件：close、navigate(key)
+  - **主题集成**：使用CSS变量--app-primary-color
+  - **主题面板**：支持主题选择与切换，**主题标签：装逼蓝/浪荡橙**
 - Calendar
   - 属性：width、height、expenses
   - 事件：click(date)
 - FloatingActionMenu
   - 属性：buttons（数组，包含 text、icon、action）
+  - **主题集成**：使用CSS变量--app-primary-color和--app-primary-rgb
 - FloatingSwitchButton
   - 属性：active（布尔值）、activeText（字符串）、inactiveText（字符串）
   - 事件：update:active
+  - **主题特色**：独立绿色主题设计
 - StatOverview
   - 属性：background、main、details
   - 事件：无
@@ -1615,15 +1809,16 @@ STATOVERVIEW["StatOverview组件"] --> IMG["内置图片资源"]
 - [LiabilityDetailPage.vue:1-607](file://src/components/mobile/liability/LiabilityDetailPage.vue#L1-L607)
 
 ### 样式定制与主题适配
-- 主题色
-  - 组件广泛使用统一主色，可通过CSS变量或覆盖类名进行主题定制
+- **主题色系统**
+  - 组件广泛使用CSS变量--app-primary-color，通过Pinia状态管理实现动态主题切换
   - 资产卡片支持自定义颜色主题
   - StatOverview 组件支持自定义颜色方案，支持白色主题
-  - **FloatingSwitchButton组件采用Material Design绿色主题 #67c23a**
+  - **FloatingSwitchButton组件采用独立的绿色主题设计 #67c23a**
   - **沙盒组件采用统一的Material Design风格设计**
-  - **FloatingActionMenu组件使用Element Plus蓝色主题 #409eff**
+  - **FloatingActionMenu组件使用CSS变量--app-primary-color和--app-primary-rgb**
   - **MoreFeatures组件使用Element Plus图标库，支持主题适配**
-- 响应式
+  - **主题标签：装逼蓝/浪荡橙**
+- **响应式设计**
   - 多处媒体查询适配小屏设备，建议在新增样式时同步考虑断点
   - 资产管理页面支持网格布局的响应式调整
   - StatOverview 组件支持多种屏幕尺寸的自适应
@@ -1631,16 +1826,17 @@ STATOVERVIEW["StatOverview组件"] --> IMG["内置图片资源"]
   - **沙盒组件采用flex布局，支持响应式调整**
   - **FloatingActionMenu组件位置固定，适配各种屏幕尺寸**
   - **MoreFeatures组件采用网格布局，支持响应式调整**
-- Element Plus
+  - **主题系统支持响应式主题切换**
+- **Element Plus集成**
   - 图标与组件样式由 Element Plus 提供，建议统一引入其样式文件
   - **FloatingSwitchButton组件使用Element Plus Switch图标**
   - **FloatingActionMenu组件使用Element Plus图标库，确保图标一致性**
   - **MoreFeatures组件使用Element Plus图标库，支持功能图标展示**
-- 资产详情页面
+- **资产详情页面**
   - 支持深色主题适配
   - 响应式卡片布局设计
   - **样式优化提升了收益记录的视觉层次**
-- StatOverview 组件
+- **StatOverview 组件**
   - 渐变覆盖层支持透明度调节
   - 字体大小根据屏幕尺寸自动调整
   - 支持自定义背景图片与颜色方案
@@ -1650,6 +1846,7 @@ STATOVERVIEW["StatOverview组件"] --> IMG["内置图片资源"]
   - 简化的标签页样式，增强界面简洁性
   - 改进的动态标签选择逻辑，提升交互流畅性
 - **浮动操作菜单样式优化**
+  - **使用CSS变量实现主题适配，支持动态主题切换**
   - 统一的蓝色主题设计，确保视觉一致性
   - 悬停动画效果，提升交互体验
   - 提示标签系统，增强可访问性
@@ -1664,10 +1861,16 @@ STATOVERVIEW["StatOverview组件"] --> IMG["内置图片资源"]
   - 渐变遮罩效果，提升视觉层次
   - 功能菜单网格布局，支持响应式调整
   - 响应式设计，适配小屏设备
+- **主题系统样式优化**
+  - **CSS变量系统实现全局主题控制**
+  - **Pinia状态管理支持主题状态持久化**
+  - **多种主题预设支持动态切换**
+  - **主题面板提供直观的主题选择界面**
+  - **主题标签更新为装逼蓝/浪荡橙**
 
 **章节来源**
 - [AppHeader.vue:50-135](file://src/components/common/AppHeader.vue#L50-L135)
-- [AppFooter.vue:34-98](file://src/components/common/AppFooter.vue#L34-L98)
+- [AppFooter.vue:34-104](file://src/components/common/AppFooter.vue#L34-L104)
 - [FloatingActionMenu.vue:61-151](file://src/components/common/FloatingActionMenu.vue#L61-L151)
 - [FloatingSwitchButton.vue:30-58](file://src/components/common/FloatingSwitchButton.vue#L30-L58)
 - [MoreFeatures.vue:113-300](file://src/components/mobile/more/MoreFeatures.vue#L113-L300)
@@ -1682,7 +1885,8 @@ STATOVERVIEW["StatOverview组件"] --> IMG["内置图片资源"]
 - [SandboxHistory.vue:85-179](file://src/components/mobile/sandbox/SandboxHistory.vue#L85-L179)
 - [SandboxResultDetail.vue:229-334](file://src/components/mobile/sandbox/SandboxResultDetail.vue#L229-L334)
 - [SandboxSimulationPage.vue:115-154](file://src/components/mobile/sandbox/SandboxSimulationPage.vue#L115-L154)
-- [main.ts:3-5](file://src/main.ts#L3-L5)
+- [theme.ts:60-85](file://src/stores/theme.ts#L60-L85)
+- [App.vue:264-267](file://src/App.vue#L264-L267)
 
 ### 最佳实践与扩展建议
 - 事件命名与参数
@@ -1698,11 +1902,13 @@ STATOVERVIEW["StatOverview组件"] --> IMG["内置图片资源"]
   - **FloatingSwitchButton组件专门负责状态切换，不包含业务逻辑**
   - **沙盒组件体系采用分层设计，职责明确**
   - **MoreFeatures组件专门负责功能入口展示，不包含业务逻辑**
+  - **主题系统组件负责主题管理，不包含业务逻辑**
 - 动态组件
   - 使用 computed 维护组件映射，避免在模板中直接分支过多
   - 资产详情页面使用 props 接收参数，支持灵活的数据传递
   - **沙盒组件通过sceneType参数动态加载场景定义**
   - **MoreFeatures组件通过本地资源直接加载轮播图内容**
+  - **主题系统通过CSS变量实现动态主题切换**
 - 性能
   - 避免在渲染周期内做重计算；及时清理定时器与监听器
   - 资产详情页面使用懒加载优化大数据量展示
@@ -1712,6 +1918,7 @@ STATOVERVIEW["StatOverview组件"] --> IMG["内置图片资源"]
   - **沙盒组件采用ECharts图表，注意内存释放**
   - **MoreFeatures组件使用本地图片资源，提升加载性能**
   - **样式优化减少了不必要的计算，提升了整体性能**
+  - **主题系统使用CSS变量，性能开销极小**
 - 可访问性
   - 为图标与按钮提供语义化文本与键盘可达性
   - 资产卡片支持点击事件，提供明确的视觉反馈
@@ -1720,6 +1927,7 @@ STATOVERVIEW["StatOverview组件"] --> IMG["内置图片资源"]
   - **沙盒组件提供完整的键盘导航支持**
   - **FloatingActionMenu组件提供悬停提示，提升可访问性**
   - **MoreFeatures组件提供清晰的功能导航层次结构**
+  - **主题系统支持深色模式适配**
 - 类型安全
   - 使用 TypeScript 类型定义确保数据结构正确性
   - 服务层返回值使用明确的类型注解
@@ -1728,6 +1936,7 @@ STATOVERVIEW["StatOverview组件"] --> IMG["内置图片资源"]
   - **沙盒组件使用SceneDef和SandboxHistory等接口定义数据结构**
   - **FloatingActionMenu组件使用ActionButton接口定义按钮结构**
   - **MoreFeatures组件使用CarouselItem接口定义轮播图结构**
+  - **主题系统使用ThemePreset接口定义主题预设**
 - 错误处理
   - 实现完善的错误处理机制，提供友好的用户反馈
   - 资产详情页面支持模拟数据回退，确保页面稳定性
@@ -1736,6 +1945,7 @@ STATOVERVIEW["StatOverview组件"] --> IMG["内置图片资源"]
   - **沙盒组件支持计算异常的错误提示**
   - **FloatingActionMenu组件支持按钮失效状态，提升用户体验**
   - **MoreFeatures组件支持轮播图加载失败的降级处理**
+  - **主题系统支持主题加载失败的默认处理**
 - 扩展建议
   - StatOverview 组件可扩展为支持更多统计维度
   - 支持动画过渡效果，提升用户体验
@@ -1752,6 +1962,11 @@ STATOVERVIEW["StatOverview组件"] --> IMG["内置图片资源"]
   - **MoreFeatures组件可扩展为支持更多功能入口**
   - **轮播图可增加无限循环播放功能**
   - **样式优化可继续提升组件的视觉一致性**
+  - **主题系统可扩展为主题配置面板**
+  - **主题预设可支持用户自定义主题**
+  - **主题切换可支持动画过渡效果**
+  - **组件主题适配可支持更丰富的主题变量**
+  - **主题标签可扩展为支持国际化显示**
 
 **章节来源**
 - [App.vue:65-89](file://src/App.vue#L65-L89)
@@ -1768,3 +1983,4 @@ STATOVERVIEW["StatOverview组件"] --> IMG["内置图片资源"]
 - [stockService.ts:154-244](file://src/services/asset/stockService.ts#L154-L244)
 - [fundService.ts:169-264](file://src/services/asset/fundService.ts#L169-L264)
 - [sandboxService.ts:280-704](file://src/services/sandbox/sandboxService.ts#L280-L704)
+- [theme.ts:60-85](file://src/stores/theme.ts#L60-L85)

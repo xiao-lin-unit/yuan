@@ -221,7 +221,11 @@ export async function updateAsset(assetId: string, data: Partial<Asset>): Promis
  * Delete asset
  */
 export async function deleteAsset(assetId: string): Promise<void> {
-  await db.run('DELETE FROM assets WHERE id = ?', [assetId])
+  const statements: { statement: string; values: any[] }[] = [
+    { statement: 'DELETE FROM assets WHERE id = ?', values: [assetId] },
+    { statement: 'DELETE FROM asset_income_records WHERE asset_id = ?', values: [assetId] }
+  ]
+  await db.executeTransaction(statements)
 }
 
 /**

@@ -41,7 +41,7 @@
           <el-input v-model.number="assetForm.income_amount" placeholder="请输入每期收益金额" type="number" min="0" step="0.01" />
         </el-form-item>
         <el-form-item label="年收益率" required v-if="assetForm.calculation_type === '按年收益率计算'">
-          <el-input v-model.number="assetForm.annual_yield_rate" placeholder="请输入年收益率（如0.05表示5%）" type="number" min="0" step="0.0001" />
+          <el-input v-model.number="assetForm.annual_yield_rate" placeholder="请输入年收益率" type="number" min="0" step="0.0001" />
         </el-form-item>
         <template v-if="assetForm.calculation_type && assetForm.calculation_type !== '无'">
           <el-form-item label="收益周期" required>
@@ -213,7 +213,7 @@ const addAsset = async () => {
       account_id: assetForm.value.account_id,
       calculation_type: assetForm.value.calculation_type as '无' | '按金额计算' | '按年收益率计算',
       income_amount: isNoCalc ? 0 : assetForm.value.income_amount,
-      annual_yield_rate: isNoCalc ? 0 : assetForm.value.annual_yield_rate,
+      annual_yield_rate: isNoCalc ? 0 : assetForm.value.annual_yield_rate / 100,
       period: isNoCalc ? undefined : assetForm.value.period,
       period_count: isNoCalc ? 0 : assetForm.value.period_count,
       income_date: isNoCalc ? undefined : incomeDate

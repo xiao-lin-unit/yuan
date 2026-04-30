@@ -242,9 +242,12 @@ export async function updateLiability(liabilityId: string, data: Partial<Liabili
  */
 export async function deleteLiability(liabilityId: string): Promise<void> {
   // Delete related records first
-  await db.run('DELETE FROM pending_repayments WHERE liability_id = ?', [liabilityId])
-  await db.run('DELETE FROM repayments WHERE liability_id = ?', [liabilityId])
-  await db.run('DELETE FROM liabilities WHERE id = ?', [liabilityId])
+  const statements: { statement: string; values: any[] }[] = [
+    { statement: 'DELETE FROM pending_repayments WHERE liability_id = ?', values: [liabilityId] },
+    { statement: 'DELETE FROM repayments WHERE liability_id = ?', values: [liabilityId] },
+    { statement: 'DELETE FROM liabilities WHERE id = ?', values: [liabilityId] }
+  ]
+  await db.executeTransaction(statements)
 }
 
 /**

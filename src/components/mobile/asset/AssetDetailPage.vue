@@ -113,7 +113,7 @@
         <el-form-item v-if="editForm.calculation_type === '按年收益率计算'" label="年收益率" required>
           <el-input
             v-model.number="editForm.annual_yield_rate"
-            placeholder="请输入年收益率，如0.03表示3%"
+            placeholder="请输入年收益率"
             type="number"
             min="0"
             step="0.0001"
@@ -142,10 +142,10 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue';
 import dayjs from 'dayjs';
-import { ArrowLeft, SwitchButton, Edit, VideoPause, VideoPlay } from '@element-plus/icons-vue';
+import { ArrowLeft, SwitchButton, Edit, VideoPause, VideoPlay, Delete } from '@element-plus/icons-vue';
 import { ElMessageBox, ElMessage } from 'element-plus';
 import FloatingActionMenu from '../../../components/common/FloatingActionMenu.vue';
-import { getAssetById, endAsset, pauseAsset, resumeAsset, updateAsset, getAssetIncomeRecords } from '../../../services/asset/assetService';
+import { getAssetById, endAsset, pauseAsset, resumeAsset, updateAsset, getAssetIncomeRecords, deleteAsset } from '../../../services/asset/assetService';
 import { getAccounts } from '../../../services/account/accountService';
 import { calculationTypes, periodTypes } from '../../../utils/dictionaries';
 import { formatDate } from '../../../utils/timezone';
@@ -261,11 +261,33 @@ const handleResumeAsset = async () => {
   }
 };
 
+const handleDelete = async () => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除资产"${assetInfo.value.name}"吗？`,
+      '删除资产',
+      {
+        confirmButtonText: '确认删除',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    );
+    await deleteAsset(props.assetId);
+    ElMessage.success('资产已删除');
+    emit('navigate', 'asset');
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      console.error('删除资产失败:', error);
+      ElMessage.error(error.message || '删除失败');
+    }
+  }
+};
+
 const openEditDialog = () => {
   editForm.value = {
     calculation_type: assetInfo.value.calculation_type || '',
     period: assetInfo.value.period || '',
-    annual_yield_rate: assetInfo.value.annual_yield_rate || 0,
+    annual_yield_rate: assetInfo.value.annual_yield_rate * 100 || 0,
     income_amount: assetInfo.value.income_amount || 0
   };
   showEditDialog.value = true;
@@ -294,7 +316,7 @@ const saveEdit = async () => {
     await updateAsset(props.assetId, {
       calculation_type: editForm.value.calculation_type,
       period: isNoCalc ? '' : editForm.value.period,
-      annual_yield_rate: editForm.value.calculation_type === '按年收益率计算' ? editForm.value.annual_yield_rate : 0,
+      annual_yield_rate: editForm.value.calculation_type === '按年收益率计算' ? editForm.value.annual_yield_rate / 100 : 0,
       income_amount: editForm.value.calculation_type === '按金额计算' ? editForm.value.income_amount : 0,
       next_income_date: isNoCalc ? '' : undefined
     });
@@ -333,6 +355,11 @@ const actionButtons = computed(() => {
     text: '结束',
     icon: SwitchButton,
     action: handleEndAsset
+  });
+  buttons.push({
+    text: '删除',
+    icon: Delete,
+    action: handleDelete
   });
   return buttons;
 });
