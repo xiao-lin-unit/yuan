@@ -82,7 +82,7 @@ const loadWeeklyIncomes = async () => {
     
     // 从流水表中查询类型为账户收入的记录
     const transactions = await db.query(
-      'SELECT t.* FROM transactions t WHERE t.type = ? AND t.created_at BETWEEN ? AND ?',
+      'SELECT t.* FROM income_expense_records t WHERE t.type = ? AND t.created_at BETWEEN ? AND ?',
       ['账户收入', start.toISOString(), end.toISOString()]
     );
     

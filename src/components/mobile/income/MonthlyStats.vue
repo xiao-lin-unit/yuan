@@ -51,13 +51,13 @@ const loadMonthlyStats = async () => {
     
     // 从流水表中查询类型为账户支出的记录
     const expenseTransactions = await db.query(
-      'SELECT SUM(amount) as total FROM transactions WHERE type = ? AND created_at BETWEEN ? AND ?',
+      'SELECT SUM(amount) as total FROM income_expense_records WHERE type = ? AND created_at BETWEEN ? AND ?',
       ['账户支出', start.toISOString(), end.toISOString()]
     );
     
     // 从流水表中查询类型为账户收入的记录
     const incomeTransactions = await db.query(
-      'SELECT SUM(amount) as total FROM transactions WHERE type = ? AND created_at BETWEEN ? AND ?',
+      'SELECT SUM(amount) as total FROM income_expense_records WHERE type = ? AND created_at BETWEEN ? AND ?',
       ['账户收入', start.toISOString(), end.toISOString()]
     );
     

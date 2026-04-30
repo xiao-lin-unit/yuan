@@ -169,7 +169,7 @@ export const useAccountStore = defineStore('account', {
           },
           // 记录流水
           {
-            statement: 'INSERT INTO transactions (id, type, amount, account_id, balance_after, remark) VALUES (?, ?, ?, ?, ?, ?)',
+            statement: 'INSERT INTO income_expense_records (id, type, amount, account_id, balance_after, remark) VALUES (?, ?, ?, ?, ?, ?)',
             values: [transactionId, '余额调整', data.amount, data.accountId, newBalance, data.remark]
           }
         ]
@@ -230,14 +230,14 @@ export const useAccountStore = defineStore('account', {
           // 记录转出流水
           const transactionId1 = getCurrentDate().valueOf().toString() + '1'
           await db.run(
-            'INSERT INTO transactions (id, type, amount, account_id, balance_after, remark) VALUES (?, ?, ?, ?, ?, ?)',
+            'INSERT INTO income_expense_records (id, type, amount, account_id, balance_after, remark) VALUES (?, ?, ?, ?, ?, ?)',
             [transactionId1, '转账支出', -data.amount, data.fromAccountId, newFromBalance, data.remark]
           )
 
           // 记录转入流水
           const transactionId2 = getCurrentDate().valueOf().toString() + '2'
           await db.run(
-            'INSERT INTO transactions (id, type, amount, account_id, balance_after, remark) VALUES (?, ?, ?, ?, ?, ?)',
+            'INSERT INTO income_expense_records (id, type, amount, account_id, balance_after, remark) VALUES (?, ?, ?, ?, ?, ?)',
             [transactionId2, '转账收入', data.amount, data.toAccountId, newToBalance, data.remark]
           )
 

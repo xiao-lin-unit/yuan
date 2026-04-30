@@ -426,7 +426,7 @@ const saveIncome = async () => {
     
     // 添加收入流水记录
     const record = {
-      statement: `INSERT INTO transactions 
+      statement: `INSERT INTO income_expense_records 
          (id, type, sub_type, amount, account_id, related_id, balance_after, remark, created_at) 
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       values: [

@@ -206,8 +206,8 @@ async function loadUserFinancialData() {
   const threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 3, 1)
   const startStr = `${threeMonthsAgo.getFullYear()}-${String(threeMonthsAgo.getMonth() + 1).padStart(2, '0')}-01`
 
-  const incomes = await db.query(`SELECT amount FROM transactions WHERE type = '账户收入' AND created_at >= ?`, [startStr])
-  const expenses = await db.query(`SELECT amount FROM transactions WHERE type = '账户支出' AND created_at >= ?`, [startStr])
+  const incomes = await db.query(`SELECT amount FROM income_expense_records WHERE type = '账户收入' AND created_at >= ?`, [startStr])
+  const expenses = await db.query(`SELECT amount FROM income_expense_records WHERE type = '账户支出' AND created_at >= ?`, [startStr])
 
   const totalIncome = incomes.reduce((s: number, r: any) => s + (r.amount || 0), 0)
   const totalExpense = expenses.reduce((s: number, r: any) => s + (r.amount || 0), 0)

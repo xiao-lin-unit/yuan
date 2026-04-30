@@ -445,10 +445,10 @@ class DatabaseManager {
           )
         `
       },
-      // 创建流水表（仅记录账户支出和收入）
+      // 创建收支记录表（记录用户手动录入的收入和支出）
       {
         sql: `
-          CREATE TABLE IF NOT EXISTS transactions (
+          CREATE TABLE IF NOT EXISTS income_expense_records (
             id TEXT PRIMARY KEY,
             type TEXT NOT NULL,
             sub_type TEXT,
@@ -828,9 +828,9 @@ class DatabaseManager {
       // 创建索引（性能优化）
       { sql: 'CREATE INDEX IF NOT EXISTS idx_accounts_type ON accounts(type)' },
       { sql: 'CREATE INDEX IF NOT EXISTS idx_accounts_is_liquid ON accounts(is_liquid)' },
-      { sql: 'CREATE INDEX IF NOT EXISTS idx_transactions_account_id ON transactions(account_id)' },
+      { sql: 'CREATE INDEX IF NOT EXISTS idx_income_expense_records_account_id ON income_expense_records(account_id)' },
       { sql: 'CREATE INDEX IF NOT EXISTS idx_account_transactions_account_id ON account_transactions(account_id)' },
-      { sql: 'CREATE INDEX IF NOT EXISTS idx_transactions_created_at ON transactions(created_at)' },
+      { sql: 'CREATE INDEX IF NOT EXISTS idx_income_expense_records_created_at ON income_expense_records(created_at)' },
       { sql: 'CREATE INDEX IF NOT EXISTS idx_assets_account_id ON assets(account_id)' },
       { sql: 'CREATE INDEX IF NOT EXISTS idx_stocks_account_id ON stocks(account_id)' },
       { sql: 'CREATE INDEX IF NOT EXISTS idx_funds_account_id ON funds(account_id)' },
@@ -927,6 +927,77 @@ class DatabaseManager {
   }
 
   /**
+   * 表名迁移：将旧表名重命名为新表名，保留已有数据。
+   * 仅在旧表存在且新表不存在时执行迁移，安全可重入。
+   * @param {string} oldName - 旧表名
+   * @param {string} newName - 新表名
+   */
+  async migrateTableName(oldName, newName) {
+    try {
+      // 检查旧表是否存在
+      const oldTable = await this.query(
+        `SELECT name FROM sqlite_master WHERE type='table' AND name=?`,
+        [oldName]
+      )
+      if (!oldTable || oldTable.length === 0) return
+
+      // 检查新表是否已存在
+      const newTable = await this.query(
+        `SELECT name FROM sqlite_master WHERE type='table' AND name=?`,
+        [newName]
+      )
+      if (newTable && newTable.length > 0) {
+        // 新表已存在，删除旧表即可（上一次迁移中途失败但不影响数据）
+        await this.run(`DROP TABLE IF EXISTS ${oldName}`)
+        if (PERFORMANCE_CONFIG.DEBUG) {
+          console.log(`Table migration: dropped leftover old table ${oldName}`)
+        }
+        return
+      }
+
+      // 旧表存在，新表不存在 → 执行迁移
+      // 1. 获取旧表的列信息
+      const columns = await this.query(`PRAGMA table_info(${oldName})`)
+      const colNames = columns.map(c => c.name)
+      const colList = colNames.join(', ')
+
+      // 2. 创建新表（使用 getCreateStatements 中的定义）
+      const schemaEntries = this.getCreateStatements().filter(s => s.sql && s.sql.includes('CREATE TABLE'))
+      const schemaEntry = schemaEntries.find(s => {
+        const match = s.sql.match(/CREATE TABLE IF NOT EXISTS (\w+)/)
+        return match && match[1] === newName
+      })
+      if (!schemaEntry) {
+        if (PERFORMANCE_CONFIG.DEBUG) {
+          console.log(`Table migration: schema for ${newName} not found, skipping`)
+        }
+        return
+      }
+      await this.run(schemaEntry.sql)
+
+      // 3. 复制数据
+      await this.run(`INSERT INTO ${newName} (${colList}) SELECT ${colList} FROM ${oldName}`)
+
+      // 4. 删除旧表
+      await this.run(`DROP TABLE ${oldName}`)
+
+      // 5. 重建索引
+      const indexStatements = this.getCreateStatements().filter(s =>
+        s.sql && s.sql.includes(`ON ${newName}`)
+      )
+      for (const idx of indexStatements) {
+        await this.run(idx.sql)
+      }
+
+      if (PERFORMANCE_CONFIG.DEBUG) {
+        console.log(`Table migration: ${oldName} → ${newName} completed successfully`)
+      }
+    } catch (e) {
+      console.error(`Table migration ${oldName} → ${newName} failed:`, e)
+    }
+  }
+
+  /**
    * 初始化数据库表结构（优化版本）
    */
   async initialize() {
@@ -948,6 +1019,9 @@ class DatabaseManager {
       await this.batch(createStatements)
 
       await this.updateSchema();
+
+      // 表名迁移：transactions → income_expense_records
+      await this.migrateTableName('transactions', 'income_expense_records');
 
       this.initialized = true
 
@@ -1022,7 +1096,7 @@ class DatabaseManager {
    * 清空所有数据（使用事务提高性能）
    */
   async clearAllData() {
-    const tables = ['accounts', 'transactions', 'assets', 'stocks', 'funds', 'liabilities', 'repayments', 'pending_repayments', 'financial_goals', 'categories', 'knowledge_favorite', 'knowledge_read_history']
+    const tables = ['accounts', 'income_expense_records', 'assets', 'stocks', 'funds', 'liabilities', 'repayments', 'pending_repayments', 'financial_goals', 'categories', 'knowledge_favorite', 'knowledge_read_history']
     
     try {
       // 事务状态

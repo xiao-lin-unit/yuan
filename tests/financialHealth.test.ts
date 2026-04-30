@@ -45,8 +45,8 @@ describe('Financial Health Assessment', () => {
   })
 
   it('should calculate monthly cash flow', async () => {
-    const incomes = await db.query(`SELECT SUM(amount) as total FROM transactions WHERE type = '账户收入'`)
-    const expenses = await db.query(`SELECT SUM(amount) as total FROM transactions WHERE type = '账户支出'`)
+    const incomes = await db.query(`SELECT SUM(amount) as total FROM income_expense_records WHERE type = '账户收入'`)
+    const expenses = await db.query(`SELECT SUM(amount) as total FROM income_expense_records WHERE type = '账户支出'`)
 
     const monthlyIncome = (incomes[0].total || 0) / 3
     const monthlyExpense = (expenses[0].total || 0) / 3
@@ -67,7 +67,7 @@ describe('Financial Health Assessment', () => {
   })
 
   it('should calculate debt-to-income ratio', async () => {
-    const incomes = await db.query(`SELECT SUM(amount) as total FROM transactions WHERE type = '账户收入'`)
+    const incomes = await db.query(`SELECT SUM(amount) as total FROM income_expense_records WHERE type = '账户收入'`)
     const monthlyIncome = (incomes[0].total || 0) / 3
 
     const liabilities = await db.query(`SELECT * FROM liabilities WHERE status = '未结清'`)

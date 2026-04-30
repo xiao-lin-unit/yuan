@@ -52,7 +52,7 @@ const loadBudget = async () => {
     const endDate = getCurrentDate().year(props.year).month(props.month - 1).endOf('month').toISOString();
     
     const expenseTransactions = await db.query(
-      'SELECT SUM(amount) as total FROM transactions WHERE type = ? AND created_at BETWEEN ? AND ?',
+      'SELECT SUM(amount) as total FROM income_expense_records WHERE type = ? AND created_at BETWEEN ? AND ?',
       ['账户支出', startDate, endDate]
     );
     

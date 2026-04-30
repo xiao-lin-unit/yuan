@@ -139,7 +139,7 @@ const loadDailyExpenses = async () => {
     
     // 从流水表中查询类型为账户支出的记录
     const transactions = await db.query(
-      'SELECT DATE(created_at) as date, SUM(amount) as total FROM transactions WHERE type = ? AND created_at BETWEEN ? AND ? GROUP BY DATE(created_at) ORDER BY date',
+      'SELECT DATE(created_at) as date, SUM(amount) as total FROM income_expense_records WHERE type = ? AND created_at BETWEEN ? AND ? GROUP BY DATE(created_at) ORDER BY date',
       ['账户支出', start, end]
     );
     
@@ -195,7 +195,7 @@ const loadCategoryExpenses = async () => {
     
     // 从流水表中查询类型为账户支出的记录，按subType分组
     const transactions = await db.query(
-      'SELECT sub_type as category, SUM(amount) as total FROM transactions WHERE type = ? AND created_at BETWEEN ? AND ? GROUP BY sub_type',
+      'SELECT sub_type as category, SUM(amount) as total FROM income_expense_records WHERE type = ? AND created_at BETWEEN ? AND ? GROUP BY sub_type',
       ['账户支出', startDate, endDate]
     );
     
@@ -227,7 +227,7 @@ const loadDailyChartData = async () => {
     
     // 从流水表中查询类型为账户支出的记录，按日期分组
     const transactions = await db.query(
-      'SELECT DATE(created_at) as date, SUM(amount) as total FROM transactions WHERE type = ? AND created_at BETWEEN ? AND ? GROUP BY DATE(created_at) ORDER BY date',
+      'SELECT DATE(created_at) as date, SUM(amount) as total FROM income_expense_records WHERE type = ? AND created_at BETWEEN ? AND ? GROUP BY DATE(created_at) ORDER BY date',
       ['账户支出', startDate, endDate]
     );
     

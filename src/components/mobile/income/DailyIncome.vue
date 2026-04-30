@@ -67,7 +67,7 @@ const loadDailyIncomes = async () => {
     
     // 从流水表中查询当天的账户收入记录
     const transactions = await db.query(
-      'SELECT t.*, a.name as account_name, a.type as account_type FROM transactions t LEFT JOIN accounts a ON t.account_id = a.id WHERE t.type = ? AND t.created_at BETWEEN ? AND ? ORDER BY t.created_at DESC',
+      'SELECT t.*, a.name as account_name, a.type as account_type FROM income_expense_records t LEFT JOIN accounts a ON t.account_id = a.id WHERE t.type = ? AND t.created_at BETWEEN ? AND ? ORDER BY t.created_at DESC',
       ['账户收入', startDate, endDate]
     );
     console.log("当天的收入记录", JSON.stringify(transactions));

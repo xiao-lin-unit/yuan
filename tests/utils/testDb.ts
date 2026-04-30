@@ -76,13 +76,13 @@ export async function seedTestData(db: any) {
     ['lia1', '房贷', '房贷', 300000, 300000, 0, 1, 4.2, '2024-01-01', '等额本息', 15, 240, 'acc3', '', '未结清']
   )
 
-  // Insert test transactions (income/expense)
+  // Insert test income/expense records
   const now = new Date()
   const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
-  await db.run(`INSERT INTO transactions (id, type, amount, account_id, balance_after, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
+  await db.run(`INSERT INTO income_expense_records (id, type, amount, account_id, balance_after, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
     ['tx1', '账户收入', 8000, 'acc3', 28000, dateStr])
-  await db.run(`INSERT INTO transactions (id, type, amount, account_id, balance_after, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
+  await db.run(`INSERT INTO income_expense_records (id, type, amount, account_id, balance_after, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
     ['tx2', '账户支出', 2000, 'acc1', 3000, dateStr])
-  await db.run(`INSERT INTO transactions (id, type, amount, account_id, balance_after, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
+  await db.run(`INSERT INTO income_expense_records (id, type, amount, account_id, balance_after, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
     ['tx3', '账户支出', 1500, 'acc1', 1500, dateStr])
 }

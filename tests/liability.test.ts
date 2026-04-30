@@ -78,7 +78,7 @@ describe('Liability Module', () => {
         return s
       }, 0)
 
-      const incomes = await db.query(`SELECT SUM(amount) as total FROM transactions WHERE type = '账户收入'`)
+      const incomes = await db.query(`SELECT SUM(amount) as total FROM income_expense_records WHERE type = '账户收入'`)
       const monthlyIncome = (incomes[0].total || 0) / 3
 
       const ratio = monthlyIncome > 0 ? (monthlyRepayment / monthlyIncome) * 100 : 0

@@ -8,22 +8,22 @@ describe('Expense Module', () => {
     await seedTestData(db)
   })
 
-  it('should query expense transactions from transactions table', async () => {
+  it('should query expense records from income_expense_records table', async () => {
     const expenses = await db.query(
-      `SELECT SUM(amount) as total FROM transactions WHERE type = '账户支出'`
+      `SELECT SUM(amount) as total FROM income_expense_records WHERE type = '账户支出'`
     )
     expect(expenses[0].total).toBe(3500)
   })
 
   it('should insert and retrieve an expense transaction', async () => {
     await db.run(
-      `INSERT INTO transactions (id, type, sub_type, amount, account_id, balance_after, created_at)
+      `INSERT INTO income_expense_records (id, type, sub_type, amount, account_id, balance_after, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
       ['tx_exp', '账户支出', 'cat1', 500, 'acc1', 1000, '2024-06-15']
     )
 
     const expenses = await db.query(
-      `SELECT * FROM transactions WHERE type = '账户支出' AND id = ?`,
+      `SELECT * FROM income_expense_records WHERE type = '账户支出' AND id = ?`,
       ['tx_exp']
     )
     expect(expenses.length).toBe(1)
@@ -36,7 +36,7 @@ describe('Expense Module', () => {
     const startOfMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
 
     const expenses = await db.query(
-      `SELECT SUM(amount) as total FROM transactions WHERE type = '账户支出' AND created_at >= ?`,
+      `SELECT SUM(amount) as total FROM income_expense_records WHERE type = '账户支出' AND created_at >= ?`,
       [startOfMonth]
     )
     expect(expenses[0].total).toBe(3500)

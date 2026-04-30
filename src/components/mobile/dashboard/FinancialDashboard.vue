@@ -152,14 +152,14 @@ const loadAllData = async () => {
 
     // 月度收入（账户收入）
     const incomeResult = await db.query(
-      "SELECT SUM(amount) as total FROM transactions WHERE type = ? AND created_at BETWEEN ? AND ?",
+      "SELECT SUM(amount) as total FROM income_expense_records WHERE type = ? AND created_at BETWEEN ? AND ?",
       ['账户收入', monthStart, monthEnd]
     )
     monthlyIncome.value = incomeResult[0]?.total || 0
 
     // 月度支出（账户支出，不含投资相关）
     const expenseResult = await db.query(
-      "SELECT SUM(amount) as total FROM transactions WHERE type = ? AND created_at BETWEEN ? AND ?",
+      "SELECT SUM(amount) as total FROM income_expense_records WHERE type = ? AND created_at BETWEEN ? AND ?",
       ['账户支出', monthStart, monthEnd]
     )
     monthlyExpense.value = expenseResult[0]?.total || 0
