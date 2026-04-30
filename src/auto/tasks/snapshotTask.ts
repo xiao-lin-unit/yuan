@@ -5,7 +5,6 @@
  * On app startup, calculates current total assets/liabilities/net worth
  * and saves a snapshot to asset_monthly_snapshots table.
  */
-import dayjs from 'dayjs'
 import db from '../../database'
 import { getCurrentDate } from '../../utils/timezone'
 import { registerTask } from '../index'

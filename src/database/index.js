@@ -444,7 +444,7 @@ class DatabaseManager {
       {
         sql: `
           CREATE TABLE IF NOT EXISTS accounts (
-            id VARCHAR(64) PRIMARY KEY,
+            id TEXT PRIMARY KEY,
             name TEXT NOT NULL UNIQUE,
             type TEXT NOT NULL,
             balance REAL DEFAULT 0,
@@ -454,8 +454,8 @@ class DatabaseManager {
             status TEXT DEFAULT '启用',
             asset_id TEXT,
             remark TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
           )
         `
       },
@@ -463,7 +463,7 @@ class DatabaseManager {
       {
         sql: `
           CREATE TABLE IF NOT EXISTS transactions (
-            id VARCHAR(64) PRIMARY KEY,
+            id TEXT PRIMARY KEY,
             type TEXT NOT NULL,
             sub_type TEXT,
             amount REAL NOT NULL,
@@ -472,7 +472,7 @@ class DatabaseManager {
             balance_after REAL NOT NULL,
             remark TEXT,
             status TEXT DEFAULT '正常',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (account_id) REFERENCES accounts(id)
           )
         `
@@ -481,14 +481,14 @@ class DatabaseManager {
       {
         sql: `
           CREATE TABLE IF NOT EXISTS account_transactions (
-            id VARCHAR(64) PRIMARY KEY,
+            id TEXT PRIMARY KEY,
             account_id TEXT NOT NULL,
             type TEXT NOT NULL,
             amount REAL NOT NULL,
             balance_after REAL NOT NULL,
             description TEXT,
-            transaction_time TIMESTAMP NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            transaction_time TEXT NOT NULL,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (account_id) REFERENCES accounts(id)
           )
         `
@@ -497,7 +497,7 @@ class DatabaseManager {
       {
         sql: `
           CREATE TABLE IF NOT EXISTS assets (
-            id VARCHAR(64) PRIMARY KEY,
+            id TEXT PRIMARY KEY,
             type TEXT NOT NULL,
             name TEXT NOT NULL,
             amount REAL DEFAULT 0,
@@ -510,8 +510,8 @@ class DatabaseManager {
             income_amount REAL DEFAULT 0,
             annual_yield_rate REAL DEFAULT 0,
             status TEXT DEFAULT '开启',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (account_id) REFERENCES accounts(id)
           )
         `
@@ -520,18 +520,18 @@ class DatabaseManager {
       {
         sql: `
           CREATE TABLE IF NOT EXISTS stocks (
-            id VARCHAR(64) PRIMARY KEY,
+            id TEXT PRIMARY KEY,
             name TEXT NOT NULL,
             code TEXT,
             quantity INTEGER DEFAULT 0,
             current_price REAL DEFAULT 0,
             cost_price REAL DEFAULT 0,
             confirmed_profit REAL DEFAULT 0,
-            first_buy_date TIMESTAMP,
+            first_buy_date TEXT,
             account_id TEXT,
             ended INTEGER DEFAULT 0,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (account_id) REFERENCES accounts(id)
           )
         `
@@ -540,16 +540,16 @@ class DatabaseManager {
       {
         sql: `
           CREATE TABLE IF NOT EXISTS stock_holdings (
-            id VARCHAR(64) PRIMARY KEY,
+            id TEXT PRIMARY KEY,
             stock_id TEXT NOT NULL,
             price REAL NOT NULL,
             quantity INTEGER NOT NULL,
             remaining_quantity INTEGER NOT NULL,
             sell_status TEXT DEFAULT '未卖出',
             fee REAL DEFAULT 0,
-            transaction_time TIMESTAMP NOT NULL,
+            transaction_time TEXT NOT NULL,
             account_id TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (stock_id) REFERENCES stocks(id),
             FOREIGN KEY (account_id) REFERENCES accounts(id)
           )
@@ -559,16 +559,16 @@ class DatabaseManager {
       {
         sql: `
           CREATE TABLE IF NOT EXISTS stock_transactions (
-            id VARCHAR(64) PRIMARY KEY,
+            id TEXT PRIMARY KEY,
             stock_id TEXT NOT NULL,
             price REAL NOT NULL,
             quantity INTEGER NOT NULL,
             type TEXT NOT NULL,
             hold_ids TEXT,
             fee REAL DEFAULT 0,
-            transaction_time TIMESTAMP NOT NULL,
+            transaction_time TEXT NOT NULL,
             account_id TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (stock_id) REFERENCES stocks(id),
             FOREIGN KEY (account_id) REFERENCES accounts(id)
           )
@@ -578,7 +578,7 @@ class DatabaseManager {
       {
         sql: `
           CREATE TABLE IF NOT EXISTS funds (
-            id VARCHAR(64) PRIMARY KEY,
+            id TEXT PRIMARY KEY,
             name TEXT NOT NULL,
             code TEXT,
             shares REAL DEFAULT 0,
@@ -586,13 +586,13 @@ class DatabaseManager {
             cost_nav REAL DEFAULT 0,
             confirmed_profit REAL DEFAULT 0,
             total_fee REAL DEFAULT 0,
-            first_buy_date TIMESTAMP,
-            has_lock BOOLEAN DEFAULT 0,
+            first_buy_date TEXT,
+            has_lock INTEGER DEFAULT 0,
             lock_period INTEGER DEFAULT 0,
             account_id TEXT,
             ended INTEGER DEFAULT 0,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (account_id) REFERENCES accounts(id)
           )
         `
@@ -601,7 +601,7 @@ class DatabaseManager {
       {
         sql: `
           CREATE TABLE IF NOT EXISTS fund_holdings (
-            id VARCHAR(64) PRIMARY KEY,
+            id TEXT PRIMARY KEY,
             fund_id TEXT NOT NULL,
             nav REAL NOT NULL,
             shares REAL NOT NULL,
@@ -609,10 +609,10 @@ class DatabaseManager {
             sell_status TEXT DEFAULT '未卖出',
             fee REAL DEFAULT 0,
             lock_period INTEGER DEFAULT 0,
-            lock_end_date TIMESTAMP,
-            transaction_time TIMESTAMP NOT NULL,
+            lock_end_date TEXT,
+            transaction_time TEXT NOT NULL,
             account_id TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (fund_id) REFERENCES funds(id),
             FOREIGN KEY (account_id) REFERENCES accounts(id)
           )
@@ -622,16 +622,16 @@ class DatabaseManager {
       {
         sql: `
           CREATE TABLE IF NOT EXISTS fund_transactions (
-            id VARCHAR(64) PRIMARY KEY,
+            id TEXT PRIMARY KEY,
             fund_id TEXT NOT NULL,
             transaction_nav REAL NOT NULL,
             shares REAL NOT NULL,
             type TEXT NOT NULL,
             hold_ids TEXT,
             fee REAL DEFAULT 0,
-            transaction_time TIMESTAMP NOT NULL,
+            transaction_time TEXT NOT NULL,
             account_id TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (fund_id) REFERENCES funds(id),
             FOREIGN KEY (account_id) REFERENCES accounts(id)
           )
@@ -641,23 +641,23 @@ class DatabaseManager {
       {
         sql: `
           CREATE TABLE IF NOT EXISTS liabilities (
-            id VARCHAR(64) PRIMARY KEY,
+            id TEXT PRIMARY KEY,
             name TEXT NOT NULL,
             type TEXT NOT NULL,
             principal REAL NOT NULL,
             remaining_principal REAL NOT NULL,
             remaining_total_interest REAL DEFAULT 0,
-            is_interest BOOLEAN DEFAULT 1,
+            is_interest INTEGER DEFAULT 1,
             interest_rate REAL DEFAULT 0,
-            start_date DATE NOT NULL,
+            start_date TEXT NOT NULL,
             repayment_method TEXT NOT NULL,
             repayment_day INTEGER,
             period INTEGER,
             account_id TEXT,
             remark TEXT,
             status TEXT DEFAULT '未结清',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (account_id) REFERENCES accounts(id)
           )
         `
@@ -666,7 +666,7 @@ class DatabaseManager {
       {
         sql: `
           CREATE TABLE IF NOT EXISTS repayments (
-            id VARCHAR(64) PRIMARY KEY,
+            id TEXT PRIMARY KEY,
             liability_id TEXT NOT NULL,
             period_number INTEGER,
             amount REAL NOT NULL,
@@ -674,8 +674,8 @@ class DatabaseManager {
             interest_amount REAL DEFAULT 0,
             type TEXT NOT NULL,
             remark TEXT,
-            repayment_time TIMESTAMP NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            repayment_time TEXT NOT NULL,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (liability_id) REFERENCES liabilities(id)
           )
         `
@@ -684,16 +684,16 @@ class DatabaseManager {
       {
         sql: `
           CREATE TABLE IF NOT EXISTS pending_repayments (
-            id VARCHAR(64) PRIMARY KEY,
+            id TEXT PRIMARY KEY,
             liability_id TEXT NOT NULL,
             period_number INTEGER NOT NULL,
-            due_date DATE NOT NULL,
+            due_date TEXT NOT NULL,
             principal_amount REAL NOT NULL,
             interest_amount REAL NOT NULL,
             total_amount REAL NOT NULL,
             status TEXT DEFAULT '未还',
-            paid_date DATE,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            paid_date TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (liability_id) REFERENCES liabilities(id)
           )
         `
@@ -702,7 +702,7 @@ class DatabaseManager {
       {
         sql: `
           CREATE TABLE IF NOT EXISTS financial_goals (
-            id VARCHAR(64) PRIMARY KEY,
+            id TEXT PRIMARY KEY,
             name TEXT NOT NULL,
             type TEXT NOT NULL,
             target_amount REAL NOT NULL,
@@ -710,8 +710,8 @@ class DatabaseManager {
             period INTEGER NOT NULL,
             account_id TEXT,
             status TEXT DEFAULT '未开始',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (account_id) REFERENCES accounts(id)
           )
         `
@@ -720,15 +720,15 @@ class DatabaseManager {
       {
         sql: `
           CREATE TABLE IF NOT EXISTS financial_health (
-            id VARCHAR(64) PRIMARY KEY,
+            id TEXT PRIMARY KEY,
             liabilities_income_ratio REAL,
             emergency_fund_ratio REAL,
             asset_liability_ratio REAL,
             savings_rate REAL,
             net_asset_growth REAL,
             total_score INTEGER,
-            report_date DATE NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            report_date TEXT NOT NULL,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
           )
         `
       },
@@ -736,13 +736,13 @@ class DatabaseManager {
       {
         sql: `
           CREATE TABLE IF NOT EXISTS categories (
-            id VARCHAR(64) PRIMARY KEY,
+            id TEXT PRIMARY KEY,
             name TEXT NOT NULL,
             icon TEXT,
             iconText TEXT,
             type TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
           )
         `
       },
@@ -750,12 +750,12 @@ class DatabaseManager {
       {
         sql: `
           CREATE TABLE IF NOT EXISTS asset_income_records (
-            id VARCHAR(64) PRIMARY KEY,
+            id TEXT PRIMARY KEY,
             asset_id TEXT NOT NULL,
             income_amount REAL NOT NULL,
-            record_time TIMESTAMP NOT NULL,
+            record_time TEXT NOT NULL,
             remark TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (asset_id) REFERENCES assets(id)
           )
         `
@@ -764,7 +764,7 @@ class DatabaseManager {
       {
         sql: `
           CREATE TABLE IF NOT EXISTS asset_monthly_snapshots (
-            id VARCHAR(64) PRIMARY KEY,
+            id TEXT PRIMARY KEY,
             year INTEGER NOT NULL,
             month INTEGER NOT NULL,
             total_assets REAL DEFAULT 0,
@@ -772,7 +772,7 @@ class DatabaseManager {
             net_worth REAL DEFAULT 0,
             confirmed_profit_stocks REAL DEFAULT 0,
             confirmed_profit_funds REAL DEFAULT 0,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(year, month)
           )
         `
@@ -781,16 +781,16 @@ class DatabaseManager {
       {
         sql: `
           CREATE TABLE IF NOT EXISTS sandbox_history (
-            id VARCHAR(64) PRIMARY KEY NOT NULL,
+            id TEXT PRIMARY KEY,
             scene_type INTEGER NOT NULL,
-            scene_name VARCHAR(64) NOT NULL,
-            user_title VARCHAR(100),
-            simulate_time VARCHAR(20) NOT NULL,
+            scene_name TEXT NOT NULL,
+            user_title TEXT,
+            simulate_time TEXT NOT NULL,
             params TEXT NOT NULL,
-            result_desc VARCHAR(255),
-            created_at VARCHAR(20) NOT NULL,
+            result_desc TEXT,
+            created_at TEXT NOT NULL,
             is_deleted INTEGER DEFAULT 0 NOT NULL,
-            remark VARCHAR(255)
+            remark TEXT
           )
         `
       },
@@ -798,24 +798,24 @@ class DatabaseManager {
       {
         sql: `
           CREATE TABLE IF NOT EXISTS sandbox_result (
-            id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+            id TEXT PRIMARY KEY NOT NULL,
             history_id TEXT NOT NULL,
-            net_assets DECIMAL(16,2),
+            net_assets REAL,
             net_assets_change TEXT,
-            cash_flow_monthly DECIMAL(16,2),
+            cash_flow_monthly REAL,
             cash_flow_change TEXT,
             debt_pressure_level INTEGER,
             debt_pressure_desc TEXT,
             survival_months INTEGER,
-            interest_save DECIMAL(16,2),
-            monthly_payment_change DECIMAL(16,2),
-            total_interest_change DECIMAL(16,2),
+            interest_save REAL,
+            monthly_payment_change REAL,
+            total_interest_change REAL,
             chart_x TEXT NOT NULL,
             chart_net_assets TEXT NOT NULL,
             chart_cash_flow TEXT NOT NULL,
             chart_debt TEXT NOT NULL,
             conclusion TEXT NOT NULL,
-            created_at VARCHAR(20) NOT NULL,
+            created_at TEXT NOT NULL,
             FOREIGN KEY (history_id) REFERENCES sandbox_history(id)
           )
         `
@@ -866,8 +866,78 @@ class DatabaseManager {
     ]
   }
 
-  updateSchema() {
+  /**
+   * Schema migration: rebuild tables whose column types are not SQLite native types.
+   * SQLite native types are: TEXT, INTEGER, REAL, BLOB
+   * Non-native types like VARCHAR, DATE, TIMESTAMP, BOOLEAN, DECIMAL are migrated.
+   */
+  async updateSchema() {
+    const schemaEntries = this.getCreateStatements().filter(s => s.sql && s.sql.includes('CREATE TABLE'))
+    const tableNames = schemaEntries
+      .map(s => {
+        const match = s.sql.match(/CREATE TABLE IF NOT EXISTS (\w+)/)
+        return match ? match[1] : null
+      })
+      .filter(Boolean)
 
+    for (const tableName of tableNames) {
+      try {
+        await this.migrateToNativeTypes(tableName, schemaEntries)
+      } catch (e) {
+        if (PERFORMANCE_CONFIG.DEBUG) {
+          console.log(`Migration skipped for ${tableName}:`, e.message)
+        }
+      }
+    }
+  }
+
+  /**
+   * Migrate a single table if it has non-native SQLite column types.
+   * Uses the create-new → copy-data → drop-old → rename pattern.
+   */
+  async migrateToNativeTypes(tableName, schemaEntries) {
+    const columns = await this.query(`PRAGMA table_info(${tableName})`)
+    if (!columns || columns.length === 0) return
+
+    const nativeTypes = new Set(['TEXT', 'INTEGER', 'REAL', 'BLOB', ''])
+    let needsMigration = false
+    for (const col of columns) {
+      const type = (col.type || '').toUpperCase()
+      if (type && !nativeTypes.has(type)) {
+        needsMigration = true
+        break
+      }
+    }
+
+    if (!needsMigration) return
+
+    if (PERFORMANCE_CONFIG.DEBUG) {
+      console.log(`Migrating table: ${tableName}`)
+    }
+
+    const schemaEntry = schemaEntries.find(s => {
+      const match = s.sql.match(/CREATE TABLE IF NOT EXISTS (\w+)/)
+      return match && match[1] === tableName
+    })
+    if (!schemaEntry) return
+
+    const createSql = schemaEntry.sql.replace(
+      `CREATE TABLE IF NOT EXISTS ${tableName}`,
+      `CREATE TABLE IF NOT EXISTS ${tableName}_new`
+    )
+
+    await this.run(createSql)
+
+    const colNames = columns.map(c => c.name)
+    const colList = colNames.join(', ')
+
+    await this.run(`INSERT INTO ${tableName}_new (${colList}) SELECT ${colList} FROM ${tableName}`)
+    await this.run(`DROP TABLE ${tableName}`)
+    await this.run(`ALTER TABLE ${tableName}_new RENAME TO ${tableName}`)
+
+    if (PERFORMANCE_CONFIG.DEBUG) {
+      console.log(`Migration completed for table: ${tableName}`)
+    }
   }
 
   /**

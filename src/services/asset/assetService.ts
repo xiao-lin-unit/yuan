@@ -12,7 +12,7 @@ import { getCurrentDate } from '../../utils/timezone.js'
 /**
  * Calculate next income date based on period and income date
  */
-function calculateNextIncomeDate(period: string, incomeDate: string): string {
+export function calculateNextIncomeDate(period: string, incomeDate: string): string {
   if (!period) return ''
 
   const now = getCurrentDate()
@@ -276,10 +276,10 @@ export async function recordAssetIncome(
   incomeAmount: number,
   recordTime: string,
   remark?: string
-): Promise<void> {
+): Promise<{ statement: string; values: (string | number)[] }> {
   const id = getCurrentDate().valueOf().toString()
-  await db.run(
-    'INSERT INTO asset_income_records (id, asset_id, income_amount, record_time, remark) VALUES (?, ?, ?, ?, ?)',
-    [id, assetId, incomeAmount, recordTime, remark || '']
-  )
+  return {
+    statement: 'INSERT INTO asset_income_records (id, asset_id, income_amount, record_time, remark) VALUES (?, ?, ?, ?, ?)',
+    values: [id, assetId, incomeAmount, recordTime, remark || '']
+  }
 }

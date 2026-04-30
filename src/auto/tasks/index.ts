@@ -8,6 +8,8 @@
 
 // Import task files (side-effect registration)
 import './snapshotTask'
+import './assetTask'
+import './liabilityTask'
 
 // Add more task imports below:
 // import './someOtherTask'

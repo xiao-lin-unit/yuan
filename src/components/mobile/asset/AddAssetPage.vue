@@ -100,11 +100,13 @@ import PageTemplate from '../../common/PageTemplate.vue'
 import { assetTypes, periodTypes, calculationTypes } from '../../../utils/dictionaries'
 import { addAsset as addAssetService } from '../../../services/asset/assetService'
 import { getNonCreditCardAccounts } from '../../../services/account/accountService'
+import { Account } from '../../../types/account/account'
+
 
 const emit = defineEmits(['navigate'])
 
 // 账户数据
-const accounts = ref([])
+const accounts = ref<Account[]>([])
 
 // 表单数据
 const assetForm = ref({
@@ -126,11 +128,11 @@ const assetForm = ref({
 // 过滤后的账户列表
 const filteredAccounts = computed(() => {
   if (assetForm.value.type === '公积金') {
-    return accounts.value.filter(acc => acc.type === '公积金')
+    return accounts.value.filter((acc: Account) => acc.type === '公积金')
   } else if (assetForm.value.type === '社保') {
     return accounts.value.filter(acc => acc.type === '社保')
   } else {
-    return accounts.value.filter(acc => acc.type !== '信用卡')
+    return accounts.value.filter(acc => acc.type !== '公积金' && acc.type !== '社保')
   }
 })
 

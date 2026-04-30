@@ -3,11 +3,11 @@
  * Handles liability and repayment operations
  */
 
-import dayjs from 'dayjs'
 import db from '../../database/index.js'
 import { getCurrentDate, getDate } from '../../utils/timezone.js'
 import type { Liability, Repayment, PendingRepayment, LiabilityInput, RepaymentInput } from '../../types/liability/liability.js'
 import { createDebitTransaction, createCreditTransaction, getAccountById } from '../../services/account/accountService'
+import { ElMessage } from 'element-plus';
 
 /**
  * Calculate total interest based on repayment method
@@ -280,8 +280,8 @@ export async function getPendingRepayments(liabilityId: string): Promise<Pending
  */
 export async function getEarliestPendingRepayment(liabilityId: string): Promise<PendingRepayment | null> {
   const result = await db.query(
-    'SELECT * FROM pending_repayments WHERE liability_id = ? AND status = ? ORDER BY period_number ASC LIMIT 1',
-    [liabilityId, '未还']
+    'SELECT * FROM pending_repayments WHERE liability_id = ? AND status = ? AND due_date <= ? ORDER BY period_number ASC LIMIT 1',
+    [liabilityId, '未还', getCurrentDate().format('YYYY-MM-DD')]
   )
   return result.length > 0 ? result[0] : null
 }
@@ -489,14 +489,7 @@ export async function makeRepayment(input: RepaymentInput): Promise<void> {
 
   const accountTxId = (getCurrentDate().valueOf() + 1).toString()
   if (account.type === '信用卡') {
-    // 信用卡还款：减少已用额度（入账）
-    const creditResult = await createCreditTransaction(
-      liability.account_id,
-      input.amount,
-      `负债还款：${liability.name}`,
-      accountTxId
-    )
-    statements.push(...creditResult.statements)
+    throw new Error('不允许使用信用卡还款')
   } else {
     // 其他账户还款：扣除余额（出账）
     const debitResult = await createDebitTransaction(

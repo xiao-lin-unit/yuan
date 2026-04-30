@@ -490,7 +490,7 @@ export async function getAccountTransactions(accountId: string): Promise<Account
  * 只返回状态为启用的账户
  */
 export async function getNonCreditCardAccounts(): Promise<Account[]> {
-  return await db.query("SELECT * FROM accounts WHERE type != ? AND (status IS NULL OR status = '启用') ORDER BY created_at DESC", ['信用卡'])
+  return await db.query("SELECT * FROM accounts WHERE type != ? AND status = '启用' ORDER BY created_at DESC", ['信用卡'])
 }
 
 // ==================== 账户停用接口 ====================

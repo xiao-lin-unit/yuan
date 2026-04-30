@@ -669,7 +669,7 @@ export async function computeSandbox(sceneType: number, params: any): Promise<{ 
   }
 
   const history: SandboxHistory = {
-    id: now.format('YYYYMMDDHHmmss') + '-' + sceneType,
+    id: getCurrentDate().valueOf().toString() + '-' + sceneType,
     scene_type: sceneType,
     scene_name: scene.name,
     simulate_time: simulateTime,
@@ -680,7 +680,7 @@ export async function computeSandbox(sceneType: number, params: any): Promise<{ 
   }
 
   const result: SandboxResult = {
-    id: now.format('YYYYMMDDHHmmss'),
+    id: history.id + '-result',
     history_id: history.id || now.format('YYYYMMDDHHmmss') + '-' + sceneType,
     net_assets: Number(netAssets.toFixed(2)),
     net_assets_change: netAssetsChange,
@@ -713,11 +713,11 @@ export async function saveSandboxSimulation(sceneType: number, params: any): Pro
         values: [history.id, history.scene_type, history.scene_name, history.simulate_time, history.params, history.result_desc, history.created_at, history.is_deleted]
       },
       {
-        statement: `INSERT INTO sandbox_result (history_id, net_assets, net_assets_change, cash_flow_monthly, cash_flow_change,
+        statement: `INSERT INTO sandbox_result (id, history_id, net_assets, net_assets_change, cash_flow_monthly, cash_flow_change,
             debt_pressure_level, debt_pressure_desc, survival_months, interest_save, monthly_payment_change,
             total_interest_change, chart_x, chart_net_assets, chart_cash_flow, chart_debt, conclusion, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        values: [result.history_id, result.net_assets, result.net_assets_change, result.cash_flow_monthly, result.cash_flow_change,
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        values: [result.id, result.history_id, result.net_assets, result.net_assets_change, result.cash_flow_monthly, result.cash_flow_change,
             result.debt_pressure_level, result.debt_pressure_desc, result.survival_months, result.interest_save,
             result.monthly_payment_change, result.total_interest_change, result.chart_x, result.chart_net_assets,
             result.chart_cash_flow, result.chart_debt, result.conclusion, result.created_at]
