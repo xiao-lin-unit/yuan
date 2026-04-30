@@ -4,10 +4,10 @@
  */
 
 import db from '../../database/index.js'
-import { getCurrentDate, getDate } from '../../utils/timezone.js'
+import { getCurrentDate, getDate, generateId } from '../../utils/timezone.js'
 import type { Liability, Repayment, PendingRepayment, LiabilityInput, RepaymentInput } from '../../types/liability/liability.js'
 import { createDebitTransaction, createCreditTransaction, getAccountById } from '../../services/account/accountService'
-import { ElMessage } from 'element-plus';
+
 
 /**
  * Calculate total interest based on repayment method
@@ -84,7 +84,7 @@ export function generatePendingRepayment(
   }
 
   return {
-    id: getCurrentDate().valueOf().toString(),
+    id: generateId(),
     liability_id: liability.id,
     period_number: periodNumber,
     due_date: dueDate.format('YYYY-MM-DD'),
@@ -99,7 +99,7 @@ export function generatePendingRepayment(
  * Executes liability insert and first pending repayment generation in a transaction
  */
 export async function addLiability(liabilityData: LiabilityInput): Promise<void> {
-  const id = getCurrentDate().valueOf().toString()
+  const id = generateId()
 
   // Calculate total interest
   const totalInterest = liabilityData.is_interest && liabilityData.period
@@ -337,7 +337,7 @@ export async function makeRepayment(input: RepaymentInput): Promise<void> {
     throw new Error('该负债已结清')
   }
 
-  const repaymentId = getCurrentDate().valueOf().toString()
+  const repaymentId = generateId()
   let principalAmount = 0
   let interestAmount = 0
   let periodNumber: number | null = null
@@ -420,8 +420,8 @@ export async function makeRepayment(input: RepaymentInput): Promise<void> {
     const isSettled = newRemainingPrincipal === 0
     const newStatus = isSettled ? '已结清' : '未结清'
 
-    principalAmount = input.amount
-    interestAmount = 0
+    // Issue 17: Use 0 as period number for early repayment since no specific period
+    periodNumber = 0
 
     // Recalculate remaining interest
     let newTotalInterest = 0
@@ -487,7 +487,7 @@ export async function makeRepayment(input: RepaymentInput): Promise<void> {
     throw new Error('关联账户不存在')
   }
 
-  const accountTxId = (getCurrentDate().valueOf() + 1).toString()
+  const accountTxId = generateId()
   if (account.type === '信用卡') {
     throw new Error('不允许使用信用卡还款')
   } else {

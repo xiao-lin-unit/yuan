@@ -5,7 +5,7 @@
 
 import dayjs from 'dayjs'
 import db from '../../database/index.js'
-import { getCurrentDate, getDate } from '../../utils/timezone.js'
+import { getCurrentDate, generateId, getDate } from '../../utils/timezone.js'
 import type {
   Fund,
   FundHolding,
@@ -37,13 +37,13 @@ export function validateFundCode(code: string): boolean {
 /**
  * Check if a fund with the given code already exists
  */
-export async function checkFundExists(code: string): Promise<{ exists: boolean; ended: boolean }> {
+export async function checkFundExists(code: string): Promise<{ exists: boolean; isEnded: boolean }> {
   const existingFunds = await db.query('SELECT * FROM funds WHERE code = ?', [code])
   if (existingFunds.length > 0) {
     const fund = existingFunds[0]
-    return { exists: true, ended: fund.ended === 1 || fund.ended === true }
+    return { exists: true, isEnded: fund.status === '结束' }
   }
-  return { exists: false, ended: false }
+  return { exists: false, isEnded: false }
 }
 
 /**
@@ -77,7 +77,7 @@ export function calculateLockEndDate(transactionTime: dayjs.Dayjs | string | Dat
  * Add a new fund with initial buy transaction
  */
 export async function addFund(fundData: FundInput, deductFromAccount: boolean = true): Promise<void> {
-  const fundId = getCurrentDate().valueOf().toString()
+  const fundId = generateId()
   const totalCost = calculateTotalCost(fundData.cost_nav, fundData.shares, fundData.fee)
 
   // Calculate lock end date
@@ -104,8 +104,8 @@ export async function addFund(fundData: FundInput, deductFromAccount: boolean = 
     ]
   })
 
-  const holdingId = getCurrentDate().valueOf().toString() + '_hold'
-  const transactionId = getCurrentDate().valueOf().toString()
+  const holdingId = generateId()
+  const transactionId = generateId()
 
   // Create fund holding record
   statements.push({
@@ -176,9 +176,9 @@ export async function buyFund(fundId: string, buyData: FundBuyInput): Promise<vo
   // Calculate lock end date
   const lockEndDate = calculateLockEndDate(buyData.transaction_time, buyData.lock_period)
 
-  const holdingId = getCurrentDate().valueOf().toString() + '_hold'
-  const transactionId = getCurrentDate().valueOf().toString()
-  const accountTransactionId = getCurrentDate().valueOf().toString() + '_acc'
+  const holdingId = generateId()
+  const transactionId = generateId()
+  const accountTransactionId = generateId()
 
   const statements = [
     // Create fund holding record
@@ -214,10 +214,10 @@ export async function buyFund(fundId: string, buyData: FundBuyInput): Promise<vo
         buyData.account_id
       ]
     },
-    // Update fund record (reset ended status to 0)
+    // Update fund record (reset status to '开启')
     {
-      statement: `UPDATE funds SET shares = ?, current_nav = ?, cost_nav = ?, total_fee = ?, ended = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-      values: [newShares, buyData.nav, newCostNav, currentFund.total_fee + buyData.fee, 0, fundId]
+      statement: `UPDATE funds SET shares = ?, current_nav = ?, cost_nav = ?, total_fee = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+      values: [newShares, buyData.nav, newCostNav, currentFund.total_fee + buyData.fee, '开启', fundId]
     },
     // 使用出账接口返回的SQL语句（已包含账户更新和交易记录）
     ...debitResult.statements
@@ -290,9 +290,9 @@ export async function sellFund(fundId: string, sellData: FundSellInput): Promise
   }
 
   // Create fund transaction record (sell)
-  const transactionId = getCurrentDate().valueOf().toString()
+  const transactionId = generateId()
   statements.push({
-    statement: `INSERT INTO fund_transactions (id, fund_id, transaction_nav, shares, type, hold_ids, fee, transaction_time, account_id) 
+    statement: `INSERT INTO fund_transactions (id, fund_id, transaction_nav, shares, type, hold_ids, fee, transaction_time, account_id)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     values: [
       transactionId,
@@ -311,10 +311,10 @@ export async function sellFund(fundId: string, sellData: FundSellInput): Promise
   const newShares = fund.shares - sellData.shares
   const confirmedProfit = (sellData.nav - fund.cost_nav) * sellData.shares - sellData.fee
   const newConfirmedProfit = (fund.confirmed_profit || 0) + confirmedProfit
-  const isEnded = newShares === 0 ? 1 : 0
+  const isEnded = newShares === 0 ? '结束' : '开启'
 
   statements.push({
-    statement: `UPDATE funds SET shares = ?, current_nav = ?, confirmed_profit = ?, ended = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+    statement: `UPDATE funds SET shares = ?, current_nav = ?, confirmed_profit = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
     values: [newShares, sellData.nav, newConfirmedProfit, isEnded, fundId]
   })
 

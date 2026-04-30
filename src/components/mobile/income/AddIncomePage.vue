@@ -114,7 +114,7 @@ import PageHeader from '../../common/PageHeader.vue'
 import NumberKeypad from '../../common/NumberKeypad.vue'
 import CategoryItem from '../../common/CategoryItem.vue'
 import type { Category } from '../../../data/categories'
-import { useAccountStore } from '../../../stores/account'
+import { getAccounts } from '../../../services/account/accountService'
 import db from '../../../database'
 import { incomeCategories } from '../../../data/categories'
 import { createCreditTransaction } from '../../../services/account/accountService'
@@ -139,17 +139,17 @@ const calculator = ref({
 const showAccountSelector = ref(false)
 const selectedAccount = ref('账户')
 
-// 账户store
-const accountStore = useAccountStore()
+// 账户列表
+const allAccounts = ref<any[]>([])
 
 // 获取选中的分类信息
 const selectedCategory = computed(() => {
   return categories.value.find(c => c.id === selectedCategoryId.value)
 })
 
-// 从store获取账户列表（收入只允许流入流动储蓄账户和信用卡）
+// 从服务获取账户列表（收入只允许流入流动储蓄账户和信用卡）
 const accounts = computed(() => {
-  return accountStore.accounts.filter(account => {
+  return allAccounts.value.filter(account => {
     // 流动资金账户始终允许（收入流入）
     if (account.is_liquid) return true
     // 信用卡允许（还款）
@@ -240,7 +240,7 @@ onActivated(() => {
 // 加载账户数据
 const loadAccounts = async () => {
   try {
-    await accountStore.loadAccounts()
+    allAccounts.value = await getAccounts()
   } catch (error) {
     console.error('Error loading accounts:', error)
   }
@@ -398,7 +398,7 @@ const saveIncome = async () => {
     return
   }
 
-  const selectedAccountObj = accountStore.accounts.find(account => account.name === selectedAccount.value)
+  const selectedAccountObj = allAccounts.value.find(account => account.name === selectedAccount.value)
   if (!selectedAccountObj) {
     alert('选中的账户不存在')
     return
@@ -449,7 +449,7 @@ const saveIncome = async () => {
     await db.executeTransaction(statements)
 
     // 执行到这里 = 事务已自动提交 
-    await accountStore.loadAccounts()
+    allAccounts.value = await getAccounts()
     console.log('保存收入成功（事务安全）')
 
   } catch (error: any) {

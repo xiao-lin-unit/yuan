@@ -11,8 +11,8 @@ describe('Financial Health Assessment', () => {
   it('should calculate total assets correctly', async () => {
     const accounts = await db.query(`SELECT * FROM accounts WHERE status = '启用'`)
     const assets = await db.query(`SELECT * FROM assets WHERE status != '结束'`)
-    const stocks = await db.query(`SELECT * FROM stocks WHERE ended = 0`)
-    const funds = await db.query(`SELECT * FROM funds WHERE ended = 0`)
+    const stocks = await db.query(`SELECT * FROM stocks WHERE status != '结束'`)
+    const funds = await db.query(`SELECT * FROM funds WHERE status != '结束'`)
 
     const liquidBalance = accounts
       .filter((a: any) => a.type !== '信用卡')

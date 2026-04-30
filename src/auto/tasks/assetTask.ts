@@ -24,7 +24,7 @@ registerTask('assetAutoIncome', async () => {
     const now = getCurrentDate()
     const today = now.format('YYYY-MM-DD')
     const assets = await db.query(
-      'SELECT * FROM assets WHERE type = ? AND status = ? AND calculation_type != ? AND next_income_date <= ?',
+      'SELECT * FROM assets WHERE type = ? AND status = ? AND calculation_type != ? AND next_income_date <= ? AND account_id IS NOT NULL',
       ['普通资产', '开启', '无', today]
     )
 
@@ -37,7 +37,6 @@ registerTask('assetAutoIncome', async () => {
 
             // Pre-load account info for transaction records
             let accountBalance: number | null = null
-            if (!asset.account_id) continue;
             const account = await getAccountById(asset.account_id)
             if (!account || account.status === '停用') continue;
             accountBalance = account.balance || 0
@@ -74,12 +73,13 @@ registerTask('assetAutoIncome', async () => {
                 currentIncomeDate = nextDate
             }
             
-            statements.push({
-                statement: 'UPDATE accounts SET balance = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-                values: [accountBalance + totalIncome, asset.account_id]
-            })
-
             if (totalIncome > 0) {
+                // Update account balance
+                statements.push({
+                    statement: 'UPDATE accounts SET balance = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+                    values: [accountBalance + totalIncome, asset.account_id]
+                })
+
                 // Update asset: set next_income_date and add total income to amount
                 statements.push({
                     statement: 'UPDATE assets SET next_income_date = ?, amount = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',

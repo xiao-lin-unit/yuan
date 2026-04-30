@@ -60,7 +60,7 @@ import { getNonCreditCardAccounts } from '../../../services/account/accountServi
 const emit = defineEmits(['navigate'])
 
 // 账户数据
-const accounts = ref([])
+const accounts = ref<any[]>([])
 
 // 表单数据
 const fundForm = ref({
@@ -135,10 +135,10 @@ const addFund = async () => {
     const fundExists = await checkFundExists(fundForm.value.code)
     
     if (fundExists.exists) {
-      if (!fundExists.ended) {
-        alert('已存在该基金，不允许重复添加')
-      } else {
+      if (fundExists.isEnded) {
         alert('已存在该基金，请到历史记录中查看')
+      } else {
+        alert('已存在该基金，不允许重复添加')
       }
       return
     }

@@ -6,7 +6,7 @@
 import db from '../../database/index.js'
 import type { Asset, AssetInput } from '../../types/asset/asset.js'
 import { createDebitTransaction } from '../account/accountService.js'
-import { getCurrentDate } from '../../utils/timezone.js'
+import { getCurrentDate, generateId } from '../../utils/timezone.js'
 
 
 /**
@@ -33,10 +33,12 @@ export function calculateNextIncomeDate(period: string, incomeDate: string): str
 
     return nextDate.format('YYYY-MM-DD')
   } else if (period === '月') {
-    // 每月：income_date format is DD, next income date is this month or next month
+    // 每月：income_date format is DD or MM-DD, next income date is this month or next month
     if (!incomeDate) return ''
-    const [day] = incomeDate.split('-')
-    let nextDate = getCurrentDate().year(now.year()).month(now.month()).date(parseInt(day))
+    const parts = incomeDate.split('-')
+    const day = parseInt(parts.length > 1 ? parts[1] : parts[0])
+    if (isNaN(day)) return ''
+    let nextDate = getCurrentDate().year(now.year()).month(now.month()).date(day)
 
     // If this month's income date has passed, next month
     if (nextDate.isBefore(now) || nextDate.isSame(now, 'day')) {
@@ -87,7 +89,7 @@ export function calculatePerAssetIncome(asset: Asset): number {
  * Add a new general asset
  */
 export async function addAsset(assetData: AssetInput, deductFromAccount: boolean = true): Promise<void> {
-  const id = getCurrentDate().valueOf().toString()
+  const id = generateId()
 
   // Calculate next income date
   let nextIncomeDate = ''
@@ -277,7 +279,7 @@ export async function recordAssetIncome(
   recordTime: string,
   remark?: string
 ): Promise<{ statement: string; values: (string | number)[] }> {
-  const id = getCurrentDate().valueOf().toString()
+  const id = generateId()
   return {
     statement: 'INSERT INTO asset_income_records (id, asset_id, income_amount, record_time, remark) VALUES (?, ?, ?, ?, ?)',
     values: [id, assetId, incomeAmount, recordTime, remark || '']

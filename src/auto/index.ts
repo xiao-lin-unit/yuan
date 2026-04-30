@@ -38,6 +38,7 @@ export async function runAutoTasks() {
     try {
       await task.run()
     } catch (error) {
+      console.error(`Auto task '${task.name}' failed:`, error)
     }
   }
 

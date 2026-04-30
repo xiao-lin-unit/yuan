@@ -175,7 +175,7 @@ export async function getSandboxResultByHistoryId(historyId: number): Promise<Sa
   return rows.length > 0 ? rows[0] : null
 }
 
-export async function softDeleteSandboxHistory(id: number): Promise<void> {
+export async function softDeleteSandboxHistory(id: string): Promise<void> {
   await db.run(`UPDATE sandbox_history SET is_deleted = 1 WHERE id = ?`, [id])
 }
 
@@ -183,8 +183,8 @@ export async function softDeleteSandboxHistory(id: number): Promise<void> {
 async function loadUserFinancialData() {
   const accounts = await db.query(`SELECT * FROM accounts WHERE status = '启用'`)
   const assets = await db.query(`SELECT * FROM assets WHERE status != '结束'`)
-  const stocks = await db.query(`SELECT * FROM stocks WHERE ended = 0`)
-  const funds = await db.query(`SELECT * FROM funds WHERE ended = 0`)
+  const stocks = await db.query(`SELECT * FROM stocks WHERE status != '结束'`)
+  const funds = await db.query(`SELECT * FROM funds WHERE status != '结束'`)
   const liabilities = await db.query(`SELECT * FROM liabilities WHERE status = '未结清'`)
 
   const liquidAccounts = accounts.filter((a: any) => a.type !== '信用卡')

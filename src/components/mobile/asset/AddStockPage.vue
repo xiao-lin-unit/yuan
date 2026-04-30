@@ -121,12 +121,12 @@ const addStock = async () => {
 
     if (stockCheck.exists) {
       // 股票代码已存在，检查是否已结束
-      if (!stockCheck.ended) {
-        // 未结束，提示已存在
-        alert('已存在该股票，不允许重复添加')
-      } else {
+      if (stockCheck.isEnded) {
         // 已结束，提示到历史记录查看
         alert('已存在该股票，请到历史记录中查看')
+      } else {
+        // 未结束，提示已存在
+        alert('已存在该股票，不允许重复添加')
       }
       return
     }

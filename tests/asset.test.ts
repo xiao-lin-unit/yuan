@@ -18,7 +18,7 @@ describe('Asset Module', () => {
     })
 
     it('should retrieve stocks with market value', async () => {
-      const stocks = await db.query(`SELECT * FROM stocks WHERE ended = 0`)
+      const stocks = await db.query(`SELECT * FROM stocks WHERE status != '结束'`)
       expect(stocks.length).toBe(1)
       expect(stocks[0].name).toBe('测试股票')
       const marketValue = (stocks[0].current_price || 0) * (stocks[0].quantity || 0)
@@ -26,7 +26,7 @@ describe('Asset Module', () => {
     })
 
     it('should retrieve funds with nav value', async () => {
-      const funds = await db.query(`SELECT * FROM funds WHERE ended = 0`)
+      const funds = await db.query(`SELECT * FROM funds WHERE status != '结束'`)
       expect(funds.length).toBe(1)
       expect(funds[0].name).toBe('测试基金')
       const marketValue = (funds[0].current_nav || 0) * (funds[0].shares || 0)

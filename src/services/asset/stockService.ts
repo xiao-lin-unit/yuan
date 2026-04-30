@@ -4,7 +4,7 @@
  */
 
 import db from '../../database/index.js'
-import { getCurrentDate } from '../../utils/timezone.js'
+import { getCurrentDate, generateId } from '../../utils/timezone.js'
 import type {
   Stock,
   StockHolding,
@@ -36,13 +36,13 @@ export function validateStockCode(code: string): boolean {
 /**
  * Check if a stock with the given code already exists
  */
-export async function checkStockExists(code: string): Promise<{ exists: boolean; ended: boolean }> {
+export async function checkStockExists(code: string): Promise<{ exists: boolean; isEnded: boolean }> {
   const existingStocks = await db.query('SELECT * FROM stocks WHERE code = ?', [code])
   if (existingStocks.length > 0) {
     const stock = existingStocks[0]
-    return { exists: true, ended: stock.ended === 1 || stock.ended === true }
+    return { exists: true, isEnded: stock.status === '结束' }
   }
-  return { exists: false, ended: false }
+  return { exists: false, isEnded: false }
 }
 
 /**
@@ -68,7 +68,7 @@ export async function checkAccountBalance(accountId: string, requiredAmount: num
  * Add a new stock with initial buy transaction
  */
 export async function addStock(stockData: StockInput, deductFromAccount: boolean = true): Promise<void> {
-  const stockId = getCurrentDate().valueOf().toString()
+  const stockId = generateId()
   const totalCost = calculateTotalCost(stockData.price, stockData.quantity, stockData.fee)
 
   // Calculate cost price
@@ -92,8 +92,8 @@ export async function addStock(stockData: StockInput, deductFromAccount: boolean
     ]
   })
 
-  const holdingId = getCurrentDate().valueOf().toString() + '_hold'
-  const transactionId = getCurrentDate().valueOf().toString()
+  const holdingId = generateId()
+  const transactionId = generateId()
 
   // Create stock holding record
   statements.push({
@@ -170,8 +170,8 @@ export async function buyStock(stockId: string, buyData: StockBuyInput): Promise
   const newQuantity = currentStock.quantity + buyData.quantity
 
   // Prepare transaction statements
-  const holdingId = getCurrentDate().valueOf().toString() + '_hold'
-  const transactionId = getCurrentDate().valueOf().toString()
+  const holdingId = generateId()
+  const transactionId = generateId()
 
   const statements = [
     // Create stock holding record
@@ -205,10 +205,10 @@ export async function buyStock(stockId: string, buyData: StockBuyInput): Promise
         buyData.account_id
       ]
     },
-    // Update stock record (reset ended status to 0)
+    // Update stock record (reset status to '开启')
     {
-      statement: `UPDATE stocks SET quantity = ?, current_price = ?, cost_price = ?, ended = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-      values: [newQuantity, buyData.price, newCostPrice, 0, stockId]
+      statement: `UPDATE stocks SET quantity = ?, current_price = ?, cost_price = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+      values: [newQuantity, buyData.price, newCostPrice, '开启', stockId]
     },
     // 使用出账接口返回的SQL语句（已包含账户更新和交易记录）
     ...debitResult.statements
@@ -280,9 +280,9 @@ export async function sellStock(stockId: string, sellData: StockSellInput): Prom
   }
 
   // Create stock transaction record (sell)
-  const transactionId = getCurrentDate().valueOf().toString()
+  const transactionId = generateId()
   statements.push({
-    statement: `INSERT INTO stock_transactions (id, stock_id, price, quantity, type, hold_ids, fee, transaction_time, account_id) 
+    statement: `INSERT INTO stock_transactions (id, stock_id, price, quantity, type, hold_ids, fee, transaction_time, account_id)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     values: [
       transactionId,
@@ -301,10 +301,10 @@ export async function sellStock(stockId: string, sellData: StockSellInput): Prom
   const newQuantity = stock.quantity - sellData.quantity
   const confirmedProfit = calculateSellProfit(sellData.price, stock.cost_price, sellData.quantity, sellData.fee)
   const newConfirmedProfit = (stock.confirmed_profit || 0) + confirmedProfit
-  const isEnded = newQuantity === 0 ? 1 : 0
+  const isEnded = newQuantity === 0 ? '结束' : '开启'
 
   statements.push({
-    statement: `UPDATE stocks SET quantity = ?, current_price = ?, confirmed_profit = ?, ended = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+    statement: `UPDATE stocks SET quantity = ?, current_price = ?, confirmed_profit = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
     values: [newQuantity, sellData.price, newConfirmedProfit, isEnded, stockId]
   })
 

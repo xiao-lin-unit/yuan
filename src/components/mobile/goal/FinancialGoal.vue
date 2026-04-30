@@ -133,11 +133,10 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
 import { getCurrentDate } from '../../../utils/timezone'
-import { useAccountStore } from '../../../stores/account'
+import { getAccounts } from '../../../services/account/accountService'
 import { goalTypes, goalStatuses } from '../../../utils/dictionaries'
 
-const accountStore = useAccountStore()
-const accounts = ref([])
+const accounts = ref<any[]>([])
 const goals = ref([])
 
 const dialogVisible = ref({
@@ -165,8 +164,7 @@ const investForm = ref({
 })
 
 onMounted(async () => {
-  await accountStore.loadAccounts()
-  accounts.value = accountStore.accounts
+  accounts.value = await getAccounts()
   await loadGoals()
 })
 

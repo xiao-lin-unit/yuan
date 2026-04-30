@@ -69,3 +69,21 @@ export function formatDate(date: dayjs.Dayjs | string | Date, format: string = '
   if (!date) return '-'
   return getDate(date).format(format)
 }
+
+/**
+ * Generate a unique ID string based on timestamp + counter.
+ * Solves millisecond collision: multiple calls within the same ms
+ * get different IDs via an auto-incrementing counter.
+ */
+let _idCounter = 0
+let _lastIdMs = 0
+export function generateId(): string {
+  const now = getCurrentTimestamp()
+  if (now === _lastIdMs) {
+    _idCounter++
+  } else {
+    _lastIdMs = now
+    _idCounter = 0
+  }
+  return now.toString() + '_' + _idCounter
+}

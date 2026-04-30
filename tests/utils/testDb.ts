@@ -63,12 +63,12 @@ export async function seedTestData(db: any) {
     ['asset1', '储蓄', '定期存款', 10000, 'acc3', 2.5, '开启'])
 
   // Insert test stocks
-  await db.run(`INSERT INTO stocks (id, name, code, quantity, current_price, cost_price, account_id, ended) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    ['stock1', '测试股票', '000001', 100, 50, 45, 'acc3', 0])
+  await db.run(`INSERT INTO stocks (id, name, code, quantity, current_price, cost_price, account_id, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ['stock1', '测试股票', '000001', 100, 50, 45, 'acc3', '开启'])
 
   // Insert test funds
-  await db.run(`INSERT INTO funds (id, name, code, shares, current_nav, cost_nav, account_id, ended) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    ['fund1', '测试基金', '110022', 500, 2.5, 2.0, 'acc3', 0])
+  await db.run(`INSERT INTO funds (id, name, code, shares, current_nav, cost_nav, account_id, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ['fund1', '测试基金', '110022', 500, 2.5, 2.0, 'acc3', '开启'])
 
   // Insert test liability
   await db.run(

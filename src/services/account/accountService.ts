@@ -6,15 +6,15 @@
 import dayjs from 'dayjs'
 import db from '../../database/index.js'
 import type { Account, AccountTransaction, AccountInput, BalanceAdjustInput, TransferInput, RepayCreditCardInput } from '../../types/account/account.js'
-import { getCurrentISOString, dateNow, getDate, getCurrentDate } from '../../utils/timezone'
+import { getCurrentISOString, dateNow, getDate, getCurrentDate, generateId } from '../../utils/timezone'
 
 /**
  * Add a new account
  * 同时生成一条入账记录
  */
 export async function addAccount(accountData: AccountInput): Promise<void> {
-  const id = dateNow().toString()
-  const transactionId = (dateNow() + 1).toString()
+  const id = generateId()
+  const transactionId = generateId()
 
   // 确定是否需要自动创建资产，并预生成资产ID
   const assetAccountTypes: Record<string, string> = {
@@ -26,7 +26,7 @@ export async function addAccount(accountData: AccountInput): Promise<void> {
     '公积金': '公积金'
   }
   const assetType = assetAccountTypes[accountData.type]
-  const assetId = assetType ? (dateNow() + 2).toString() : null
+  const assetId = assetType ? generateId() : null
 
   const statements = [
     // 1. 创建账户（包含关联资产ID）
@@ -228,7 +228,7 @@ export async function createDebitTransaction(
     throw new Error(`账户类型"${account.type}"不允许出账，仅流动储蓄账户和信用卡支持出账`)
   }
 
-  const txId = transactionId || dateNow().toString()
+  const txId = transactionId || generateId()
   const txTime = transactionTime || getCurrentDate()
   let balanceAfter: number
   let accountUpdateStatement: { statement: string; values: any[] }
@@ -329,7 +329,7 @@ export async function createCreditTransaction(
   }
 
   const isCreditCard = account.type === '信用卡'
-  const txId = transactionId || dateNow().toString()
+  const txId = transactionId || generateId()
   const txTime = transactionTime || getCurrentDate()
   let balanceAfter: number
   let accountUpdateStatement: { statement: string; values: any[] }
@@ -393,8 +393,13 @@ export async function adjustBalance(input: BalanceAdjustInput): Promise<void> {
     throw new Error('账户不存在')
   }
 
+  // 检查账户状态
+  if (account.status === '停用') {
+    throw new Error('账户已停用，无法调整余额')
+  }
+
   const newBalance = account.balance + input.amount
-  const transactionId = dateNow().toString()
+  const transactionId = generateId()
 
   const statements = [
     // Update account balance
@@ -404,7 +409,7 @@ export async function adjustBalance(input: BalanceAdjustInput): Promise<void> {
     },
     // Create account transaction record
     {
-      statement: `INSERT INTO account_transactions (id, account_id, type, amount, balance_after, description, transaction_time) 
+      statement: `INSERT INTO account_transactions (id, account_id, type, amount, balance_after, description, transaction_time)
                   VALUES (?, ?, ?, ?, ?, ?, ?)`,
       values: [
         transactionId,
@@ -447,13 +452,13 @@ export async function transfer(input: TransferInput): Promise<void> {
     throw new Error('转入账户不存在')
   }
 
-  const transactionId = dateNow().toString()
+  const transactionId = generateId()
   const transactionTime = getCurrentDate()
 
   // 使用新的出账入账接口（现在已包含交易记录创建）
   const debitResult = await createDebitTransaction(
-    input.from_account_id, 
-    input.amount, 
+    input.from_account_id,
+    input.amount,
     `转账至：${toAccount.name}`,
     transactionId + '_from',
     transactionTime
@@ -620,15 +625,15 @@ export async function updateAccountBalance(accountId: string, newBalance: number
   const diff = newBalance - account.balance
   if (diff === 0) return
 
-  const transactionId = dateNow().toString()
-
+  const transactionId = generateId()
+  
   const statements = [
     {
       statement: 'UPDATE accounts SET balance = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
       values: [newBalance, accountId]
     },
     {
-      statement: `INSERT INTO account_transactions (id, account_id, type, amount, balance_after, description, transaction_time) 
+      statement: `INSERT INTO account_transactions (id, account_id, type, amount, balance_after, description, transaction_time)
                   VALUES (?, ?, ?, ?, ?, ?, ?)`,
       values: [
         transactionId,

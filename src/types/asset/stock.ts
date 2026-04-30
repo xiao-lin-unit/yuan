@@ -15,7 +15,7 @@ export interface Stock {
   confirmed_profit: number
   first_buy_date: dayjs.Dayjs | string
   account_id: string
-  ended: number
+  status: string
   created_at?: dayjs.Dayjs | string
   updated_at?: dayjs.Dayjs | string
 }

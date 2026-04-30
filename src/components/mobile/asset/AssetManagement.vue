@@ -161,7 +161,7 @@ const toggleAssetsView = () => {
   showEndedAssets.value = !showEndedAssets.value;
 };
 
-// 计算属性：根据ended状态和搜索关键词过滤资产
+// 计算属性：根据status状态和搜索关键词过滤资产
 const filteredGeneralAssets = computed(() => {
   let list = generalAssets.value.filter(asset => {
     const isEnded = asset.status === '结束';
@@ -175,7 +175,7 @@ const filteredGeneralAssets = computed(() => {
 
 const filteredStocks = computed(() => {
   let list = stocks.value.filter(stock => {
-    const isEnded = stock.ended === 1;
+    const isEnded = stock.status === '结束';
     return showEndedAssets.value ? isEnded : !isEnded;
   });
   if (searchKeyword.value.trim()) {
@@ -186,7 +186,7 @@ const filteredStocks = computed(() => {
 
 const filteredFunds = computed(() => {
   let list = funds.value.filter(fund => {
-    const isEnded = fund.ended === 1;
+    const isEnded = fund.status === '结束';
     return showEndedAssets.value ? isEnded : !isEnded;
   });
   if (searchKeyword.value.trim()) {

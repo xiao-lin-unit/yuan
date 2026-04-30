@@ -17,7 +17,7 @@ export interface Fund {
   has_lock: boolean
   lock_period: number
   account_id: string
-  ended: number
+  status: string
   created_at?: dayjs.Dayjs | string
   updated_at?: dayjs.Dayjs | string
 }

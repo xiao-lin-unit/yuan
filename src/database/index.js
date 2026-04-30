@@ -14,7 +14,9 @@ const PERFORMANCE_CONFIG = {
   // Web环境持久化节流时间（毫秒）
   SAVE_THROTTLE_MS: 1000,
   // 启用详细日志
-  DEBUG: false
+  DEBUG: false,
+  // 查询缓存TTL（毫秒）
+  CACHE_TTL_MS: 30000
 }
 
 // 数据库管理（单例模式）
@@ -202,10 +204,16 @@ class DatabaseManager {
     
     // 检查缓存
     if (useCache && this.cache.has(cacheKey)) {
-      if (PERFORMANCE_CONFIG.DEBUG) {
-        console.log('Using cached query result')
+      const cached = this.cache.get(cacheKey)
+      // Check TTL
+      if (cached && Date.now() - cached.timestamp < PERFORMANCE_CONFIG.CACHE_TTL_MS) {
+        if (PERFORMANCE_CONFIG.DEBUG) {
+          console.log('Using cached query result')
+        }
+        return cached.data
       }
-      return this.cache.get(cacheKey)
+      // Cache expired
+      this.cache.delete(cacheKey)
     }
 
     const db = await this.getDB()
@@ -215,9 +223,10 @@ class DatabaseManager {
         if (this.isNative) {
           // Capacitor SQLite 查询 - 注意：使用位置参数！
           const queryResult = await db.query(sql, params)
-          console.log('SQL Query Result:', JSON.stringify(queryResult))
+          if (PERFORMANCE_CONFIG.DEBUG) {
+            console.log('SQL Query Result:', JSON.stringify(queryResult))
+          }
           const values = queryResult.values || []
-          console.log('Values:', JSON.stringify(values))
           
           // 检查values是否已经是对象数组
           if (values.length > 0 && typeof values[0] === 'object' && values[0] !== null) {
@@ -226,7 +235,6 @@ class DatabaseManager {
           } else {
             // 如果是二维数组，转换为对象数组并使用原始字段名
             const columns = queryResult.columns || []
-            console.log('Columns:', columns)
             result = values.map(row => {
               const obj = {}
               columns.forEach((column, index) => {
@@ -236,7 +244,9 @@ class DatabaseManager {
               return obj
             })
           }
-          console.log('Transformed result:', JSON.stringify(result))
+          if (PERFORMANCE_CONFIG.DEBUG) {
+            console.log('Transformed result:', JSON.stringify(result))
+          }
         } else {
           // SQL.js 查询
           const stmt = db.prepare(sql)
@@ -253,7 +263,7 @@ class DatabaseManager {
 
       // 缓存结果
       if (useCache) {
-        this.cache.set(cacheKey, result)
+        this.cache.set(cacheKey, { data: result, timestamp: Date.now() })
       }
 
       return result
@@ -314,36 +324,12 @@ class DatabaseManager {
    * @returns {Array} 执行结果数组
    */
   async batch(statements) {
-    const db = await this.getDB()
-    const results = []
-
-    try {
-      if (this.isNative) {
-        // Capacitor SQLite 批处理
-        for (const { sql, params = [] } of statements) {
-          const result = await db.run(sql, params)
-          results.push({ lastID: result.lastId || 0, changes: result.changes || 1 })
-        }
-      } else {
-        // SQL.js 批处理
-        for (const { sql, params = [] } of statements) {
-          const stmt = db.prepare(sql)
-          stmt.run(params)
-          stmt.free()
-          results.push({ lastID: 0, changes: 1 })
-        }
-        // 延迟持久化
-        this.debouncedSave()
-      }
-
-      // 清除缓存
-      this.clearCache()
-
-      return results
-    } catch (e) {
-      console.error('Batch SQL Error:', e)
-      throw new Error('批处理SQL失败: ' + (e.message || e.toString()))
-    }
+    // Use executeTransaction for atomic batch execution
+    const txStatements = statements.map(({ sql, params = [] }) => ({
+      statement: sql,
+      values: params
+    }))
+    return await this.executeTransaction(txStatements)
   }
 
   /**
@@ -529,7 +515,7 @@ class DatabaseManager {
             confirmed_profit REAL DEFAULT 0,
             first_buy_date TEXT,
             account_id TEXT,
-            ended INTEGER DEFAULT 0,
+            status TEXT DEFAULT '开启',
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (account_id) REFERENCES accounts(id)
@@ -590,7 +576,7 @@ class DatabaseManager {
             has_lock INTEGER DEFAULT 0,
             lock_period INTEGER DEFAULT 0,
             account_id TEXT,
-            ended INTEGER DEFAULT 0,
+            status TEXT DEFAULT '开启',
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (account_id) REFERENCES accounts(id)
