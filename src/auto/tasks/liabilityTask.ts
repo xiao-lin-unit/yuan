@@ -11,6 +11,8 @@ registerTask('liabilityAutoRepayment', async () => {
       ['未结清', '随借随还']
     )
 
+    console.log(`自动处理负债还款`, JSON.stringify(liabilities))
+
     for (const liability of liabilities) {
         try {
             while (true) {

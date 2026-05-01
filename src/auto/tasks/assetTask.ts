@@ -24,10 +24,10 @@ registerTask('assetAutoIncome', async () => {
     const now = getCurrentDate()
     const today = now.format('YYYY-MM-DD')
     const assets = await db.query(
-      'SELECT * FROM assets WHERE type = ? AND status = ? AND calculation_type != ? AND next_income_date <= ? AND account_id IS NOT NULL',
-      ['普通资产', '开启', '无', today]
+      'SELECT * FROM assets WHERE status = ? AND calculation_type != ? AND next_income_date <= ? AND account_id IS NOT NULL',
+      ['开启', '无', today]
     )
-
+    console.log(`自动处理资产收益`, JSON.stringify(assets))
     for (const asset of assets) {
         try {
             const statements: { statement: string; values: any[] }[] = []
@@ -43,6 +43,7 @@ registerTask('assetAutoIncome', async () => {
             
             // Process each missed income period from next_income_date up to today
             while (getDate(currentIncomeDate).isBefore(now) || getDate(currentIncomeDate).isSame(now, 'day')) {
+                console.log(`处理的资产`, asset)
                 const income = calculatePerAssetIncome({...asset, amount})
                 if (income <= 0) break
 
@@ -85,7 +86,7 @@ registerTask('assetAutoIncome', async () => {
                     statement: 'UPDATE assets SET next_income_date = ?, amount = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
                     values: [currentIncomeDate, amount, asset.id]
                 })
-
+                console.log(`自动处理资产收益更新`, JSON.stringify(statements))
                 // Execute all statements in a single transaction
                 await db.executeTransaction(statements)
             }

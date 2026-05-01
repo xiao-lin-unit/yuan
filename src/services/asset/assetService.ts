@@ -65,7 +65,7 @@ export function calculatePerAssetIncome(asset: Asset): number {
     return (asset.income_amount || 0)
   } else if (asset.calculation_type === '按年收益率计算') {
     // 按年收益率计算：根据周期不同，年化收益率需要除以不同的基数
-    const rate = (asset.annual_yield_rate || 0) / 100
+    const rate = (asset.annual_yield_rate || 0) // / 100
     const principal = asset.amount || 0
 
     if (rate <= 0 || principal <= 0) return 0
