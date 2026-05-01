@@ -8,6 +8,9 @@
 import initSqlJs from 'sql.js'
 import { Capacitor } from '@capacitor/core'
 import { CapacitorSQLite, SQLiteConnection, SQLiteDBConnection } from '@capacitor-community/sqlite'
+import { MIGRATIONS, compareVersions, getLatestVersion } from './version'
+
+
 
 // 性能配置
 const PERFORMANCE_CONFIG = {
@@ -852,148 +855,49 @@ class DatabaseManager {
     ]
   }
 
-  /**
-   * Schema migration: rebuild tables whose column types are not SQLite native types.
-   * SQLite native types are: TEXT, INTEGER, REAL, BLOB
-   * Non-native types like VARCHAR, DATE, TIMESTAMP, BOOLEAN, DECIMAL are migrated.
-   */
-  async updateSchema() {
-    const schemaEntries = this.getCreateStatements().filter(s => s.sql && s.sql.includes('CREATE TABLE'))
-    const tableNames = schemaEntries
-      .map(s => {
-        const match = s.sql.match(/CREATE TABLE IF NOT EXISTS (\w+)/)
-        return match ? match[1] : null
-      })
-      .filter(Boolean)
+  async versionUpdate() {
+    // 1. 确保版本追踪表存在
+    await this.run(`
+      CREATE TABLE IF NOT EXISTS db_version (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        version TEXT NOT NULL
+      )
+    `)
 
-    for (const tableName of tableNames) {
-      try {
-        await this.migrateToNativeTypes(tableName, schemaEntries)
-      } catch (e) {
-        if (PERFORMANCE_CONFIG.DEBUG) {
-          console.log(`Migration skipped for ${tableName}:`, e.message)
-        }
-      }
-    }
-  }
+    // 2. 读取已记录的数据库版本
+    const rows = await this.query('SELECT version FROM db_version WHERE id = 1')
+    const currentVersion = rows.length > 0 ? rows[0].version : '0.0.0'
 
-  /**
-   * Migrate a single table if it has non-native SQLite column types.
-   * Uses the create-new → copy-data → drop-old → rename pattern.
-   */
-  async migrateToNativeTypes(tableName, schemaEntries) {
-    const columns = await this.query(`PRAGMA table_info(${tableName})`)
-    if (!columns || columns.length === 0) return
-
-    const nativeTypes = new Set(['TEXT', 'INTEGER', 'REAL', 'BLOB', ''])
-    let needsMigration = false
-    for (const col of columns) {
-      const type = (col.type || '').toUpperCase()
-      if (type && !nativeTypes.has(type)) {
-        needsMigration = true
-        break
-      }
-    }
-
-    if (!needsMigration) return
-
-    if (PERFORMANCE_CONFIG.DEBUG) {
-      console.log(`Migrating table: ${tableName}`)
-    }
-
-    const schemaEntry = schemaEntries.find(s => {
-      const match = s.sql.match(/CREATE TABLE IF NOT EXISTS (\w+)/)
-      return match && match[1] === tableName
-    })
-    if (!schemaEntry) return
-
-    const createSql = schemaEntry.sql.replace(
-      `CREATE TABLE IF NOT EXISTS ${tableName}`,
-      `CREATE TABLE IF NOT EXISTS ${tableName}_new`
+    // 3. 筛选需要执行的迁移（版本号大于当前数据库版本）
+    const pending = MIGRATIONS.filter(
+      m => compareVersions(m.version, currentVersion) > 0
     )
 
-    await this.run(createSql)
+    if (pending.length === 0) {
+      if (PERFORMANCE_CONFIG.DEBUG) {
+        console.log(`DB version ${currentVersion} is up to date, no migrations needed`)
+      }
+      return
+    }
 
-    const colNames = columns.map(c => c.name)
-    const colList = colNames.join(', ')
+    // 4. 按顺序执行迁移
+    for (const migration of pending) {
+      if (PERFORMANCE_CONFIG.DEBUG) {
+        console.log(`Running migration: ${migration.version} - ${migration.description}`)
+      }
+      await migration.migrate(this)
+    }
 
-    await this.run(`INSERT INTO ${tableName}_new (${colList}) SELECT ${colList} FROM ${tableName}`)
-    await this.run(`DROP TABLE ${tableName}`)
-    await this.run(`ALTER TABLE ${tableName}_new RENAME TO ${tableName}`)
+    // 5. 更新版本记录为最新版本
+    const latestVersion = getLatestVersion()
+    await this.run(
+      `INSERT INTO db_version (id, version) VALUES (1, ?)
+       ON CONFLICT(id) DO UPDATE SET version = excluded.version`,
+      [latestVersion]
+    )
 
     if (PERFORMANCE_CONFIG.DEBUG) {
-      console.log(`Migration completed for table: ${tableName}`)
-    }
-  }
-
-  /**
-   * 表名迁移：将旧表名重命名为新表名，保留已有数据。
-   * 仅在旧表存在且新表不存在时执行迁移，安全可重入。
-   * @param {string} oldName - 旧表名
-   * @param {string} newName - 新表名
-   */
-  async migrateTableName(oldName, newName) {
-    try {
-      // 检查旧表是否存在
-      const oldTable = await this.query(
-        `SELECT name FROM sqlite_master WHERE type='table' AND name=?`,
-        [oldName]
-      )
-      if (!oldTable || oldTable.length === 0) return
-
-      // 检查新表是否已存在
-      const newTable = await this.query(
-        `SELECT name FROM sqlite_master WHERE type='table' AND name=?`,
-        [newName]
-      )
-      if (newTable && newTable.length > 0) {
-        // 新表已存在，删除旧表即可（上一次迁移中途失败但不影响数据）
-        await this.run(`DROP TABLE IF EXISTS ${oldName}`)
-        if (PERFORMANCE_CONFIG.DEBUG) {
-          console.log(`Table migration: dropped leftover old table ${oldName}`)
-        }
-        return
-      }
-
-      // 旧表存在，新表不存在 → 执行迁移
-      // 1. 获取旧表的列信息
-      const columns = await this.query(`PRAGMA table_info(${oldName})`)
-      const colNames = columns.map(c => c.name)
-      const colList = colNames.join(', ')
-
-      // 2. 创建新表（使用 getCreateStatements 中的定义）
-      const schemaEntries = this.getCreateStatements().filter(s => s.sql && s.sql.includes('CREATE TABLE'))
-      const schemaEntry = schemaEntries.find(s => {
-        const match = s.sql.match(/CREATE TABLE IF NOT EXISTS (\w+)/)
-        return match && match[1] === newName
-      })
-      if (!schemaEntry) {
-        if (PERFORMANCE_CONFIG.DEBUG) {
-          console.log(`Table migration: schema for ${newName} not found, skipping`)
-        }
-        return
-      }
-      await this.run(schemaEntry.sql)
-
-      // 3. 复制数据
-      await this.run(`INSERT INTO ${newName} (${colList}) SELECT ${colList} FROM ${oldName}`)
-
-      // 4. 删除旧表
-      await this.run(`DROP TABLE ${oldName}`)
-
-      // 5. 重建索引
-      const indexStatements = this.getCreateStatements().filter(s =>
-        s.sql && s.sql.includes(`ON ${newName}`)
-      )
-      for (const idx of indexStatements) {
-        await this.run(idx.sql)
-      }
-
-      if (PERFORMANCE_CONFIG.DEBUG) {
-        console.log(`Table migration: ${oldName} → ${newName} completed successfully`)
-      }
-    } catch (e) {
-      console.error(`Table migration ${oldName} → ${newName} failed:`, e)
+      console.log(`DB version updated: ${currentVersion} → ${latestVersion}`)
     }
   }
 
@@ -1018,10 +922,7 @@ class DatabaseManager {
       // 批量执行
       await this.batch(createStatements)
 
-      await this.updateSchema();
-
-      // 表名迁移：transactions → income_expense_records
-      await this.migrateTableName('transactions', 'income_expense_records');
+      await this.versionUpdate();
 
       this.initialized = true
 

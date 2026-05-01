@@ -48,12 +48,18 @@
         <span>沙盒</span>
       </div>
     </div>
+
+    <!-- 版本信息 -->
+    <div class="version-info">
+      <span>裕安 {{ versionText }}</span>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue';
 import { DataAnalysis, Document, Flag, PieChart } from '@element-plus/icons-vue';
+import { getVersionText } from '../../../utils/version';
 import m4 from '@/assets/img/m4.jpg';
 import m5 from '@/assets/img/m5.jpg';
 import m3 from '@/assets/img/m3.jpg';
@@ -81,6 +87,7 @@ const carouselItems = [
 ];
 
 const currentSlide = ref(0);
+const versionText = getVersionText();
 let slideInterval: number | null = null;
 
 const startAutoSlide = () => {
@@ -234,6 +241,13 @@ const navigateTo = (key: string) => {
   font-size: 14px;
   color: #303133;
   text-align: center;
+}
+
+.version-info {
+  text-align: center;
+  padding: 32px 0 16px;
+  color: #C0C4CC;
+  font-size: 13px;
 }
 
 @media (max-width: 375px) {

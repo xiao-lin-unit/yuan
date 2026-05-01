@@ -44,7 +44,7 @@ describe('Asset Module', () => {
     it('should calculate daily income by annual rate', () => {
       const asset = {
         amount: 10000,
-        annual_yield_rate: 3.65,
+        annual_yield_rate: 0.0365,
         period: '日',
         calculation_type: '按年收益率计算'
       } as any
@@ -55,7 +55,7 @@ describe('Asset Module', () => {
     it('should calculate monthly income by annual rate', () => {
       const asset = {
         amount: 12000,
-        annual_yield_rate: 12,
+        annual_yield_rate: 0.12,
         period: '月',
         calculation_type: '按年收益率计算'
       } as any
