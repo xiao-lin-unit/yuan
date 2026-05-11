@@ -107,7 +107,6 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onActivated, computed } from 'vue'
-import dayjs from 'dayjs'
 import { getCurrentDate, getDate } from '../../../utils/timezone'
 import { Close } from '@element-plus/icons-vue'
 import PageHeader from '../../common/PageHeader.vue'
@@ -152,8 +151,6 @@ const accounts = computed(() => {
   return allAccounts.value.filter(account => {
     // 流动资金账户始终允许（收入流入）
     if (account.is_liquid) return true
-    // 信用卡允许（还款）
-    if (account.type === '信用卡') return true
     
     return false
   })

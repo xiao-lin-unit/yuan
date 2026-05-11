@@ -415,3 +415,31 @@ export async function getFundById(fundId: string): Promise<Fund | null> {
   const result = await db.query('SELECT * FROM funds WHERE id = ?', [fundId])
   return result.length > 0 ? result[0] : null
 }
+
+/**
+ * Delete a fund and all related data (holdings, transactions)
+ * Uses executeTransaction for atomicity
+ */
+export async function deleteFund(fundId: string): Promise<void> {
+  const fundData = await db.query('SELECT * FROM funds WHERE id = ?', [fundId])
+  if (fundData.length === 0) {
+    throw new Error('基金不存在')
+  }
+
+  const statements = [
+    {
+      statement: 'DELETE FROM fund_transactions WHERE fund_id = ?',
+      values: [fundId]
+    },
+    {
+      statement: 'DELETE FROM fund_holdings WHERE fund_id = ?',
+      values: [fundId]
+    },
+    {
+      statement: 'DELETE FROM funds WHERE id = ?',
+      values: [fundId]
+    }
+  ]
+
+  await db.executeTransaction(statements)
+}

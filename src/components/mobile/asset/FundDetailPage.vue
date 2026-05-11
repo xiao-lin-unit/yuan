@@ -186,14 +186,15 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import { ArrowLeft, Plus, Minus, More, Switch, Edit } from '@element-plus/icons-vue';
+import { ArrowLeft, Plus, Minus, More, Switch, Edit, Delete } from '@element-plus/icons-vue';
 import { ElMessageBox, ElMessage } from 'element-plus';
 import FloatingActionMenu from '../../../components/common/FloatingActionMenu.vue';
 import {
   getFundDetail,
   getFundHoldings,
   getFundTransactions,
-  updateFundNav
+  updateFundNav,
+  deleteFund as deleteFundService
 } from '../../../services/asset/fundService';
 import type { FundHolding, FundTransaction } from '../../../types/asset/fund';
 import { formatDate } from '../../../utils/timezone';
@@ -251,6 +252,30 @@ const editFundNav = async () => {
   }
 };
 
+// 删除基金
+const handleDeleteFund = async () => {
+  try {
+    await ElMessageBox.confirm(
+      '删除后将清除该基金的所有持有记录和交易记录，且无法恢复，确定删除吗？',
+      '删除基金',
+      {
+        confirmButtonText: '确定删除',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    );
+
+    await deleteFundService(props.fundId);
+    ElMessage.success('基金删除成功');
+    emit('navigate', 'asset');
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('删除基金失败:', error);
+      ElMessage.error('删除基金失败');
+    }
+  }
+};
+
 // 定义按钮列表
 const actionButtons = [
   {
@@ -272,6 +297,11 @@ const actionButtons = [
     text: '卖出',
     icon: Minus,
     action: navigateToSellFund
+  },
+  {
+    text: '删除',
+    icon: Delete,
+    action: handleDeleteFund
   }
 ];
 

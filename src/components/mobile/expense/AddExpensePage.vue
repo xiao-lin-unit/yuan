@@ -58,7 +58,7 @@
               @click="selectAccount(account)"
             >
               <div class="account-name">{{ account.name }}</div>
-              <div class="account-balance">余额: ¥{{ account.balance }}</div>
+              <div class="account-balance">{{ account.type === '信用卡' ? `可用: ¥${(account.total_limit - account.used_limit).toFixed(2)}` : `余额: ¥${account.balance.toFixed(2)}` }}</div>
             </div>
             <div v-if="accounts.length === 0" class="no-accounts">
               暂无账户，请先添加账户

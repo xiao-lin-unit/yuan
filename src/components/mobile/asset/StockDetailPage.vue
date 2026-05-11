@@ -171,14 +171,15 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import { ArrowLeft, Plus, Minus, Edit } from '@element-plus/icons-vue';
+import { ArrowLeft, Plus, Minus, Edit, Delete } from '@element-plus/icons-vue';
 import { ElMessageBox, ElMessage } from 'element-plus';
 import FloatingActionMenu from '../../../components/common/FloatingActionMenu.vue';
 import {
   getStockDetail,
   getStockHoldings,
   getStockTransactions,
-  updateStockPrice
+  updateStockPrice,
+  deleteStock as deleteStockService
 } from '../../../services/asset/stockService';
 import type { StockHolding, StockTransaction } from '../../../types/asset/stock';
 import { formatDate } from '../../../utils/timezone';
@@ -236,6 +237,30 @@ const editStockPrice = async () => {
   }
 };
 
+// 删除股票
+const handleDeleteStock = async () => {
+  try {
+    await ElMessageBox.confirm(
+      '删除后将清除该股票的所有持有记录和交易记录，且无法恢复，确定删除吗？',
+      '删除股票',
+      {
+        confirmButtonText: '确定删除',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    );
+
+    await deleteStockService(props.stockId);
+    ElMessage.success('股票删除成功');
+    emit('navigate', 'asset');
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('删除股票失败:', error);
+      ElMessage.error('删除股票失败');
+    }
+  }
+};
+
 // 定义按钮列表
 const actionButtons = [
   {
@@ -252,6 +277,11 @@ const actionButtons = [
     text: '卖出',
     icon: Minus,
     action: navigateToSellStock
+  },
+  {
+    text: '删除',
+    icon: Delete,
+    action: handleDeleteStock
   }
 ];
 

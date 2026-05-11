@@ -405,3 +405,31 @@ export async function getStockById(stockId: string): Promise<Stock | null> {
   const result = await db.query('SELECT * FROM stocks WHERE id = ?', [stockId])
   return result.length > 0 ? result[0] : null
 }
+
+/**
+ * Delete a stock and all related data (holdings, transactions)
+ * Uses executeTransaction for atomicity
+ */
+export async function deleteStock(stockId: string): Promise<void> {
+  const stockData = await db.query('SELECT * FROM stocks WHERE id = ?', [stockId])
+  if (stockData.length === 0) {
+    throw new Error('股票不存在')
+  }
+
+  const statements = [
+    {
+      statement: 'DELETE FROM stock_transactions WHERE stock_id = ?',
+      values: [stockId]
+    },
+    {
+      statement: 'DELETE FROM stock_holdings WHERE stock_id = ?',
+      values: [stockId]
+    },
+    {
+      statement: 'DELETE FROM stocks WHERE id = ?',
+      values: [stockId]
+    }
+  ]
+
+  await db.executeTransaction(statements)
+}
