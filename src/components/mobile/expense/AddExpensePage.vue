@@ -107,7 +107,6 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onActivated, computed } from 'vue'
-import dayjs from 'dayjs'
 import { Close } from '@element-plus/icons-vue'
 import PageHeader from '../../common/PageHeader.vue'
 import NumberKeypad from '../../common/NumberKeypad.vue'
@@ -117,7 +116,7 @@ import { getAccounts } from '../../../services/account/accountService'
 import db from '../../../database'
 import { expenseCategories } from '../../../data/categories'
 import { createDebitTransaction } from '../../../services/account/accountService'
-import { getCurrentISOString, formatForDB, getCurrentDate, getDate } from '../../../utils/timezone'
+import { getCurrentString, formatForDB, getCurrentDate, getDate } from '../../../utils/timezone'
 
 const emit = defineEmits(['navigate'])
 
@@ -179,7 +178,7 @@ const selectAccount = (account: { name: string }) => {
 
 // 日期时间选择
 const showDateTimeSelector = ref(false)
-const selectedDateTime = ref(getCurrentISOString().slice(0, 16)) // 默认当前时间(UTC+8)
+const selectedDateTime = ref(getCurrentString().slice(0, 16)) // 默认当前时间(UTC+8)
 const formattedDateTime = ref('')
 
 // 初始化日期时间格式

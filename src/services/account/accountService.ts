@@ -6,7 +6,7 @@
 import dayjs from 'dayjs'
 import db from '../../database/index.js'
 import type { Account, AccountTransaction, AccountInput, BalanceAdjustInput, TransferInput, RepayCreditCardInput } from '../../types/account/account.js'
-import { getCurrentISOString, dateNow, getDate, getCurrentDate, generateId } from '../../utils/timezone'
+import { getCurrentString, dateNow, getDate, getCurrentDate, generateId } from '../../utils/timezone'
 
 /**
  * Add a new account
@@ -59,7 +59,7 @@ export async function addAccount(accountData: AccountInput): Promise<void> {
         accountData.balance,
         accountData.balance,
         '账户初始入账',
-        getCurrentISOString()
+        getCurrentString()
       ]
     })
   }
@@ -77,7 +77,7 @@ export async function addAccount(accountData: AccountInput): Promise<void> {
         usedLimit,
         usedLimit,
         '信用卡初始借款',
-        getCurrentISOString()
+        getCurrentString()
       ]
     })
   }
@@ -418,7 +418,7 @@ export async function adjustBalance(input: BalanceAdjustInput): Promise<void> {
         Math.abs(input.amount),
         newBalance,
         input.remark || `${input.type}：余额调整`,
-        getCurrentISOString()
+        getCurrentString()
       ]
     }
   ]
@@ -642,7 +642,7 @@ export async function updateAccountBalance(accountId: string, newBalance: number
         Math.abs(diff),
         newBalance,
         remark || '账户余额调整',
-        getCurrentISOString()
+        getCurrentString()
       ]
     }
   ]

@@ -350,9 +350,9 @@ export async function getFundDetail(fundId: string): Promise<FundDetail> {
   // Calculate derived values
   const costAmount = f.cost_nav * f.shares
   const currentAmount = f.current_nav * f.shares
-  const totalReturn = currentAmount - costAmount
+  const holdReturn = currentAmount - costAmount
   const confirmedReturn = f.confirmed_profit || 0
-  const holdReturn = totalReturn - confirmedReturn
+  const totalReturn = holdReturn + confirmedReturn
 
   return {
     id: f.id,

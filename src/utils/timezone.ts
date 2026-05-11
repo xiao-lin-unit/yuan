@@ -21,15 +21,8 @@ export function getCurrentDate(): dayjs.Dayjs {
 /**
  * Get current ISO string in UTC+8
  */
-export function getCurrentISOString(): string {
-  return getCurrentDate().toISOString()
-}
-
-/**
- * Convert a date to UTC+8 ISO string
- */
-export function toUTC8ISOString(date: dayjs.Dayjs | string | Date): string {
-  return dayjs(date as any).tz().toISOString()
+export function getCurrentString(): string {
+  return formatDate(getCurrentDate(), 'YYYY-MM-DDTHH:mm:ss')
 }
 
 /**
@@ -43,7 +36,7 @@ export function getCurrentTimestamp(): number {
  * Format date for database storage (UTC+8)
  */
 export function formatForDB(date: dayjs.Dayjs | string | Date = dayjs()): string {
-  return dayjs(date as any).tz().toISOString()
+  return formatDate(dayjs(date as any).tz(), 'YYYY-MM-DDTHH:mm:ss');
 }
 
 /**
@@ -69,7 +62,6 @@ export function formatDate(date: dayjs.Dayjs | string | Date, format: string = '
   if (!date) return '-'
   return getDate(date).format(format)
 }
-
 /**
  * Generate a unique ID string based on timestamp + counter.
  * Solves millisecond collision: multiple calls within the same ms

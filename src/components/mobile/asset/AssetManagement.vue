@@ -503,7 +503,7 @@ const navigateToAddFund = () => {
   align-items: center;
   gap: 8px;
   padding: 12px 16px;
-  background-color: #67c23a;
+  background-color: rgba(103, 194, 58, 0.8);
   border-radius: 24px;
   box-shadow: 0 4px 12px rgba(103, 194, 58, 0.5);
   cursor: pointer;

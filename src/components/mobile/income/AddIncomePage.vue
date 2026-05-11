@@ -118,7 +118,7 @@ import { getAccounts } from '../../../services/account/accountService'
 import db from '../../../database'
 import { incomeCategories } from '../../../data/categories'
 import { createCreditTransaction } from '../../../services/account/accountService'
-import { getCurrentISOString, formatForDB } from '../../../utils/timezone'
+import { getCurrentString, formatForDB } from '../../../utils/timezone'
 
 const emit = defineEmits(['navigate'])
 
@@ -174,7 +174,7 @@ const selectAccount = (account: { name: string }) => {
 
 // 日期时间选择
 const showDateTimeSelector = ref(false)
-const selectedDateTime = ref(getCurrentISOString().slice(0, 16)) // 默认当前时间(UTC+8)
+const selectedDateTime = ref(getCurrentString().slice(0, 16)) // 默认当前时间(UTC+8)
 const formattedDateTime = ref('')
 
 // 初始化日期时间格式

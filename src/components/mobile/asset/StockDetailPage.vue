@@ -299,9 +299,6 @@ const loadStockDetail = async () => {
     const stock = await getStockDetail(props.stockId);
     console.log('Stock detail loaded:', stock);
 
-    // 计算持有收益
-const holdReturn = (stock.currentPrice - stock.costPrice) * stock.quantity;
-
     stockInfo.value = {
       name: stock.name,
       code: stock.code,
@@ -310,8 +307,8 @@ const holdReturn = (stock.currentPrice - stock.costPrice) * stock.quantity;
       currentPrice: stock.currentPrice,
       quantity: stock.quantity,
       confirmedReturn: stock.confirmedProfit,
-      holdReturn: holdReturn,
-      totalReturn: holdReturn + stock.confirmedProfit
+      holdReturn: stock.holdReturn,
+      totalReturn: stock.totalReturn
     };
 
     // 加载持有记录

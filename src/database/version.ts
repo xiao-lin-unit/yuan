@@ -10,12 +10,35 @@
  * - migrate 函数必须是幂等的（重复调用不会产生副作用）
  */
 
-import type DatabaseManager from './index.js'
-
 interface Migration {
   version: string
   description: string
-  migrate: (db: DatabaseManager) => Promise<void>
+  migrate: (db: any) => Promise<void>
+}
+
+/**
+ * 辅助函数：检查表是否存在某列
+ */
+async function hasColumn(db: any, table: string, column: string): Promise<boolean> {
+  const columns = await db.query(`PRAGMA table_info(${table})`)
+  return columns.some((c: any) => c.name === column)
+}
+
+/**
+ * 辅助函数：重建表（用于删除列等 SQLite 不直接支持的操作）
+ * 使用 create-new → copy-data → drop-old → rename 模式
+ */
+async function rebuildTable(db: any, tableName: string, createSql: string, columnsToKeep: string[]): Promise<void> {
+  const tempTable = `${tableName}_migration_temp`
+  const tempCreateSql = createSql.replace(
+    `CREATE TABLE IF NOT EXISTS ${tableName}`,
+    `CREATE TABLE IF NOT EXISTS ${tempTable}`
+  )
+  await db.run(tempCreateSql)
+  const colList = columnsToKeep.join(', ')
+  await db.run(`INSERT INTO ${tempTable} (${colList}) SELECT ${colList} FROM ${tableName}`)
+  await db.run(`DROP TABLE ${tableName}`)
+  await db.run(`ALTER TABLE ${tempTable} RENAME TO ${tableName}`)
 }
 
 export const MIGRATIONS: Migration[] = [
@@ -27,13 +50,43 @@ export const MIGRATIONS: Migration[] = [
     }
   },
   // ── 新版本迁移在此处追加 ──────────────────────────
-  // {
-  //   version: '1.0.1',
-  //   description: '例如：为 accounts 表添加新字段',
-  //   migrate: async (db) => {
-  //     await db.run('ALTER TABLE accounts ADD COLUMN new_field TEXT')
-  //   }
-  // },
+   {
+    version: '1.0.1',
+    description: 'stocks/funds 表确保 status 列存在（兼容 ended 列迁移）',
+    migrate: async (db) => {
+      // ── funds 表迁移 ──
+      const fundsHasStatus = await hasColumn(db, 'funds', 'status')
+      const fundsHasEnded = await hasColumn(db, 'funds', 'ended')
+
+      if (!fundsHasStatus) {
+        // status 列不存在，需要添加
+        await db.run(`ALTER TABLE funds ADD COLUMN status TEXT DEFAULT '开启'`)
+        if (fundsHasEnded) {
+          // 从 ended 列迁移数据
+          await db.run(`UPDATE funds SET status = CASE WHEN ended = 1 THEN '结束' ELSE '开启' END`)
+        }
+      } else if (fundsHasEnded) {
+        // 两列都存在（中间状态），同步空值
+        await db.run(`UPDATE funds SET status = CASE WHEN ended = 1 THEN '结束' ELSE '开启' END WHERE status IS NULL OR status = ''`)
+      }
+
+      // ── stocks 表迁移 ──
+      const stocksHasStatus = await hasColumn(db, 'stocks', 'status')
+      const stocksHasEnded = await hasColumn(db, 'stocks', 'ended')
+
+      if (!stocksHasStatus) {
+        // status 列不存在，需要添加
+        await db.run(`ALTER TABLE stocks ADD COLUMN status TEXT DEFAULT '开启'`)
+        if (stocksHasEnded) {
+          // 从 ended 列迁移数据
+          await db.run(`UPDATE stocks SET status = CASE WHEN ended = 1 THEN '结束' ELSE '开启' END`)
+        }
+      } else if (stocksHasEnded) {
+        // 两列都存在（中间状态），同步空值
+        await db.run(`UPDATE stocks SET status = CASE WHEN ended = 1 THEN '结束' ELSE '开启' END WHERE status IS NULL OR status = ''`)
+      }
+    }
+  },
 ]
 
 /** 获取最新版本号 */

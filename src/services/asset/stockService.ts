@@ -340,9 +340,9 @@ export async function getStockDetail(stockId: string): Promise<StockDetail> {
   // Calculate derived values
   const costAmount = s.cost_price * s.quantity
   const currentAmount = s.current_price * s.quantity
-  const totalReturn = currentAmount - costAmount
+  const holdReturn = currentAmount - costAmount
   const confirmedReturn = s.confirmed_profit || 0
-  const holdReturn = totalReturn - confirmedReturn
+  const totalReturn = holdReturn + confirmedReturn
 
   return {
     id: s.id,
@@ -353,7 +353,9 @@ export async function getStockDetail(stockId: string): Promise<StockDetail> {
     currentPrice: s.current_price,
     quantity: s.quantity,
     confirmedProfit: confirmedReturn,
-    marketValue: currentAmount
+    marketValue: currentAmount,
+    holdReturn,
+    totalReturn
   }
 }
 

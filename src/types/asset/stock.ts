@@ -93,4 +93,6 @@ export interface StockDetail {
   costAmount: number
   confirmedProfit: number
   marketValue: number
+  holdReturn: number
+  totalReturn: number
 }
