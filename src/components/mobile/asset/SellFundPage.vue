@@ -59,9 +59,9 @@ const fundForm = ref({
   id: '',
   name: '',
   code: '',
-  current_nav: 0,
-  shares: 0,
-  fee: 0,
+  current_nav: 0.0000,
+  shares: 0.00,
+  fee: 0.00,
   transaction_time: getCurrentDate(),
   account_id: ''
 })
@@ -121,9 +121,9 @@ const sellFund = async () => {
   
   try {
     await sellFundService(props.fundId, {
-      nav: fundForm.value.current_nav,
-      shares: fundForm.value.shares,
-      fee: fundForm.value.fee,
+      nav: Number((fundForm.value.current_nav).toFixed(4)),
+      shares: Number((fundForm.value.shares).toFixed(2)),
+      fee: Number((fundForm.value.fee).toFixed(2)),
       transaction_time: fundForm.value.transaction_time,
       account_id: fundForm.value.account_id
     })

@@ -21,7 +21,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import dayjs from 'dayjs';
-import { getCurrentDate, getDate } from '../../../utils/timezone';
+import { getCurrentDate, getDate, formatDate } from '../../../utils/timezone';
 import db from '../../../database';
 
 interface DayData {
@@ -47,7 +47,7 @@ const formatAmount = (amount: number): string => {
   if (amount >= 1000) {
     return (amount / 1000).toFixed(2) + 'K';
   }
-  return amount.toFixed(1);
+  return amount.toFixed(2);
 };
 
 // 计算柱状图高度
@@ -83,7 +83,7 @@ const loadWeeklyIncomes = async () => {
     // 从流水表中查询类型为账户收入的记录
     const transactions = await db.query(
       'SELECT t.* FROM income_expense_records t WHERE t.type = ? AND t.created_at BETWEEN ? AND ?',
-      ['账户收入', start.toISOString(), end.toISOString()]
+      ['账户收入', formatDate(start), formatDate(end)]
     );
     
     
@@ -115,7 +115,7 @@ const loadWeeklyIncomes = async () => {
       days.push({
         date,
         label: dayLabels[i],
-        amount: dailyIncomes.get(dateStr) || 0
+        amount: Number((dailyIncomes.get(dateStr) || 0).toFixed(2))
       });
     }
     
@@ -125,13 +125,13 @@ const loadWeeklyIncomes = async () => {
     console.error('加载本周收入数据失败:', error);
     // 出错时使用默认数据
     weeklyData.value = [
-      { date: getCurrentDate(), label: '周一', amount: 0 },
-      { date: getCurrentDate(), label: '周二', amount: 0 },
-      { date: getCurrentDate(), label: '周三', amount: 0 },
-      { date: getCurrentDate(), label: '周四', amount: 0 },
-      { date: getCurrentDate(), label: '周五', amount: 0 },
-      { date: getCurrentDate(), label: '周六', amount: 0 },
-      { date: getCurrentDate(), label: '周日', amount: 0 }
+      { date: getCurrentDate(), label: '周一', amount: 0.00 },
+      { date: getCurrentDate(), label: '周二', amount: 0.00 },
+      { date: getCurrentDate(), label: '周三', amount: 0.00 },
+      { date: getCurrentDate(), label: '周四', amount: 0.00 },
+      { date: getCurrentDate(), label: '周五', amount: 0.00 },
+      { date: getCurrentDate(), label: '周六', amount: 0.00 },
+      { date: getCurrentDate(), label: '周日', amount: 0.00 }
     ];
   }
 };

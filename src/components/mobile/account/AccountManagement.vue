@@ -185,9 +185,9 @@ const accountForm = ref({
   id: '',
   name: '',
   type: '',
-  balance: 0,
-  used_limit: 0,
-  total_limit: 0,
+  balance: 0.00,
+  used_limit: 0.00,
+  total_limit: 0.00,
   is_liquid: true,
   remark: ''
 })
@@ -195,24 +195,24 @@ const accountForm = ref({
 const adjustForm = ref({
   account_id: '',
   type: '',
-  amount: 0,
+  amount: 0.00,
   remark: ''
 })
 
 // 计算数据
 const totalAssets = computed(() => {
-  const generalAssets = assets.value.reduce((total, asset) => total + (asset.amount || 0), 0)
-  const stockAssets = stocks.value.reduce((total, stock) => total + (stock.current_price || 0) * (stock.quantity || 0), 0)
-  const fundAssets = fundList.value.reduce((total, fund) => total + (fund.current_nav || 0) * (fund.shares || 0), 0)
+  const generalAssets = assets.value.reduce((total, asset) => total + Number((asset.amount || 0.00).toFixed(2)), 0.00)
+  const stockAssets = stocks.value.reduce((total, stock) => total + Number((stock.current_price || 0.00).toFixed(2)) * (stock.quantity || 0.00), 0.00)
+  const fundAssets = fundList.value.reduce((total, fund) => total + Number((fund.current_nav || 0.00).toFixed(2)) * (fund.shares || 0.00), 0.00)
   return generalAssets + stockAssets + fundAssets
 })
 
 const totalLiabilities = computed(() => {
-  return liabilities.value.reduce((total, liability) => total + (liability.remaining_principal || 0), 0)
+  return liabilities.value.reduce((total, liability) => total + Number((liability.remaining_principal || 0.00).toFixed(2)), 0.00)
 })
 
 const netWorth = computed(() => {
-  return totalAssets.value - totalLiabilities.value
+  return Number(totalAssets.value - totalLiabilities.value).toFixed(2)
 })
 
 const assetsCount = computed(() => {
@@ -224,31 +224,31 @@ const liabilitiesCount = computed(() => {
 })
 
 const debtRatio = computed(() => {
-  if (totalAssets.value === 0) return 0
+  if (totalAssets.value === 0) return 0.00
   return ((totalLiabilities.value / totalAssets.value) * 100).toFixed(2)
 })
 
 const trendPercentage = computed(() => {
-  if (totalAssets.value === 0) return 0
-  return Math.min((totalLiabilities.value / totalAssets.value) * 100, 100)
+  if (totalAssets.value === 0) return 0.00
+  return Math.min((totalLiabilities.value / totalAssets.value) * 100, 100.00).toFixed(2)
 })
 
 const totalBorrowed = computed(() => {
   return liabilities.value
     .filter(liability => liability.status !== '已结清' && liability.type === '亲友借款')
-    .reduce((total, liability) => total + (liability.remaining_principal || 0), 0)
+    .reduce((total, liability) => total + Number((liability.remaining_principal || 0.00).toFixed(2)), 0.00)
 })
 
 const totalLent = computed(() => {
   return assets.value
     .filter(asset => asset.type === '亲友借款')
-    .reduce((total, asset) => total + (asset.amount || 0), 0)
+    .reduce((total, asset) => total + Number((asset.amount || 0.00).toFixed(2)), 0.00)
 })
 
 const totalCreditCardAvailable = computed(() => {
   return accounts.value
     .filter(account => account.type === '信用卡')
-    .reduce((total, card) => total + ((card.total_limit || 0) - (card.used_limit || 0)), 0)
+    .reduce((total, card) => total + Number(((card.total_limit || 0.00) - (card.used_limit || 0.00)).toFixed(2)), 0.00)
 })
 
 // 从accounts中计算信用卡和资金数据
@@ -259,8 +259,8 @@ const creditCards = computed(() => {
     .map(account => ({
       id: account.id,
       name: account.name,
-      used_limit: account.used_limit || 0,
-      total_limit: account.total_limit || 0
+      used_limit: Number((account.used_limit || 0.00).toFixed(2)),
+      total_limit: Number((account.total_limit || 0.00).toFixed(2))
     }))
 })
 
@@ -271,7 +271,7 @@ const funds = computed(() => {
     .map(account => ({
       id: account.id,
       name: account.name,
-      balance: account.balance
+      balance: Number((account.balance || 0.00).toFixed(2))
     }))
 })
 
@@ -282,17 +282,17 @@ const otherFunds = computed(() => {
     .map(account => ({
       id: account.id,
       name: account.name,
-      balance: account.balance
+      balance: Number((account.balance || 0.00).toFixed(2))
     }))
 })
 
 // 计算总资金
 const totalFunds = computed(() => {
-  return funds.value.reduce((total, fund) => total + fund.balance, 0)
+  return funds.value.reduce((total, fund) => total + Number((fund.balance || 0.00).toFixed(2)), 0.00)
 })
 
 const totalOtherFunds = computed(() => {
-  return otherFunds.value.reduce((total, fund) => total + fund.balance, 0)
+  return otherFunds.value.reduce((total, fund) => total + Number((fund.balance || 0.00).toFixed(2)), 0.00)
 })
 
 // 展开/收起状态
@@ -390,7 +390,7 @@ const openBalanceAdjustDialog = (account: any) => {
   adjustForm.value = {
     account_id: account.id,
     type: '',
-    amount: 0,
+    amount: Number((adjustForm.value.amount || 0.00).toFixed(2)),
     remark: ''
   }
   dialogVisible.value.adjust = true
@@ -401,9 +401,9 @@ const updateAccount = async () => {
     await updateAccountService(accountForm.value.id, {
       name: accountForm.value.name,
       type: accountForm.value.type,
-      balance: accountForm.value.balance,
-      used_limit: accountForm.value.used_limit,
-      total_limit: accountForm.value.total_limit,
+      balance: Number((accountForm.value.balance || 0.00).toFixed(2)),
+      used_limit: Number((accountForm.value.used_limit || 0.00).toFixed(2)),
+      total_limit: Number((accountForm.value.total_limit || 0.00).toFixed(2)),
       is_liquid: accountForm.value.is_liquid,
       remark: accountForm.value.remark
     })

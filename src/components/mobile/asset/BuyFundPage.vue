@@ -59,9 +59,9 @@ const fundForm = ref({
   id: '',
   name: '',
   code: '',
-  cost_nav: 0,
-  shares: 0,
-  fee: 0,
+  cost_nav: 0.0000,
+  shares: 0.00,
+  fee: 0.00,
   has_lock: false,
   lock_period: 0,
   transaction_time: getCurrentDate(),
@@ -121,9 +121,9 @@ const buyFund = async () => {
   
   try {
     await buyFundService(props.fundId, {
-      nav: fundForm.value.cost_nav,
-      shares: fundForm.value.shares,
-      fee: fundForm.value.fee,
+      nav: Number((fundForm.value.cost_nav).toFixed(4)),
+      shares: Number((fundForm.value.shares).toFixed(2)),
+      fee: Number((fundForm.value.fee).toFixed(2)),
       has_lock: fundForm.value.has_lock,
       lock_period: fundForm.value.lock_period,
       transaction_time: fundForm.value.transaction_time,

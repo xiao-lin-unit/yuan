@@ -128,8 +128,8 @@ const loadAllData = async () => {
   try {
     await db.connect()
     const now = getCurrentDate()
-    const monthStart = now.startOf('month').toISOString()
-    const monthEnd = now.endOf('month').toISOString()
+    // const monthStart = now.startOf('month').format('YYYY-MM-DD')
+    // const monthEnd = now.endOf('month').format('YYYY-MM-DD')
     const monthStartDate = now.startOf('month').format('YYYY-MM-DD')
     const monthEndDate = now.endOf('month').format('YYYY-MM-DD')
 
@@ -153,27 +153,27 @@ const loadAllData = async () => {
     // 月度收入（账户收入）
     const incomeResult = await db.query(
       "SELECT SUM(amount) as total FROM income_expense_records WHERE type = ? AND created_at BETWEEN ? AND ?",
-      ['账户收入', monthStart, monthEnd]
+      ['账户收入', monthStartDate, monthEndDate]
     )
-    monthlyIncome.value = incomeResult[0]?.total || 0
+    monthlyIncome.value = Number((incomeResult[0]?.total || 0).toFixed(2))
 
     // 月度支出（账户支出，不含投资相关）
     const expenseResult = await db.query(
       "SELECT SUM(amount) as total FROM income_expense_records WHERE type = ? AND created_at BETWEEN ? AND ?",
-      ['账户支出', monthStart, monthEnd]
+      ['账户支出', monthStartDate, monthEndDate]
     )
-    monthlyExpense.value = expenseResult[0]?.total || 0
+    monthlyExpense.value = Number((expenseResult[0]?.total || 0).toFixed(2))
 
     // 月度总还款（当月待还）
     const repaymentResult = await db.query(
       "SELECT SUM(total_amount) as total FROM pending_repayments WHERE due_date BETWEEN ? AND ?",
       [monthStartDate, monthEndDate]
     )
-    monthlyRepayment.value = repaymentResult[0]?.total || 0
+    monthlyRepayment.value = Number((repaymentResult[0]?.total || 0).toFixed(2))
 
     // 累计已实现盈亏
-    confirmedProfitStocks.value = stocks.value.reduce((sum, s) => sum + (s.confirmed_profit || 0), 0)
-    confirmedProfitFunds.value = funds.value.reduce((sum, f) => sum + (f.confirmed_profit || 0), 0)
+    confirmedProfitStocks.value = Number(stocks.value.reduce((sum, s) => sum + (s.confirmed_profit || 0), 0).toFixed(2))
+    confirmedProfitFunds.value = Number(funds.value.reduce((sum, f) => sum + (f.confirmed_profit || 0), 0).toFixed(2))
 
     // 加载上月快照
     const lastMonth = now.subtract(1, 'month')
@@ -188,116 +188,115 @@ const loadAllData = async () => {
 const liquidFunds = computed(() => {
   return accounts.value
     .filter((a: any) => a.type !== '信用卡')
-    .reduce((sum, a) => sum + (a.balance || 0), 0)
+    .reduce((sum, a) => Number((sum + (a.balance || 0.00)).toFixed(2)), 0.00)
 })
 
 // 社保资产
 const socialSecurityAssets = computed(() => {
   return assets.value
     .filter((a: any) => a.type === '社保')
-    .reduce((sum, a) => sum + (a.amount || 0), 0)
+    .reduce((sum, a) => Number((sum + (a.amount || 0.00)).toFixed(2)), 0.00)
 })
 
 // 公积金资产
 const providentFundAssets = computed(() => {
   return assets.value
     .filter((a: any) => a.type === '公积金')
-    .reduce((sum, a) => sum + (a.amount || 0), 0)
+    .reduce((sum, a) => Number((sum + (a.amount || 0.00)).toFixed(2)), 0.00)
 })
 
 // 股票市值
 const stockMarketValue = computed(() => {
-  return stocks.value.reduce((sum, s) => sum + (s.current_price || 0) * (s.quantity || 0), 0)
+  return stocks.value.reduce((sum, s) => Number((sum + (s.current_price || 0.00) * (s.quantity || 0.00)).toFixed(2)), 0.00)
 })
 
 // 基金市值
 const fundMarketValue = computed(() => {
-  return funds.value.reduce((sum, f) => sum + (f.current_nav || 0) * (f.shares || 0), 0)
+  return funds.value.reduce((sum, f) => Number((sum + (f.current_nav || 0.00) * (f.shares || 0.00)).toFixed(2)), 0.00)
 })
 
 // 亲友借出
 const loansToFriends = computed(() => {
   return assets.value
     .filter((a: any) => a.type === '亲友借款')
-    .reduce((sum, a) => sum + (a.amount || 0), 0)
+    .reduce((sum, a) => Number((sum + (a.amount || 0.00)).toFixed(2)), 0.00)
 })
 
 // 资产总额
 const totalAssets = computed(() => {
-  return (
+  return Number((
     liquidFunds.value +
     socialSecurityAssets.value +
     providentFundAssets.value +
     stockMarketValue.value +
     fundMarketValue.value +
     loansToFriends.value
-  )
+  ).toFixed(2))
 })
 
 // 信用卡已用额度
 const creditCardUsed = computed(() => {
   return accounts.value
     .filter((a: any) => a.type === '信用卡')
-    .reduce((sum, a) => sum + (a.used_limit || 0), 0)
+    .reduce((sum, a) => Number((sum + (a.used_limit || 0.00)).toFixed(2)), 0.00)
 })
 
 // 总负债
 const totalLiabilities = computed(() => {
   const liabilityPrincipal = liabilities.value.reduce(
-    (sum, l) => sum + (l.remaining_principal || 0),
-    0
+    (sum, l) => Number((sum + (l.remaining_principal || 0.00)).toFixed(2)), 0.00
   )
   return liabilityPrincipal + creditCardUsed.value
 })
 
 // 净资产
 const netWorth = computed(() => {
-  return totalAssets.value - totalLiabilities.value
+  return Number((totalAssets.value - totalLiabilities.value).toFixed(2))
 })
 
 // 月度现金流
 const monthlyCashFlow = computed(() => {
-  return monthlyIncome.value - monthlyExpense.value
+  return Number((monthlyIncome.value - monthlyExpense.value).toFixed(2))
 })
 
 // 月度投资盈亏变化
 const monthlyInvestmentProfit = computed(() => {
-  if (!lastMonthSnapshot.value) return 0
-  const lastStocks = lastMonthSnapshot.value.confirmedProfitStocks || 0
-  const lastFunds = lastMonthSnapshot.value.confirmedProfitFunds || 0
-  const currentStocks = confirmedProfitStocks.value
-  const currentFunds = confirmedProfitFunds.value
-  return currentStocks + currentFunds - lastStocks - lastFunds
+  if (!lastMonthSnapshot.value) return 0.00
+  const lastStocks = Number((lastMonthSnapshot.value.confirmedProfitStocks || 0.00).toFixed(2))
+  const lastFunds = Number((lastMonthSnapshot.value.confirmedProfitFunds || 0.00).toFixed(2))
+  const currentStocks = Number((confirmedProfitStocks.value || 0.00).toFixed(2))
+  const currentFunds = Number((confirmedProfitFunds.value || 0.00).toFixed(2))
+  return Number((currentStocks + currentFunds - lastStocks - lastFunds).toFixed(2))
 })
 
 // 投资亏损（仅负数部分转为正数）
 const monthlyInvestmentLoss = computed(() => {
-  return monthlyInvestmentProfit.value < 0 ? Math.abs(monthlyInvestmentProfit.value) : 0
+  return Number((monthlyInvestmentProfit.value < 0 ? Math.abs(monthlyInvestmentProfit.value) : 0).toFixed(2))
 })
 
 // 月度结余
 const monthlyBalance = computed(() => {
-  return monthlyIncome.value - monthlyExpense.value - monthlyInvestmentLoss.value - monthlyRepayment.value
+  return Number((monthlyIncome.value - monthlyExpense.value - monthlyInvestmentLoss.value - monthlyRepayment.value).toFixed(2))
 })
 
 // 债务收入比
 const debtIncomeRatio = computed(() => {
-  if (monthlyIncome.value === 0) return 0
-  return (monthlyRepayment.value / monthlyIncome.value) * 100
+  if (monthlyIncome.value === 0) return 0.00
+  return Number(((monthlyRepayment.value / monthlyIncome.value) * 100).toFixed(2))
 })
 
 // 资产负债率
 const assetLiabilityRatio = computed(() => {
-  if (totalAssets.value === 0) return 0
-  return (totalLiabilities.value / totalAssets.value) * 100
+  if (totalAssets.value === 0) return 0.00
+  return Number(((totalLiabilities.value / totalAssets.value) * 100).toFixed(2))
 })
 
 // 资产月增长率
 const assetGrowthRate = computed(() => {
-  if (!lastMonthSnapshot.value) return 0
-  const lastAssets = lastMonthSnapshot.value.totalAssets || 0
-  if (lastAssets === 0) return 0
-  return ((totalAssets.value - lastAssets) / lastAssets) * 100
+  if (!lastMonthSnapshot.value) return 0.00
+  const lastAssets = Number((lastMonthSnapshot.value.totalAssets || 0.00).toFixed(2))
+  if (lastAssets === 0.00) return 0.00
+  return Number(((totalAssets.value - lastAssets) / lastAssets * 100).toFixed(2))
 })
 
 // ============ 评分计算 ============

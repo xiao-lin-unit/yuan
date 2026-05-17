@@ -50,7 +50,7 @@ export const MIGRATIONS: Migration[] = [
     }
   },
   // ── 新版本迁移在此处追加 ──────────────────────────
-   {
+  {
     version: '1.0.1',
     description: 'stocks/funds 表确保 status 列存在（兼容 ended 列迁移）',
     migrate: async (db) => {
@@ -87,6 +87,35 @@ export const MIGRATIONS: Migration[] = [
       }
     }
   },
+  {
+    version: '1.0.2',
+    description: 'stocks/funds 表确保 status 列存在（兼容 ended 列迁移）',
+    migrate: async (db) => {
+      // 将系统中所有表的时间字段进行统一，将原本表中不同格式的时间日期改为统一的YYYY-MM-DD HH:mm:ss格式
+
+      // 1. 获取系统中的所有表
+      const tables = await db.query(`SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name`)
+      for (const table of tables) {
+        if (table.name === 'sqlite_sequence') continue
+        if (table.name.indexOf('_new') > -1) {
+          db.run(`DROP TABLE ${table.name}`)
+        }
+        // 2. 获取表中的所有字段
+        const columns = await db.query(`PRAGMA table_info(${table.name})`)
+        for (const column of columns) {
+          // 3. 判断字段类型是否为时间字段
+          if (column.name === 'created_at' || column.name === 'updated_at' || column.name.indexOf('_time') > -1) {
+            // 4. 更新时间字段为统一格式
+            await db.run(`UPDATE ${table.name} SET ${column.name} = strftime('%Y-%m-%d %H:%M:%S', ${column.name}) WHERE ${column.name} IS NOT NULL`);
+          } else if (column.name.indexOf('_date') > -1) {
+            // 5. 更新日期字段为统一格式
+            await db.run(`UPDATE ${table.name} SET ${column.name} = strftime('%Y-%m-%d 00:00:00', ${column.name}) WHERE ${column.name} IS NOT NULL`);
+          }
+        }
+      }
+
+    }
+  }
 ]
 
 /** 获取最新版本号 */

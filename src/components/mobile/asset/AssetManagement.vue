@@ -43,7 +43,7 @@
             v-for="asset in filteredGeneralAssets"
             :key="asset.id"
             :title="asset.name"
-            :amount="asset.amount"
+            :amount="Number(asset.amount.toFixed(2))"
             :icon="asset.icon"
             :color="asset.color"
             :assetId="asset.id"
@@ -58,7 +58,7 @@
             v-for="stock in filteredStocks"
             :key="stock.id"
             :title="stock.name"
-            :amount="stock.cost_price * stock.quantity"
+            :amount="Number((stock.cost_price * stock.quantity).toFixed(2))"
             :icon="stock.icon"
             :color="stock.color"
             :assetId="stock.id"
@@ -73,7 +73,7 @@
             v-for="fund in filteredFunds"
             :key="fund.id"
             :title="fund.name"
-            :amount="fund.cost_nav * fund.shares"
+            :amount="Number((fund.cost_nav * fund.shares).toFixed(2))"
             :icon="fund.icon"
             :color="fund.color"
             :assetId="fund.id"
@@ -197,11 +197,11 @@ const filteredFunds = computed(() => {
 
 const totalAssetAmount = computed(() => {
   if (selectedAssetType.value === '普通资产') {
-    return filteredGeneralAssets.value.reduce((sum, a) => sum + (a.amount || 0), 0);
+    return filteredGeneralAssets.value.reduce((sum, a) => Number((sum + (a.amount || 0.00)).toFixed(2)), 0.00);
   } else if (selectedAssetType.value === '股票') {
-    return filteredStocks.value.reduce((sum, s) => sum + (s.cost_price * s.quantity || 0), 0);
+    return filteredStocks.value.reduce((sum, s) => Number((sum + (s.cost_price * s.quantity || 0.00)).toFixed(2)), 0.00);
   } else {
-    return filteredFunds.value.reduce((sum, f) => sum + (f.cost_nav * f.shares || 0), 0);
+    return filteredFunds.value.reduce((sum, f) => Number((sum + (f.cost_nav * f.shares || 0.00)).toFixed(2)), 0.00);
   }
 });
 
@@ -238,7 +238,7 @@ const assetForm = ref({
   id: '',
   name: '',
   type: '',
-  amount: 0,
+  amount: 0.00,
   account_id: '',
   period: '' // 周期：年、月、空（不选择）
 });
@@ -247,9 +247,9 @@ const stockForm = ref({
   id: '',
   name: '',
   code: '',
-  price: 0,
+  price: 0.00,
   quantity: 0,
-  fee: 0,
+  fee: 0.00,
   transaction_time: getCurrentDate(),
   type: '买入',
   account_id: ''
@@ -259,9 +259,9 @@ const fundForm = ref({
   id: '',
   name: '',
   code: '',
-  nav: 0,
+  nav: 0.00,
   shares: 0,
-  fee: 0,
+  fee: 0.00,
   has_lock: false,
   transaction_time: getCurrentDate(),
   type: '买入',

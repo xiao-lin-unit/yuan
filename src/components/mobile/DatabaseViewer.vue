@@ -26,13 +26,12 @@
       <!-- 表选择 -->
       <div class="table-selector">
         <el-select v-model="selectedTable" placeholder="选择数据表" @change="loadTableData">
-          <el-option label="账户表 (accounts)" value="accounts" />
-          <el-option label="流水表 (transactions)" value="transactions" />
-          <el-option label="分类表 (categories)" value="categories" />
-          <el-option label="资产表 (assets)" value="assets" />
-          <el-option label="股票表 (stocks)" value="stocks" />
-          <el-option label="基金表 (funds)" value="funds" />
-          <el-option label="负债表 (liabilities)" value="liabilities" />
+          <el-option
+            v-for="t in allTables"
+            :key="t.name"
+            :label="`${t.label} (${t.name})`"
+            :value="t.name"
+          />
         </el-select>
         <el-button type="primary" @click="refreshData" :loading="loading">
           <el-icon><Refresh /></el-icon>
@@ -104,6 +103,35 @@ import db from '../../database'
 
 const emit = defineEmits(['navigate'])
 
+// 表名 → 中文标签映射
+const TABLE_LABELS: Record<string, string> = {
+  accounts: '账户表',
+  income_expense_records: '收支记录表',
+  account_transactions: '账户流水表',
+  assets: '资产表',
+  stocks: '股票表',
+  stock_holdings: '股票持有表',
+  stock_transactions: '股票交易表',
+  funds: '基金表',
+  fund_holdings: '基金持有表',
+  fund_transactions: '基金交易表',
+  liabilities: '负债表',
+  repayments: '还款记录表',
+  pending_repayments: '待还款表',
+  financial_goals: '财务目标表',
+  financial_health: '财务健康表',
+  db_version: '数据库版本表',
+  categories: '分类表',
+  asset_income_records: '普通资产收益记录表',
+  asset_monthly_snapshots: '月度资产记录表',
+  knowledge_favorite: '知识收藏表',
+  knowledge_read_history: '阅读历史表',
+  sandbox_result: '沙盘推演结果表',
+  sandbox_history: '沙盘推演历史表',
+
+
+}
+
 // 状态
 const loading = ref(false)
 const selectedTable = ref('accounts')
@@ -111,6 +139,7 @@ const tableData = ref<any[]>([])
 const tableColumns = ref<string[]>([])
 const isMemoryMode = ref(false)
 const isDataSaved = ref(false)
+const allTables = ref<{ name: string; label: string }[]>([])
 
 // 本地存储大小
 const sqliteStorageSize = ref('0 KB')
@@ -230,9 +259,29 @@ const clearAllData = async () => {
   }
 }
 
+// 加载所有表名
+const loadAllTables = async () => {
+  try {
+    const tables = await db.query(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+    )
+    allTables.value = tables.map((t: any) => ({
+      name: t.name,
+      label: TABLE_LABELS[t.name] || t.name
+    }))
+    // 如果当前选中的表不在列表中，选第一个
+    if (allTables.value.length > 0 && !allTables.value.find(t => t.name === selectedTable.value)) {
+      selectedTable.value = allTables.value[0].name
+    }
+  } catch (error) {
+    console.error('Error loading table list:', error)
+  }
+}
+
 // 初始化
 onMounted(async () => {
   await checkStorageStatus()
+  await loadAllTables()
   await loadTableData()
 })
 </script>

@@ -4,9 +4,9 @@
  */
 
 import db from '../../database/index.js'
-import { getCurrentDate, getDate, generateId } from '../../utils/timezone.js'
+import { getCurrentDate, getDate, generateId, formatDate, getCurrentString } from '../../utils/timezone.js'
 import type { Liability, Repayment, PendingRepayment, LiabilityInput, RepaymentInput } from '../../types/liability/liability.js'
-import { createDebitTransaction, createCreditTransaction, getAccountById } from '../../services/account/accountService'
+import { createDebitTransaction, getAccountById } from '../../services/account/accountService'
 
 
 /**
@@ -44,10 +44,10 @@ export function generatePendingRepayment(
   liability: Liability,
   periodNumber: number
 ): { id: string; liability_id: string; period_number: number; due_date: string; principal_amount: number; interest_amount: number; total_amount: number } {
-  const monthlyRate = liability.interest_rate / 100 / 12
-  let principalAmount = 0
-  let interestAmount = 0
-  let totalAmount = 0
+  const monthlyRate = Number((liability.interest_rate / 100 / 12).toFixed(4))
+  let principalAmount = 0.00
+  let interestAmount = 0.00
+  let totalAmount = 0.00
 
   const totalPeriods = liability.period || 1
 
@@ -55,25 +55,25 @@ export function generatePendingRepayment(
     case '等额本息': {
       const remainingPeriods = totalPeriods - periodNumber + 1
       if (remainingPeriods > 0) {
-        const monthlyPayment = liability.remaining_principal * monthlyRate * Math.pow(1 + monthlyRate, remainingPeriods) /
-          (Math.pow(1 + monthlyRate, remainingPeriods) - 1)
-        interestAmount = liability.remaining_principal * monthlyRate
-        principalAmount = monthlyPayment - interestAmount
-        totalAmount = monthlyPayment
+        const monthlyPayment = Number((liability.remaining_principal * monthlyRate * Math.pow(1 + monthlyRate, remainingPeriods) /
+          (Math.pow(1 + monthlyRate, remainingPeriods) - 1)).toFixed(2))
+        interestAmount = Number((liability.remaining_principal * monthlyRate).toFixed(2))
+        principalAmount = Number((monthlyPayment - interestAmount).toFixed(2))
+        totalAmount = Number((monthlyPayment).toFixed(2))
       }
       break
     }
     case '等额本金': {
-      principalAmount = liability.principal / totalPeriods
-      interestAmount = liability.remaining_principal * monthlyRate
-      totalAmount = principalAmount + interestAmount
+      principalAmount = Number((liability.principal / totalPeriods).toFixed(2))
+      interestAmount = Number((liability.remaining_principal * monthlyRate).toFixed(2))
+      totalAmount = Number((principalAmount + interestAmount).toFixed(2))
       break
     }
     case '随借随还':
     default: {
-      principalAmount = 0
-      interestAmount = 0
-      totalAmount = 0
+      principalAmount = 0.00
+      interestAmount = 0.00
+      totalAmount = 0.00
     }
   }
 
@@ -87,10 +87,10 @@ export function generatePendingRepayment(
     id: generateId(),
     liability_id: liability.id,
     period_number: periodNumber,
-    due_date: dueDate.format('YYYY-MM-DD'),
-    principal_amount: Math.round(principalAmount * 100) / 100,
-    interest_amount: Math.round(interestAmount * 100) / 100,
-    total_amount: Math.round(totalAmount * 100) / 100
+    due_date: dueDate.format('YYYY-MM-DD 00:00:00'),
+    principal_amount: Number((Math.round(principalAmount * 100) / 100).toFixed(2)),
+    interest_amount: Number((Math.round(interestAmount * 100) / 100).toFixed(2)),
+    total_amount: Number((Math.round(totalAmount * 100) / 100).toFixed(2))
   }
 }
 
@@ -121,11 +121,11 @@ export async function addLiability(liabilityData: LiabilityInput): Promise<void>
         id,
         liabilityData.name,
         liabilityData.type,
-        liabilityData.principal,
-        liabilityData.principal,
-        totalInterest,
+        liabilityData.principal.toFixed(2),
+        liabilityData.principal.toFixed(2),
+        totalInterest.toFixed(2),
         liabilityData.is_interest ? 1 : 0,
-        liabilityData.interest_rate,
+        liabilityData.interest_rate.toFixed(4),
         liabilityData.start_date,
         liabilityData.repayment_method,
         liabilityData.repayment_day || null,
@@ -147,7 +147,7 @@ export async function addLiability(liabilityData: LiabilityInput): Promise<void>
       remaining_principal: liabilityData.principal,
       remaining_total_interest: totalInterest,
       is_interest: liabilityData.is_interest,
-      interest_rate: liabilityData.interest_rate,
+      interest_rate: Number(liabilityData.interest_rate.toFixed(4)) || 0.00,
       start_date: liabilityData.start_date,
       repayment_method: liabilityData.repayment_method,
       repayment_day: liabilityData.repayment_day,
@@ -228,7 +228,8 @@ export async function updateLiability(liabilityId: string, data: Partial<Liabili
 
   if (fields.length === 0) return
 
-  fields.push('updated_at = CURRENT_TIMESTAMP')
+  fields.push('updated_at = ?')
+  values.push(getCurrentString())
   values.push(liabilityId)
 
   await db.run(
@@ -281,7 +282,7 @@ export async function getPendingRepayments(liabilityId: string): Promise<Pending
 export async function getEarliestPendingRepayment(liabilityId: string): Promise<PendingRepayment | null> {
   const result = await db.query(
     'SELECT * FROM pending_repayments WHERE liability_id = ? AND status = ? AND due_date <= ? ORDER BY period_number ASC LIMIT 1',
-    [liabilityId, '未还', getCurrentDate().format('YYYY-MM-DD')]
+    [liabilityId, '未还', getCurrentDate().format('YYYY-MM-DD 00:00:00')]
   )
   return result.length > 0 ? result[0] : null
 }
@@ -314,9 +315,9 @@ export function generateNextPendingRepaymentStatement(
       pending.liability_id,
       pending.period_number,
       pending.due_date,
-      pending.principal_amount,
-      pending.interest_amount,
-      pending.total_amount,
+      pending.principal_amount.toFixed(2),
+      pending.interest_amount.toFixed(2),
+      pending.total_amount.toFixed(2),
       '未还'
     ]
   }
@@ -338,8 +339,8 @@ export async function makeRepayment(input: RepaymentInput): Promise<void> {
   }
 
   const repaymentId = generateId()
-  let principalAmount = 0
-  let interestAmount = 0
+  let principalAmount = 0.00
+  let interestAmount = 0.00
   let periodNumber: number | null = null
   let statements: {}[] = []
   if (input.type === '正常还款') {
@@ -349,16 +350,16 @@ export async function makeRepayment(input: RepaymentInput): Promise<void> {
     }
 
     // Exact amount check
-    if (input.amount !== pending.total_amount) {
+    if (input.amount.toFixed(2) !== pending.total_amount.toFixed(2)) {
       throw new Error(`还款金额必须等于本期应还金额 ¥${pending.total_amount.toFixed(2)}`)
     }
 
     periodNumber = pending.period_number
-    principalAmount = pending.principal_amount
-    interestAmount = pending.interest_amount
+    principalAmount = Number(pending.principal_amount.toFixed(2))
+    interestAmount = Number(pending.interest_amount.toFixed(2))
 
-    const newRemainingPrincipal = liability.remaining_principal - pending.principal_amount
-    const newRemainingTotalInterest = Math.max(0, liability.remaining_total_interest - pending.interest_amount)
+    const newRemainingPrincipal = Number(liability.remaining_principal.toFixed(2)) - Number(pending.principal_amount.toFixed(2))
+    const newRemainingTotalInterest = Math.max(0, Number(liability.remaining_total_interest.toFixed(2)) - Number(pending.interest_amount.toFixed(2)))
     const isSettled = newRemainingPrincipal <= 0
     const newStatus = isSettled ? '已结清' : '未结清'
 
@@ -368,16 +369,16 @@ export async function makeRepayment(input: RepaymentInput): Promise<void> {
 
     statements.push({
       statement: `UPDATE pending_repayments SET status = '已还', paid_date = ? WHERE id = ?`,
-      values: [getCurrentDate().format('YYYY-MM-DD'), pending.id]
+      values: [getCurrentDate().format('YYYY-MM-DD 00:00:00'), pending.id]
     })
-    statements.push({statement: `UPDATE liabilities SET remaining_principal = ?, remaining_total_interest = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-      values: [newRemainingPrincipal, newRemainingTotalInterest, newStatus, input.liabilityId]
+    statements.push({statement: `UPDATE liabilities SET remaining_principal = ?, remaining_total_interest = ?, status = ?, updated_at = ? WHERE id = ?`,
+      values: [newRemainingPrincipal.toFixed(2), newRemainingTotalInterest.toFixed(2), newStatus, getCurrentString(), input.liabilityId]
     })
 
     if (!isSettled) {
       const updatedLiability = { ...liability, remaining_principal: newRemainingPrincipal, remaining_total_interest: newRemainingTotalInterest }
         const nextPending = generatePendingRepayment(updatedLiability, pending.period_number + 1)
-        if (nextPending.total_amount > 0) {
+        if (Number(nextPending.total_amount.toFixed(2)) > 0) {
             statements.push({
               statement: `INSERT INTO pending_repayments (id, liability_id, period_number, due_date, principal_amount, interest_amount, total_amount, status)
                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -386,9 +387,9 @@ export async function makeRepayment(input: RepaymentInput): Promise<void> {
                     nextPending.liability_id,
                     nextPending.period_number,
                     nextPending.due_date,
-                    nextPending.principal_amount,
-                    nextPending.interest_amount,
-                    nextPending.total_amount,
+                    nextPending.principal_amount.toFixed(2),
+                    nextPending.interest_amount.toFixed(2),
+                    nextPending.total_amount.toFixed(2),
                     '未还'
                   ]
           })
@@ -402,18 +403,18 @@ export async function makeRepayment(input: RepaymentInput): Promise<void> {
           repaymentId,
           input.liabilityId,
           periodNumber,
-          input.amount,
-          principalAmount,
-          interestAmount,
+          input.amount.toFixed(2),
+          principalAmount.toFixed(2),
+          interestAmount.toFixed(2),
           input.type,
           input.remark || '',
-          getCurrentDate().toISOString()
+          formatDate(getCurrentDate())
         ]
     })
 
   } else {
     // 提前还款
-    const newRemainingPrincipal = liability.remaining_principal - input.amount
+    const newRemainingPrincipal = Number((liability.remaining_principal - input.amount).toFixed(2))
     if (newRemainingPrincipal < 0) {
       throw new Error('还款金额不能超过剩余本金')
     }
@@ -438,8 +439,8 @@ export async function makeRepayment(input: RepaymentInput): Promise<void> {
       values: [input.liabilityId]
     })
     statements.push({
-      statement: `UPDATE liabilities SET remaining_principal = ?, remaining_total_interest = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-      values: [newRemainingPrincipal, newTotalInterest, newStatus, input.liabilityId]
+      statement: `UPDATE liabilities SET remaining_principal = ?, remaining_total_interest = ?, status = ?, updated_at = ? WHERE id = ?`,
+      values: [newRemainingPrincipal.toFixed(2), newTotalInterest.toFixed(2), newStatus, getCurrentString(), input.liabilityId]
     })
     if (!isSettled && liability.repayment_method !== '随借随还' && liability.period) {
         const completedPeriods = await getCompletedPeriods(input.liabilityId)
@@ -455,9 +456,9 @@ export async function makeRepayment(input: RepaymentInput): Promise<void> {
               nextPending.liability_id,
               nextPending.period_number,
               nextPending.due_date,
-              nextPending.principal_amount,
-              nextPending.interest_amount,
-              nextPending.total_amount,
+              nextPending.principal_amount.toFixed(2),
+              nextPending.interest_amount.toFixed(2),
+              nextPending.total_amount.toFixed(2),
               '未还'
             ]
           })
@@ -471,12 +472,12 @@ export async function makeRepayment(input: RepaymentInput): Promise<void> {
           repaymentId,
           input.liabilityId,
           periodNumber,
-          input.amount,
-          principalAmount,
-          interestAmount,
+          input.amount.toFixed(2),
+          principalAmount.toFixed(2),
+          interestAmount.toFixed(2),
           input.type,
           input.remark || '',
-          getCurrentDate().toISOString()
+          formatDate(getCurrentDate())
         ]
     })
   }

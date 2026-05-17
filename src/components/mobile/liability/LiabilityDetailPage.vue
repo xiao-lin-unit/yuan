@@ -228,7 +228,7 @@ const repayDialogVisible = ref(false);
 const activeTag = computed(() => liabilityInfo.value.status !== '已结清' && liabilityInfo.value.repayment_method !== '随借随还' ? 'pending' : 'repayments');
 
 const repayForm = ref({
-  amount: 0,
+  amount: 0.00,
   type: '正常还款',
   remark: ''
 });
@@ -251,7 +251,7 @@ const goBack = () => {
 
 const openRepayDialog = () => {
   repayForm.value = {
-    amount: 0,
+    amount: 0.00,
     type: '正常还款',
     remark: ''
   };
@@ -271,7 +271,7 @@ const confirmRepayment = async () => {
   try {
     await makeRepayment({
       liabilityId: props.liabilityId,
-      amount: repayForm.value.amount,
+      amount: Number(repayForm.value.amount.toFixed(2)),
       type: repayForm.value.type as '正常还款' | '提前还款',
       remark: repayForm.value.remark
     });

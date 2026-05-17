@@ -61,8 +61,8 @@ const loadDailyIncomes = async () => {
     const year = props.year;
     
     // 构建当天的开始和结束时间
-    const startDate = getCurrentDate().year(year).month(month - 1).date(day).startOf('day').format('YYYY-MM-DDTHH:mm:ss');
-    const endDate = getCurrentDate().year(year).month(month - 1).date(day).endOf('day').format('YYYY-MM-DDTHH:mm:ss');
+    const startDate = getCurrentDate().year(year).month(month - 1).date(day).startOf('day').format('YYYY-MM-DD HH:mm:ss');
+    const endDate = getCurrentDate().year(year).month(month - 1).date(day).endOf('day').format('YYYY-MM-DD HH:mm:ss');
     console.log("开始时间", startDate, "结束时间", endDate);
     
     // 从流水表中查询当天的账户收入记录
@@ -85,16 +85,16 @@ const loadDailyIncomes = async () => {
       
       incomeList.push({
         category: categoryName,
-        amount: transaction.amount,
+        amount: Number(transaction.amount.toFixed(2)),
         account_name: transaction.account_name,
         remark: transaction.remark
       });
-      total += transaction.amount;
+      total += Number(transaction.amount.toFixed(2));
     });
     
     console.log("最终当天的收入记录", JSON.stringify(incomeList));
     incomes.value = incomeList;
-    totalIncome.value = total;
+    totalIncome.value = Number(total.toFixed(2));
   } catch (error) {
     console.error('加载当日收入记录失败:', error);
   }

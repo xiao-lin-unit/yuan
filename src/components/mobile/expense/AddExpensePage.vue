@@ -440,7 +440,7 @@ const saveExpense = async () => {
           amountNumber,
           selectedAccountObj.id,
           relatedId,
-          debitResult.balanceAfter,
+          debitResult.balanceAfter.toFixed(2),
           remark.value,
           formatForDB(selectedDateTime.value)
         ]

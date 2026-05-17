@@ -134,8 +134,8 @@ const loadDailyIncomes = async () => {
     await db.connect();
     
     // 获取本月的开始和结束日期
-    const start = getCurrentDate().year(selectedYear.value).month(selectedMonth.value - 1).startOf('month').toISOString();
-    const end = getCurrentDate().year(selectedYear.value).month(selectedMonth.value - 1).endOf('month').toISOString();
+    const start = getCurrentDate().year(selectedYear.value).month(selectedMonth.value - 1).startOf('month').format('YYYY-MM-DD');
+    const end = getCurrentDate().year(selectedYear.value).month(selectedMonth.value - 1).endOf('month').format('YYYY-MM-DD');
     
     // 从流水表中查询类型为账户收入的记录
     const transactions = await db.query(
@@ -190,8 +190,8 @@ const loadCategoryIncomes = async () => {
     await db.connect();
     
     // 获取本月的开始和结束日期
-    const startDate = getCurrentDate().year(selectedYear.value).month(selectedMonth.value - 1).startOf('month').toISOString();
-    const endDate = getCurrentDate().year(selectedYear.value).month(selectedMonth.value - 1).endOf('month').toISOString();
+    const startDate = getCurrentDate().year(selectedYear.value).month(selectedMonth.value - 1).startOf('month').format('YYYY-MM-DD');
+    const endDate = getCurrentDate().year(selectedYear.value).month(selectedMonth.value - 1).endOf('month').format('YYYY-MM-DD');
     
     // 从流水表中查询类型为账户收入的记录，按subType分组
     const transactions = await db.query(
@@ -222,8 +222,8 @@ const loadDailyChartData = async () => {
     await db.connect();
     
     // 获取本月的开始和结束日期
-    const startDate = getCurrentDate().year(selectedYear.value).month(selectedMonth.value - 1).startOf('month').toISOString();
-    const endDate = getCurrentDate().year(selectedYear.value).month(selectedMonth.value - 1).endOf('month').toISOString();
+    const startDate = getCurrentDate().year(selectedYear.value).month(selectedMonth.value - 1).startOf('month').format('YYYY-MM-DD');
+    const endDate = getCurrentDate().year(selectedYear.value).month(selectedMonth.value - 1).endOf('month').format('YYYY-MM-DD');
     
     // 从流水表中查询类型为账户收入的记录，按日期分组
     const transactions = await db.query(
@@ -274,12 +274,12 @@ const renderCategoryChart = async (labels: string[], data: number[]) => {
   
   if (hasData) {
     // 有数据时，使用实际数据
-    const totalIncome = data.reduce((sum, val) => sum + val, 0);
+    const totalIncome = data.reduce((sum, val) => Number((sum + val).toFixed(2)), 0.00);
     
     chartData = labels.map((label, index) => {
       const translatedName = categoryMap.get(label) || label;
       const value = data[index];
-      const percentage = totalIncome > 0 ? ((value / totalIncome) * 100).toFixed(1) : '0.0';
+      const percentage = totalIncome > 0 ? ((value / totalIncome) * 100).toFixed(2) : '0.00';
       return {
         name: translatedName,
         value: value,
@@ -289,12 +289,12 @@ const renderCategoryChart = async (labels: string[], data: number[]) => {
     });
   } else {
     // 没有数据时，将所有分类平均展示
-    const equalValue = 100 / incomeCategories.length;
+    const equalValue = Number((100 / incomeCategories.length).toFixed(2));
     chartData = incomeCategories.map(category => ({
       name: category.name,
       value: equalValue,
       originalLabel: category.id,
-      percentage: (100 / incomeCategories.length).toFixed(1)
+      percentage: (equalValue).toFixed(2)
     }));
   }
   

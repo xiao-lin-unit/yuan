@@ -4,7 +4,7 @@
  */
 
 import db from '../../database/index.js'
-import { getCurrentDate, generateId } from '../../utils/timezone.js'
+import { getCurrentString, generateId } from '../../utils/timezone.js'
 import type {
   Stock,
   StockHolding,
@@ -85,8 +85,8 @@ export async function addStock(stockData: StockInput, deductFromAccount: boolean
       stockData.name,
       stockData.code,
       stockData.quantity,
-      stockData.price,
-      costPrice,
+      stockData.price.toFixed(4),
+      costPrice.toFixed(4),
       stockData.transaction_time,
       stockData.account_id
     ]
@@ -102,10 +102,10 @@ export async function addStock(stockData: StockInput, deductFromAccount: boolean
     values: [
       holdingId,
       stockId,
-      stockData.price,
+      stockData.price.toFixed(4),
       stockData.quantity,
       stockData.quantity,
-      stockData.fee,
+      stockData.fee.toFixed(2),
       stockData.transaction_time,
       stockData.account_id
     ]
@@ -118,11 +118,11 @@ export async function addStock(stockData: StockInput, deductFromAccount: boolean
     values: [
       transactionId,
       stockId,
-      stockData.price,
+      stockData.price.toFixed(4),
       stockData.quantity,
       '买入',
       holdingId,
-      stockData.fee,
+      stockData.fee.toFixed(2),
       stockData.transaction_time,
       stockData.account_id
     ]
@@ -181,10 +181,10 @@ export async function buyStock(stockId: string, buyData: StockBuyInput): Promise
       values: [
         holdingId,
         stockId,
-        buyData.price,
+        buyData.price.toFixed(4),
         buyData.quantity,
         buyData.quantity,
-        buyData.fee,
+        buyData.fee.toFixed(2),
         buyData.transaction_time,
         buyData.account_id
       ]
@@ -196,19 +196,19 @@ export async function buyStock(stockId: string, buyData: StockBuyInput): Promise
       values: [
         transactionId,
         stockId,
-        buyData.price,
+        buyData.price.toFixed(4),
         buyData.quantity,
         '买入',
         holdingId,
-        buyData.fee,
+        buyData.fee.toFixed(2),
         buyData.transaction_time,
         buyData.account_id
       ]
     },
     // Update stock record (reset status to '开启')
     {
-      statement: `UPDATE stocks SET quantity = ?, current_price = ?, cost_price = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-      values: [newQuantity, buyData.price, newCostPrice, '开启', stockId]
+      statement: `UPDATE stocks SET quantity = ?, current_price = ?, cost_price = ?, status = ?, updated_at = ? WHERE id = ?`,
+      values: [newQuantity, buyData.price.toFixed(4), newCostPrice.toFixed(4), '开启', getCurrentString(), stockId]
     },
     // 使用出账接口返回的SQL语句（已包含账户更新和交易记录）
     ...debitResult.statements
@@ -287,11 +287,11 @@ export async function sellStock(stockId: string, sellData: StockSellInput): Prom
     values: [
       transactionId,
       stockId,
-      sellData.price,
+      sellData.price.toFixed(4),
       sellData.quantity,
       '卖出',
       soldHoldIds.join(','),
-      sellData.fee,
+      sellData.fee.toFixed(2),
       sellData.transaction_time,
       sellData.account_id
     ]
@@ -304,8 +304,8 @@ export async function sellStock(stockId: string, sellData: StockSellInput): Prom
   const isEnded = newQuantity === 0 ? '结束' : '开启'
 
   statements.push({
-    statement: `UPDATE stocks SET quantity = ?, current_price = ?, confirmed_profit = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-    values: [newQuantity, sellData.price, newConfirmedProfit, isEnded, stockId]
+    statement: `UPDATE stocks SET quantity = ?, current_price = ?, confirmed_profit = ?, status = ?, updated_at = ? WHERE id = ?`,
+    values: [newQuantity, sellData.price.toFixed(4), newConfirmedProfit.toFixed(2), isEnded, getCurrentString(), stockId]
   })
 
   // Calculate net proceeds
@@ -338,11 +338,11 @@ export async function getStockDetail(stockId: string): Promise<StockDetail> {
   const s = stock[0]
 
   // Calculate derived values
-  const costAmount = s.cost_price * s.quantity
-  const currentAmount = s.current_price * s.quantity
+  const costAmount = Number((s.cost_price * s.quantity).toFixed(2))
+  const currentAmount = Number((s.current_price * s.quantity).toFixed(2))
   const holdReturn = currentAmount - costAmount
-  const confirmedReturn = s.confirmed_profit || 0
-  const totalReturn = holdReturn + confirmedReturn
+  const confirmedReturn = Number((s.confirmed_profit || 0).toFixed(2))
+  const totalReturn = Number((holdReturn + confirmedReturn).toFixed(2))
 
   return {
     id: s.id,
@@ -393,8 +393,8 @@ export async function updateStockPrice(stockId: string, newPrice: number): Promi
   }
 
   await db.run(
-    'UPDATE stocks SET current_price = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-    [newPrice, stockId]
+    'UPDATE stocks SET current_price = ?, updated_at = ? WHERE id = ?',
+    [newPrice.toFixed(4), getCurrentString(), stockId]
   )
 }
 

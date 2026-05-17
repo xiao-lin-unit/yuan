@@ -21,7 +21,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import dayjs from 'dayjs';
-import { getCurrentDate, getDate } from '../../../utils/timezone';
+import { getCurrentDate, getDate, formatDate } from '../../../utils/timezone';
 import db from '../../../database';
 
 interface DayData {
@@ -34,12 +34,12 @@ const weeklyData = ref<DayData[]>([]);
 
 // 计算本周总支出
 const totalExpense = computed(() => {
-  return weeklyData.value.reduce((total, day) => total + day.amount, 0);
+  return weeklyData.value.reduce((total, day) => Number((total + day.amount).toFixed(2)), 0.00);
 });
 
 // 计算本周最大支出（用于图表高度）
 const maxExpense = computed(() => {
-  return Math.max(...weeklyData.value.map(day => day.amount), 1); // 确保至少为1，避免除以0
+  return Math.max(...weeklyData.value.map(day => Number(day.amount.toFixed(2))), 0.00); // 确保至少为0.00，避免除以0
 });
 
 // 格式化金额
@@ -47,7 +47,7 @@ const formatAmount = (amount: number): string => {
   if (amount >= 1000) {
     return (amount / 1000).toFixed(2) + 'K';
   }
-  return amount.toFixed(1);
+  return amount.toFixed(2);
 };
 
 // 计算柱状图高度
@@ -73,7 +73,6 @@ const getWeekRange = (): { start: dayjs.Dayjs; end: dayjs.Dayjs } => {
 // 从流水记录中获取本周支出数据
 const loadWeeklyExpenses = async () => {
   try {
-    console.log('开始加载本周支出数据');
     
     // 连接数据库
     await db.connect();
@@ -84,7 +83,7 @@ const loadWeeklyExpenses = async () => {
     // 从流水表中查询类型为账户支出的记录
     const transactions = await db.query(
       'SELECT t.* FROM income_expense_records t WHERE t.type = ? AND t.created_at BETWEEN ? AND ?',
-      ['账户支出', start.toISOString(), end.toISOString()]
+      ['账户支出', formatDate(start), formatDate(end)]
     );
     
     // 按日期分组统计支出
@@ -99,12 +98,10 @@ const loadWeeklyExpenses = async () => {
         if (dailyExpenses.has(dateStr)) {
           dailyExpenses.set(dateStr, dailyExpenses.get(dateStr)! + (transaction.amount || 0));
         } else {
-          dailyExpenses.set(dateStr, transaction.amount || 0);
+          dailyExpenses.set(dateStr, Number((transaction.amount || 0).toFixed(2)));
         }
       }
     });
-    
-    console.log('按日期分组的支出:', Object.fromEntries(dailyExpenses));
     
     // 生成本周的日期数据
     const days: DayData[] = [];
@@ -127,13 +124,13 @@ const loadWeeklyExpenses = async () => {
     console.error('加载本周支出数据失败:', error);
     // 出错时使用默认数据
     weeklyData.value = [
-      { date: getCurrentDate(), label: '周一', amount: 0 },
-      { date: getCurrentDate(), label: '周二', amount: 0 },
-      { date: getCurrentDate(), label: '周三', amount: 0 },
-      { date: getCurrentDate(), label: '周四', amount: 0 },
-      { date: getCurrentDate(), label: '周五', amount: 0 },
-      { date: getCurrentDate(), label: '周六', amount: 0 },
-      { date: getCurrentDate(), label: '周日', amount: 0 }
+      { date: getCurrentDate(), label: '周一', amount: 0.00 },
+      { date: getCurrentDate(), label: '周二', amount: 0.00 },
+      { date: getCurrentDate(), label: '周三', amount: 0.00 },
+      { date: getCurrentDate(), label: '周四', amount: 0.00 },
+      { date: getCurrentDate(), label: '周五', amount: 0.00 },
+      { date: getCurrentDate(), label: '周六', amount: 0.00 },
+      { date: getCurrentDate(), label: '周日', amount: 0.00 }
     ];
   }
 };

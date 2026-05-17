@@ -149,8 +149,8 @@ const goalForm = ref({
   id: '',
   name: '',
   type: '',
-  target_amount: 0,
-  monthly_amount: 0,
+  target_amount: 0.00,
+  monthly_amount: 0.00,
   period: 12,
   account_id: '',
   status: '未开始'
@@ -158,7 +158,7 @@ const goalForm = ref({
 
 const investForm = ref({
   goalId: '',
-  amount: 0,
+  amount: 0.00,
   date: getCurrentDate(),
   remark: ''
 })
@@ -170,7 +170,7 @@ onMounted(async () => {
 
 watch([() => goalForm.value.target_amount, () => goalForm.value.period], () => {
   if (goalForm.value.period > 0) {
-    goalForm.value.monthly_amount = goalForm.value.target_amount / goalForm.value.period
+    goalForm.value.monthly_amount = Number((goalForm.value.target_amount / goalForm.value.period).toFixed(2))
   }
 })
 
@@ -181,7 +181,7 @@ const loadGoals = async () => {
       id: '1',
       name: '3年存10万',
       type: '储蓄类',
-      target_amount: 100000,
+      target_amount: 100000.00,  
       monthly_amount: 2777.78,
       period: 36,
       account_id: '1',
@@ -191,7 +191,7 @@ const loadGoals = async () => {
       id: '2',
       name: '还清房贷',
       type: '还款类',
-      target_amount: 950000,
+      target_amount: 950000.00,
       monthly_amount: 5000,
       period: 190,
       account_id: '1',
@@ -205,8 +205,8 @@ const openAddGoalDialog = () => {
     id: '',
     name: '',
     type: '',
-    target_amount: 0,
-    monthly_amount: 0,
+    target_amount: 0.00,  
+    monthly_amount: 0.00,
     period: 12,
     account_id: '',
     status: '未开始'

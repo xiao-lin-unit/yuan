@@ -6,7 +6,7 @@
 import dayjs from 'dayjs'
 import db from '../../database/index.js'
 import type { Account, AccountTransaction, AccountInput, BalanceAdjustInput, TransferInput, RepayCreditCardInput } from '../../types/account/account.js'
-import { getCurrentString, dateNow, getDate, getCurrentDate, generateId } from '../../utils/timezone'
+import { getCurrentString, formatDate, getDate, getCurrentDate, generateId } from '../../utils/timezone'
 
 /**
  * Add a new account
@@ -27,22 +27,25 @@ export async function addAccount(accountData: AccountInput): Promise<void> {
   }
   const assetType = assetAccountTypes[accountData.type]
   const assetId = assetType ? generateId() : null
+  const now = getCurrentString()
 
   const statements = [
     // 1. 创建账户（包含关联资产ID）
     {
-      statement: `INSERT INTO accounts (id, name, type, balance, used_limit, total_limit, is_liquid, asset_id, remark) 
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      statement: `INSERT INTO accounts (id, name, type, balance, used_limit, total_limit, is_liquid, asset_id, remark, created_at, updated_at) 
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       values: [
         id,
         accountData.name,
         accountData.type,
-        accountData.balance,
-        accountData.used_limit || 0,
-        accountData.total_limit || 0,
+        accountData.balance.toFixed(2),
+        accountData.used_limit?.toFixed(2) || '0.00',
+        accountData.total_limit?.toFixed(2) || '0.00',
         accountData.is_liquid !== false ? 1 : 0,
         assetId,
-        accountData.remark || ''
+        accountData.remark || '',
+        now,
+        now
       ]
     }
   ]
@@ -50,16 +53,17 @@ export async function addAccount(accountData: AccountInput): Promise<void> {
   // 2. 非信用卡且余额大于0时，创建入账记录
   if (accountData.type !== '信用卡' && accountData.balance > 0) {
     statements.push({
-      statement: `INSERT INTO account_transactions (id, account_id, type, amount, balance_after, description, transaction_time) 
-                   VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      statement: `INSERT INTO account_transactions (id, account_id, type, amount, balance_after, description, transaction_time, created_at) 
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       values: [
         transactionId,
         id,
         '收入',
-        accountData.balance,
-        accountData.balance,
+        accountData.balance.toFixed(2),
+        accountData.balance.toFixed(2),
         '账户初始入账',
-        getCurrentString()
+        now, 
+        now
       ]
     })
   }
@@ -68,36 +72,39 @@ export async function addAccount(accountData: AccountInput): Promise<void> {
   const usedLimit = accountData.used_limit || 0
   if (accountData.type === '信用卡' && usedLimit > 0) {
     statements.push({
-      statement: `INSERT INTO account_transactions (id, account_id, type, amount, balance_after, description, transaction_time) 
-                   VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      statement: `INSERT INTO account_transactions (id, account_id, type, amount, balance_after, description, transaction_time, created_at) 
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       values: [
         transactionId,
         id,
         '支出',
-        usedLimit,
-        usedLimit,
+        usedLimit.toFixed(2),
+        usedLimit.toFixed(2),
         '信用卡初始借款',
-        getCurrentString()
+        now,
+        now
       ]
     })
   }
 
   // 4. 为特定账户类型自动创建对应资产
   if (assetType && assetId) {
-    const tomorrow = getCurrentDate().add(1, 'day').format('YYYY-MM-DD')
+    const tomorrow = getCurrentDate().add(1, 'day').format('YYYY-MM-DD 00:00:00')
     statements.push({
       statement: `INSERT INTO assets (id, type, name, amount, account_id, period, calculation_type, annual_yield_rate, next_income_date, created_at, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       values: [
         assetId,
         assetType,
         accountData.name,
-        accountData.balance || 0,
+        accountData.balance.toFixed(2) || '0.00',
         id,
         '日',
         '按年收益率计算',
-        0,
-        tomorrow
+        0.00,  
+        tomorrow,
+        now,
+        now
       ]
     })
   }
@@ -143,7 +150,8 @@ export async function updateAccount(accountId: string, data: Partial<Account>): 
 
   if (fields.length === 0) return
 
-  fields.push('updated_at = CURRENT_TIMESTAMP')
+  fields.push('updated_at = ?')
+  values.push(getCurrentString())
   values.push(accountId)
 
   await db.run(
@@ -230,6 +238,7 @@ export async function createDebitTransaction(
 
   const txId = transactionId || generateId()
   const txTime = transactionTime || getCurrentDate()
+  const now = getCurrentString()
   let balanceAfter: number
   let accountUpdateStatement: { statement: string; values: any[] }
 
@@ -240,10 +249,10 @@ export async function createDebitTransaction(
       throw new Error(`信用卡可用额度不足，可用额度：¥${availableLimit.toFixed(2)}，需要：¥${amount.toFixed(2)}`)
     }
     // 信用卡：增加已用额度（used_limit）
-    balanceAfter = (account.used_limit || 0) + amount
+    balanceAfter = Number(((account.used_limit || 0) + amount).toFixed(2))
     accountUpdateStatement = {
-      statement: 'UPDATE accounts SET used_limit = used_limit + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-      values: [amount, accountId]
+      statement: 'UPDATE accounts SET used_limit = used_limit + ?, updated_at = ? WHERE id = ?',
+      values: [amount.toFixed(2), now, accountId]
     }
   } else {
     // 规则2：流动储蓄账户，出账金额不能大于账户余额
@@ -251,25 +260,26 @@ export async function createDebitTransaction(
       throw new Error(`账户余额不足，当前余额：¥${account.balance.toFixed(2)}，需要：¥${amount.toFixed(2)}`)
     }
     // 储蓄账户：减少余额
-    balanceAfter = account.balance - amount
+    balanceAfter = Number((account.balance - amount).toFixed(2))
     accountUpdateStatement = {
-      statement: 'UPDATE accounts SET balance = balance - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-      values: [amount, accountId]
+      statement: 'UPDATE accounts SET balance = balance - ?, updated_at = ? WHERE id = ?',
+      values: [amount.toFixed(2), now, accountId]
     }
   }
 
   // 创建交易记录
   const transactionStatement = {
-    statement: `INSERT INTO account_transactions (id, account_id, type, amount, balance_after, description, transaction_time) 
-                VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    statement: `INSERT INTO account_transactions (id, account_id, type, amount, balance_after, description, transaction_time, created_at) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     values: [
       txId,
       accountId,
       '支出',
-      amount,
-      balanceAfter,
+      amount.toFixed(2),
+      balanceAfter.toFixed(2),
       description,
-      txTime.toISOString()
+      formatDate(txTime),
+      now
     ]
   }
 
@@ -278,8 +288,8 @@ export async function createDebitTransaction(
   // 同步修改关联资产金额（储蓄账户出账时减少资产金额）
   if (syncLinkedAsset && !isCreditCard && account.asset_id) {
     statements.push({
-      statement: 'UPDATE assets SET amount = amount - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-      values: [amount, account.asset_id]
+      statement: 'UPDATE assets SET amount = amount - ?, updated_at = ? WHERE id = ?',
+      values: [amount.toFixed(2), now, account.asset_id]
     })
   }
 
@@ -331,39 +341,41 @@ export async function createCreditTransaction(
   const isCreditCard = account.type === '信用卡'
   const txId = transactionId || generateId()
   const txTime = transactionTime || getCurrentDate()
+  const now = getCurrentString()
   let balanceAfter: number
   let accountUpdateStatement: { statement: string; values: any[] }
 
   if (isCreditCard) {
     // 信用卡：减少已用额度（还款）
     // 确保还款金额不超过已用额度
-    const repaymentAmount = Math.min(amount, account.used_limit || 0)
-    balanceAfter = Math.max(0, (account.used_limit || 0) - amount)
+    const repaymentAmount = Number((Math.min(amount, account.used_limit || 0)).toFixed(2))
+    balanceAfter =  Number((Math.max(0, (account.used_limit || 0) - amount)).toFixed(2))
     accountUpdateStatement = {
-      statement: 'UPDATE accounts SET used_limit = used_limit - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-      values: [repaymentAmount, accountId]
+      statement: 'UPDATE accounts SET used_limit = used_limit - ?, updated_at = ? WHERE id = ?',
+      values: [repaymentAmount.toFixed(2), now, accountId]
     }
   } else {
     // 储蓄账户：增加余额
-    balanceAfter = account.balance + amount
+    balanceAfter = Number((account.balance + amount).toFixed(2))
     accountUpdateStatement = {
-      statement: 'UPDATE accounts SET balance = balance + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-      values: [amount, accountId]
+      statement: 'UPDATE accounts SET balance = balance + ?, updated_at = ? WHERE id = ?',
+      values: [amount.toFixed(2), now, accountId]
     }
   }
 
   // 创建交易记录
   const transactionStatement = {
-    statement: `INSERT INTO account_transactions (id, account_id, type, amount, balance_after, description, transaction_time) 
-                VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    statement: `INSERT INTO account_transactions (id, account_id, type, amount, balance_after, description, transaction_time, created_at) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     values: [
       txId,
       accountId,
       '收入',
-      amount,
-      balanceAfter,
+      amount.toFixed(2),
+      balanceAfter.toFixed(2),
       description,
-      txTime.toISOString()
+      formatDate(txTime),
+      now
     ]
   }
 
@@ -372,8 +384,8 @@ export async function createCreditTransaction(
   // 同步修改关联资产金额（储蓄账户入账时增加资产金额）
   if (syncLinkedAsset && !isCreditCard && account.asset_id) {
     statements.push({
-      statement: 'UPDATE assets SET amount = amount + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-      values: [amount, account.asset_id]
+      statement: 'UPDATE assets SET amount = amount + ?, updated_at = ? WHERE id = ?',
+      values: [amount.toFixed(2), now, account.asset_id]
     })
   }
 
@@ -398,27 +410,29 @@ export async function adjustBalance(input: BalanceAdjustInput): Promise<void> {
     throw new Error('账户已停用，无法调整余额')
   }
 
-  const newBalance = account.balance + input.amount
+  const newBalance = Number((account.balance + input.amount).toFixed(2))
   const transactionId = generateId()
 
+  const now = getCurrentString();
   const statements = [
     // Update account balance
     {
-      statement: 'UPDATE accounts SET balance = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-      values: [newBalance, input.account_id]
+      statement: 'UPDATE accounts SET balance = ?, updated_at = ? WHERE id = ?',
+      values: [newBalance.toFixed(2), now, input.account_id]
     },
     // Create account transaction record
     {
-      statement: `INSERT INTO account_transactions (id, account_id, type, amount, balance_after, description, transaction_time)
-                  VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      statement: `INSERT INTO account_transactions (id, account_id, type, amount, balance_after, description, transaction_time, created_at)
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       values: [
         transactionId,
         input.account_id,
         input.amount >= 0 ? '收入' : '支出',
-        Math.abs(input.amount),
-        newBalance,
+        Math.abs(input.amount).toFixed(2),
+        newBalance.toFixed(2),
         input.remark || `${input.type}：余额调整`,
-        getCurrentString()
+        now,
+        now
       ]
     }
   ]
@@ -426,8 +440,8 @@ export async function adjustBalance(input: BalanceAdjustInput): Promise<void> {
   // 同步修改关联资产金额
   if (account.asset_id) {
     statements.push({
-      statement: 'UPDATE assets SET amount = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-      values: [newBalance, account.asset_id]
+      statement: 'UPDATE assets SET amount = ?, updated_at = ? WHERE id = ?',
+      values: [newBalance.toFixed(2), now, account.asset_id]
     })
   }
 
@@ -458,14 +472,14 @@ export async function transfer(input: TransferInput): Promise<void> {
   // 使用新的出账入账接口（现在已包含交易记录创建）
   const debitResult = await createDebitTransaction(
     input.from_account_id,
-    input.amount,
+    Number(input.amount.toFixed(2)),
     `转账至：${toAccount.name}`,
     transactionId + '_from',
     transactionTime
   )
   const creditResult = await createCreditTransaction(
     input.to_account_id, 
-    input.amount,
+    Number(input.amount.toFixed(2)),
     `转账来自：${fromAccount.name}`,
     transactionId + '_to',
     transactionTime
@@ -517,8 +531,8 @@ export async function deactivateAccount(accountId: string): Promise<void> {
 
   // 更新账户状态为停用
   await db.run(
-    'UPDATE accounts SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-    ['停用', accountId]
+    'UPDATE accounts SET status = ?, updated_at = ? WHERE id = ?',
+    ['停用', formatDate(getCurrentDate()), accountId]
   )
 }
 
@@ -537,15 +551,15 @@ export async function deactivateCreditCard(accountId: string): Promise<void> {
     throw new Error('该账户不是信用卡')
   }
 
-  const usedLimit = account.used_limit || 0
+  const usedLimit = Number((account.used_limit || 0).toFixed(2))
   if (usedLimit > 0) {
     throw new Error(`信用卡仍有未还借款 ¥${usedLimit.toFixed(2)}，无法停用`)
   }
 
   // 更新账户状态为停用
   await db.run(
-    'UPDATE accounts SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-    ['停用', accountId]
+    'UPDATE accounts SET status = ?, updated_at = ? WHERE id = ?',
+    ['停用', getCurrentString(), accountId]
   )
 }
 
@@ -578,7 +592,7 @@ export async function repayCreditCard(input: RepayCreditCardInput): Promise<void
   }
 
   // 检查信用卡已用额度
-  const usedLimit = creditCard.used_limit || 0
+  const usedLimit = Number((creditCard.used_limit || 0).toFixed(2))
   if (amount > usedLimit) {
     throw new Error(`还款金额不能超过已用额度 ¥${usedLimit.toFixed(2)}`)
   }
@@ -588,7 +602,7 @@ export async function repayCreditCard(input: RepayCreditCardInput): Promise<void
   // 使用标准入账/出账接口，确保事务一致性
   const creditResult = await createCreditTransaction(
     credit_card_id,
-    amount,
+    Number(amount.toFixed(2)),
     `还款来自：${fromAccount.name}${remark ? ' - ' + remark : ''}`,
     undefined,
     txTime,
@@ -597,7 +611,7 @@ export async function repayCreditCard(input: RepayCreditCardInput): Promise<void
 
   const debitResult = await createDebitTransaction(
     from_account_id,
-    amount,
+    Number(amount.toFixed(2)),
     `还款至：${creditCard.name}${remark ? ' - ' + remark : ''}`,
     undefined,
     txTime,
@@ -626,23 +640,24 @@ export async function updateAccountBalance(accountId: string, newBalance: number
   if (diff === 0) return
 
   const transactionId = generateId()
-  
+  const now = getCurrentString();
   const statements = [
     {
-      statement: 'UPDATE accounts SET balance = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-      values: [newBalance, accountId]
+      statement: 'UPDATE accounts SET balance = ?, updated_at = ? WHERE id = ?',
+      values: [newBalance, now, accountId]
     },
     {
-      statement: `INSERT INTO account_transactions (id, account_id, type, amount, balance_after, description, transaction_time)
-                  VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      statement: `INSERT INTO account_transactions (id, account_id, type, amount, balance_after, description, transaction_time, created_at)
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       values: [
         transactionId,
         accountId,
         diff > 0 ? '收入' : '支出',
-        Math.abs(diff),
-        newBalance,
+        Math.abs(diff).toFixed(2),
+        newBalance.toFixed(2),
         remark || '账户余额调整',
-        getCurrentString()
+        now,
+now
       ]
     }
   ]
@@ -650,8 +665,8 @@ export async function updateAccountBalance(accountId: string, newBalance: number
   // 同步修改关联资产金额
   if (account.asset_id) {
     statements.push({
-      statement: 'UPDATE assets SET amount = amount + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-      values: [diff, account.asset_id]
+      statement: 'UPDATE assets SET amount = amount + ?, updated_at = ? WHERE id = ?',
+      values: [diff.toFixed(2), now, account.asset_id]
     })
   }
 

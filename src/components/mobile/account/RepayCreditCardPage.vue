@@ -71,7 +71,7 @@ const repayForm = ref({
   account_name: '',
   account_type: '',
   current_used_limit: '',
-  amount: 0,
+  amount: 0.00,
   transaction_time: getCurrentDate(),
   from_account_id: '',
   remark: ''
@@ -135,7 +135,7 @@ const repayCreditCard = async () => {
     await repayCreditCardService({
       credit_card_id: props.accountId,
       from_account_id: repayForm.value.from_account_id,
-      amount: repayForm.value.amount,
+      amount: Number(repayForm.value.amount.toFixed(2)),
       transaction_time: repayForm.value.transaction_time,
       remark: repayForm.value.remark
     })

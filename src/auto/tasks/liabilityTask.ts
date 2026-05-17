@@ -21,7 +21,7 @@ registerTask('liabilityAutoRepayment', async () => {
 
                 await makeRepayment({
                   liabilityId: liability.id,
-                  amount: pending.total_amount,
+                  amount: Number(pending.total_amount.toFixed(2)),
                   type: '正常还款',
                   remark: '系统自动还款'
                 })

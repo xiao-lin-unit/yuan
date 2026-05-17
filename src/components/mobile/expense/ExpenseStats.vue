@@ -134,8 +134,8 @@ const loadDailyExpenses = async () => {
     await db.connect();
     
     // 获取本月的开始和结束日期
-    const start = getCurrentDate().year(selectedYear.value).month(selectedMonth.value - 1).startOf('month').toISOString();
-    const end = getCurrentDate().year(selectedYear.value).month(selectedMonth.value - 1).endOf('month').toISOString();
+    const start = getCurrentDate().year(selectedYear.value).month(selectedMonth.value - 1).startOf('month').format('YYYY-MM-DD');
+    const end = getCurrentDate().year(selectedYear.value).month(selectedMonth.value - 1).endOf('month').format('YYYY-MM-DD');
     
     // 从流水表中查询类型为账户支出的记录
     const transactions = await db.query(
@@ -190,8 +190,8 @@ const loadCategoryExpenses = async () => {
     await db.connect();
     
     // 获取本月的开始和结束日期
-    const startDate = getCurrentDate().year(selectedYear.value).month(selectedMonth.value - 1).startOf('month').toISOString();
-    const endDate = getCurrentDate().year(selectedYear.value).month(selectedMonth.value - 1).endOf('month').toISOString();
+    const startDate = getCurrentDate().year(selectedYear.value).month(selectedMonth.value - 1).startOf('month').format('YYYY-MM-DD');
+    const endDate = getCurrentDate().year(selectedYear.value).month(selectedMonth.value - 1).endOf('month').format('YYYY-MM-DD');
     
     // 从流水表中查询类型为账户支出的记录，按subType分组
     const transactions = await db.query(
@@ -222,8 +222,8 @@ const loadDailyChartData = async () => {
     await db.connect();
     
     // 获取本月的开始和结束日期
-    const startDate = getCurrentDate().year(selectedYear.value).month(selectedMonth.value - 1).startOf('month').toISOString();
-    const endDate = getCurrentDate().year(selectedYear.value).month(selectedMonth.value - 1).endOf('month').toISOString();
+    const startDate = getCurrentDate().year(selectedYear.value).month(selectedMonth.value - 1).startOf('month').format('YYYY-MM-DD');
+    const endDate = getCurrentDate().year(selectedYear.value).month(selectedMonth.value - 1).endOf('month').format('YYYY-MM-DD');
     
     // 从流水表中查询类型为账户支出的记录，按日期分组
     const transactions = await db.query(

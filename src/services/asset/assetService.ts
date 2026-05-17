@@ -6,7 +6,7 @@
 import db from '../../database/index.js'
 import type { Asset, AssetInput } from '../../types/asset/asset.js'
 import { createDebitTransaction } from '../account/accountService.js'
-import { getCurrentDate, generateId } from '../../utils/timezone.js'
+import { getCurrentDate, generateId, getCurrentString } from '../../utils/timezone.js'
 
 
 /**
@@ -19,7 +19,7 @@ export function calculateNextIncomeDate(period: string, incomeDate: string): str
 
   if (period === '日') {
     // 每日：下一个收益日是明天
-    return now.add(1, 'day').format('YYYY-MM-DD')
+    return now.add(1, 'day').format('YYYY-MM-DD 00:00:00')
   } else if (period === '年') {
     // 每年：income_date format is MM-DD, next income date is this year or next year
     if (!incomeDate) return ''
@@ -31,7 +31,7 @@ export function calculateNextIncomeDate(period: string, incomeDate: string): str
       nextDate = nextDate.add(1, 'year')
     }
 
-    return nextDate.format('YYYY-MM-DD')
+    return nextDate.format('YYYY-MM-DD 00:00:00')
   } else if (period === '月') {
     // 每月：income_date format is DD or MM-DD, next income date is this month or next month
     if (!incomeDate) return ''
@@ -45,7 +45,7 @@ export function calculateNextIncomeDate(period: string, incomeDate: string): str
       nextDate = nextDate.add(1, 'month')
     }
 
-    return nextDate.format('YYYY-MM-DD')
+    return nextDate.format('YYYY-MM-DD 00:00:00')
   }
 
   return ''
@@ -57,18 +57,18 @@ export function calculateNextIncomeDate(period: string, incomeDate: string): str
  * @returns The income amount for one period
  */
 export function calculatePerAssetIncome(asset: Asset): number {
-  if (!asset.calculation_type || !asset.period) return 0
-  if (asset.calculation_type === '无') return 0
+  if (!asset.calculation_type || !asset.period) return 0.00
+  if (asset.calculation_type === '无') return 0.00
 
   if (asset.calculation_type === '按金额计算') {
     // 按每期固定金额计算
-    return (asset.income_amount || 0)
+    return Number((asset.income_amount || 0).toFixed(2))
   } else if (asset.calculation_type === '按年收益率计算') {
     // 按年收益率计算：根据周期不同，年化收益率需要除以不同的基数
-    const rate = (asset.annual_yield_rate || 0) // / 100
-    const principal = asset.amount || 0
+    const rate = Number((asset.annual_yield_rate || 0.00).toFixed(4)) // / 100
+    const principal = Number((asset.amount || 0.00).toFixed(2))
 
-    if (rate <= 0 || principal <= 0) return 0
+    if (rate <= 0 || principal <= 0) return 0.00
 
     let periodDivisor = 1
     if (asset.period === '日') {
@@ -79,10 +79,10 @@ export function calculatePerAssetIncome(asset: Asset): number {
       periodDivisor = 1
     }
 
-    return principal * rate / periodDivisor
+    return Number((principal * rate / periodDivisor).toFixed(2))
   }
 
-  return 0
+  return 0.00
 }
 
 /**
@@ -106,15 +106,15 @@ export async function addAsset(assetData: AssetInput, deductFromAccount: boolean
       id,
       assetData.type,
       assetData.name,
-      assetData.amount,
+      assetData.amount.toFixed(2),
       assetData.account_id,
       assetData.period || null,
       assetData.period_count || 0,
       assetData.income_date || null,
       nextIncomeDate || null,
       assetData.calculation_type || null,
-      assetData.income_amount || 0,
-      assetData.annual_yield_rate || 0
+      assetData.income_amount?.toFixed(2) || 0.00,
+      assetData.annual_yield_rate?.toFixed(4) || 0.00
     ]
   })
 
@@ -169,7 +169,7 @@ export async function updateAsset(assetId: string, data: Partial<Asset>): Promis
   }
   if (data.amount !== undefined) {
     fields.push('amount = ?')
-    values.push(data.amount)
+    values.push(data.amount.toFixed(2))
   }
   if (data.account_id !== undefined) {
     fields.push('account_id = ?')
@@ -197,7 +197,7 @@ export async function updateAsset(assetId: string, data: Partial<Asset>): Promis
   }
   if (data.income_amount !== undefined) {
     fields.push('income_amount = ?')
-    values.push(data.income_amount)
+    values.push(data.income_amount.toFixed(2))
   }
   if (data.annual_yield_rate !== undefined) {
     fields.push('annual_yield_rate = ?')
@@ -210,7 +210,8 @@ export async function updateAsset(assetId: string, data: Partial<Asset>): Promis
 
   if (fields.length === 0) return
 
-  fields.push('updated_at = CURRENT_TIMESTAMP')
+  fields.push('updated_at = ?')
+  values.push(getCurrentString())
   values.push(assetId)
 
   await db.run(
@@ -230,34 +231,32 @@ export async function deleteAsset(assetId: string): Promise<void> {
   await db.executeTransaction(statements)
 }
 
+export async function switchStatusAsset(assetId: string, status: string): Promise<void> {
+  await db.run(
+    "UPDATE assets SET status = ?, updated_at = ? WHERE id = ?",
+    [status, getCurrentString(), assetId]
+  )
+}
+
 /**
  * Mark asset as ended
  */
 export async function endAsset(assetId: string): Promise<void> {
-  await db.run(
-    "UPDATE assets SET status = '结束', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-    [assetId]
-  )
+  await switchStatusAsset(assetId, '结束')
 }
 
 /**
  * Pause asset (exclude from income calculation)
  */
 export async function pauseAsset(assetId: string): Promise<void> {
-  await db.run(
-    "UPDATE assets SET status = '暂停', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-    [assetId]
-  )
+  await switchStatusAsset(assetId, '暂停')
 }
 
 /**
  * Resume asset (back to active)
  */
 export async function resumeAsset(assetId: string): Promise<void> {
-  await db.run(
-    "UPDATE assets SET status = '开启', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-    [assetId]
-  )
+  await switchStatusAsset(assetId, '开启')
 }
 
 /**
@@ -282,6 +281,6 @@ export async function recordAssetIncome(
   const id = generateId()
   return {
     statement: 'INSERT INTO asset_income_records (id, asset_id, income_amount, record_time, remark) VALUES (?, ?, ?, ?, ?)',
-    values: [id, assetId, incomeAmount, recordTime, remark || '']
+    values: [id, assetId, incomeAmount.toFixed(2), recordTime, remark || '']
   }
 }

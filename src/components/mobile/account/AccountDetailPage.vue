@@ -246,9 +246,9 @@ const accountInfo = ref<Account>({
   id: '',
   name: '',
   type: '',
-  balance: 0,
-  used_limit: 0,
-  total_limit: 0,
+  balance: 0.00,
+  used_limit: 0.00,
+  total_limit: 0.00,
   is_liquid: true,
   remark: ''
 });
@@ -259,9 +259,9 @@ const activeTab = ref('income');
 // 编辑对话框
 const showEditDialog = ref(false);
 const editForm = ref({
-  balance: 0,
-  used_limit: 0,
-  total_limit: 0
+  balance: 0.00,
+  used_limit: 0.00,
+  total_limit: 0.00
 });
 
 // 交易记录数据
@@ -358,15 +358,15 @@ const navigateToRepay = () => {
 const editAccountInfo = () => {
   if (accountInfo.value.type === '信用卡') {
     editForm.value = {
-      balance: 0,
-      used_limit: accountInfo.value.used_limit || 0,
-      total_limit: accountInfo.value.total_limit || 0
+      balance: 0.00,
+      used_limit: Number((accountInfo.value.used_limit || 0).toFixed(2)),
+      total_limit: Number((accountInfo.value.total_limit || 0).toFixed(2))
     };
   } else {
     editForm.value = {
-      balance: accountInfo.value.balance || 0,
-      used_limit: 0,
-      total_limit: 0
+      balance: Number((accountInfo.value.balance || 0).toFixed(2)),
+      used_limit: 0.00,
+      total_limit: 0.00
     };
   }
   showEditDialog.value = true;
@@ -390,7 +390,7 @@ const saveEdit = async () => {
       });
       ElMessage.success('信用卡信息已更新');
     } else {
-      await updateAccountBalance(props.accountId, editForm.value.balance, '账户余额调整');
+      await updateAccountBalance(props.accountId, Number((editForm.value.balance || 0).toFixed(2)), '账户余额调整');
       ElMessage.success('账户余额已更新');
     }
     showEditDialog.value = false;

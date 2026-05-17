@@ -85,10 +85,10 @@ export function calculateFundWeightedNavCostPrice(
   newShares: number,
   fee: number
 ): number {
-  const totalShares = heldShares + newShares
-  if (totalShares === 0) return 0
-  const totalCost = (heldNav * heldShares) + (newNav * newShares) + fee
-  return totalCost / totalShares
+  const totalShares = Number((heldShares + newShares).toFixed(2))
+  if (totalShares === 0) return 0.00
+  const totalCost = Number((heldNav * heldShares + newNav * newShares + fee).toFixed(2))
+  return Number((totalCost / totalShares).toFixed(2))
 }
 
 /**
@@ -96,6 +96,6 @@ export function calculateFundWeightedNavCostPrice(
  * monthlyAmount = targetAmount / periodMonths
  */
 export function calculateMonthlyAmount(targetAmount: number, periodMonths: number): number {
-  if (periodMonths === 0) return 0
-  return targetAmount / periodMonths
+  if (periodMonths === 0) return 0.00
+  return Number((targetAmount / periodMonths).toFixed(2))
 }

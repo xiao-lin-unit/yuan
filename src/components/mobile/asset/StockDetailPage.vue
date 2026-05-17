@@ -290,13 +290,13 @@ const emit = defineEmits(['navigate']);
 const stockInfo = ref({
   name: '',
   code: '',
-  costAmount: 0,
-  costPrice: 0,
-  currentPrice: 0,
+  costAmount: 0.00,
+  costPrice: 0.00,
+  currentPrice: 0.00,
   quantity: 0,
-  confirmedReturn: 0,
-  holdReturn: 0,
-  totalReturn: 0
+  confirmedReturn: 0.00,
+  holdReturn: 0.00,
+  totalReturn: 0.00
 });
 
 // 当前激活的标签
@@ -332,13 +332,13 @@ const loadStockDetail = async () => {
     stockInfo.value = {
       name: stock.name,
       code: stock.code,
-      costAmount: stock.costAmount,
-      costPrice: stock.costPrice,
-      currentPrice: stock.currentPrice,
+      costAmount: Number(stock.costAmount.toFixed(2)),
+      costPrice: Number(stock.costPrice.toFixed(2)),
+      currentPrice: Number(stock.currentPrice.toFixed(2)),
       quantity: stock.quantity,
-      confirmedReturn: stock.confirmedProfit,
-      holdReturn: stock.holdReturn,
-      totalReturn: stock.totalReturn
+      confirmedReturn: Number(stock.confirmedProfit.toFixed(2)),
+      holdReturn: Number(stock.holdReturn.toFixed(2)),
+      totalReturn: Number(stock.totalReturn.toFixed(2))
     };
 
     // 加载持有记录
@@ -348,22 +348,17 @@ const loadStockDetail = async () => {
     const transactions = await getStockTransactions(props.stockId);
     buyTransactions.value = transactions.buyTransactions;
     sellTransactions.value = transactions.sellTransactions;
-
-    console.log('Holdings loaded:', holdings.value);
-    console.log('Buy transactions loaded:', buyTransactions.value);
-    console.log('Sell transactions loaded:', sellTransactions.value);
   } catch (error) {
-    console.error('Error loading stock detail:', error);
     // 设置默认値，避免模板渲染错误
     stockInfo.value = {
       name: '未知股票',
       code: '',
-      costAmount: 0,
-      costPrice: 0,
-      currentPrice: 0,
+      costAmount: 0.00,
+      costPrice: 0.00,
+      currentPrice: 0.00,
       quantity: 0,
-      confirmedReturn: 0,
-      holdReturn: 0,
+      confirmedReturn: 0.00,
+      holdReturn: 0.00,
       totalReturn: 0
     };
   }

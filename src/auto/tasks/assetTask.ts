@@ -1,6 +1,6 @@
 import { registerTask } from '../index'
 import db from '../../database'
-import { getCurrentDate, getDate } from '../../utils/timezone'
+import { getCurrentDate, getDate, formatDate } from '../../utils/timezone'
 import { calculatePerAssetIncome, recordAssetIncome } from '../../services/asset/assetService'
 import { getAccountById } from '../../services/account/accountService'
 
@@ -22,24 +22,25 @@ function addPeriod(dateStr: string, period: string): string | null {
 registerTask('assetAutoIncome', async () => {
     await db.connect()
     const now = getCurrentDate()
-    const today = now.format('YYYY-MM-DD')
+    const todayLast = now.add(1, 'day').format('YYYY-MM-DD 00:00:00')   
+    const time = now.format('YYYY-MM-DD 00:00:00')
     const assets = await db.query(
       'SELECT * FROM assets WHERE status = ? AND calculation_type != ? AND next_income_date <= ? AND account_id IS NOT NULL',
-      ['开启', '无', today]
+      ['开启', '无', todayLast]
     )
     console.log(`自动处理资产收益`, JSON.stringify(assets))
     for (const asset of assets) {
         try {
             const statements: { statement: string; values: any[] }[] = []
-            let totalIncome = 0
+            let totalIncome = 0.00
             let currentIncomeDate = asset.next_income_date
-            let amount = asset.amount || 0
+            let amount = Number((asset.amount || 0).toFixed(2))
 
             // Pre-load account info for transaction records
             let accountBalance: number | null = null
             const account = await getAccountById(asset.account_id)
             if (!account || account.status === '停用') continue;
-            accountBalance = account.balance || 0
+            accountBalance = Number((account.balance || 0).toFixed(2))
             
             // Process each missed income period from next_income_date up to today
             while (getDate(currentIncomeDate).isBefore(now) || getDate(currentIncomeDate).isSame(now, 'day')) {
@@ -61,10 +62,10 @@ registerTask('assetAutoIncome', async () => {
                         txId,
                         asset.account_id,
                         '收入',
-                        income,
-                        accountBalance + totalIncome,
+                        income.toFixed(2),
+                        (accountBalance + totalIncome).toFixed(2),
                         `资产收益：${asset.name}`,
-                        now.toISOString()
+                        formatDate(currentIncomeDate)
                     ]
                 })
 
@@ -77,14 +78,14 @@ registerTask('assetAutoIncome', async () => {
             if (totalIncome > 0) {
                 // Update account balance
                 statements.push({
-                    statement: 'UPDATE accounts SET balance = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-                    values: [accountBalance + totalIncome, asset.account_id]
+                    statement: 'UPDATE accounts SET balance = ?, updated_at = ? WHERE id = ?',
+                    values: [(accountBalance + totalIncome).toFixed(2), time, asset.account_id]
                 })
 
                 // Update asset: set next_income_date and add total income to amount
                 statements.push({
-                    statement: 'UPDATE assets SET next_income_date = ?, amount = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-                    values: [currentIncomeDate, amount, asset.id]
+                    statement: 'UPDATE assets SET next_income_date = ?, amount = ?, updated_at = ? WHERE id = ?',
+                    values: [formatDate(currentIncomeDate, 'YYYY-MM-DD 00:00:00'), amount.toFixed(2), time, asset.id]
                 })
                 console.log(`自动处理资产收益更新`, JSON.stringify(statements))
                 // Execute all statements in a single transaction

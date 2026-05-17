@@ -5,7 +5,7 @@
 
 import dayjs from 'dayjs'
 import db from '../../database/index.js'
-import { getCurrentDate, generateId, getDate } from '../../utils/timezone.js'
+import { getCurrentDate, generateId, getDate, formatDate, getCurrentString } from '../../utils/timezone.js'
 import type {
   Fund,
   FundHolding,
@@ -59,10 +59,10 @@ export async function getAvailableAccounts(): Promise<Array<{ id: string; name: 
 export async function checkAccountBalance(accountId: string, requiredAmount: number): Promise<{ sufficient: boolean; currentBalance: number }> {
   const accountData = await db.query('SELECT balance FROM accounts WHERE id = ?', [accountId])
   if (accountData.length === 0) {
-    return { sufficient: false, currentBalance: 0 }
+    return { sufficient: false, currentBalance: 0.00 }
   }
   const currentBalance = accountData[0].balance
-  return { sufficient: currentBalance >= requiredAmount, currentBalance }
+  return { sufficient: currentBalance >= requiredAmount, currentBalance: Number(currentBalance.toFixed(2)) }
 }
 
 /**
@@ -94,9 +94,9 @@ export async function addFund(fundData: FundInput, deductFromAccount: boolean = 
       fundData.name,
       fundData.code,
       fundData.shares,
-      fundData.cost_nav,
-      fundData.cost_nav,
-      fundData.fee,
+      fundData.cost_nav.toFixed(4),
+      fundData.cost_nav.toFixed(4),
+      fundData.fee.toFixed(2),
       fundData.transaction_time,
       fundData.has_lock,
       fundData.lock_period,
@@ -114,12 +114,12 @@ export async function addFund(fundData: FundInput, deductFromAccount: boolean = 
     values: [
       holdingId,
       fundId,
-      fundData.cost_nav,
+      fundData.cost_nav.toFixed(4),
       fundData.shares,
       fundData.shares,
-      fundData.fee,
+      fundData.fee.toFixed(2),
       fundData.lock_period,
-      lockEndDate ? lockEndDate.toISOString() : null,
+      lockEndDate ? formatDate(lockEndDate) : null,
       fundData.transaction_time,
       fundData.account_id
     ]
@@ -132,11 +132,11 @@ export async function addFund(fundData: FundInput, deductFromAccount: boolean = 
     values: [
       transactionId,
       fundId,
-      fundData.cost_nav,
+      fundData.cost_nav.toFixed(4),
       fundData.shares,
       '买入',
       holdingId,
-      fundData.fee,
+      fundData.fee.toFixed(2),
       fundData.transaction_time,
       fundData.account_id
     ]
@@ -178,7 +178,6 @@ export async function buyFund(fundId: string, buyData: FundBuyInput): Promise<vo
 
   const holdingId = generateId()
   const transactionId = generateId()
-  const accountTransactionId = generateId()
 
   const statements = [
     // Create fund holding record
@@ -188,12 +187,12 @@ export async function buyFund(fundId: string, buyData: FundBuyInput): Promise<vo
       values: [
         holdingId,
         fundId,
-        buyData.nav,
+        buyData.nav.toFixed(2),
         buyData.shares,
         buyData.shares,
-        buyData.fee,
+        buyData.fee.toFixed(2),
         buyData.lock_period,
-        lockEndDate ? lockEndDate.toISOString() : null,
+        lockEndDate ? formatDate(lockEndDate) : null,
         buyData.transaction_time,
         buyData.account_id
       ]
@@ -205,19 +204,19 @@ export async function buyFund(fundId: string, buyData: FundBuyInput): Promise<vo
       values: [
         transactionId,
         fundId,
-        buyData.nav,
+        buyData.nav.toFixed(4),
         buyData.shares,
         '买入',
         holdingId,
-        buyData.fee,
+        buyData.fee.toFixed(2),
         buyData.transaction_time,
         buyData.account_id
       ]
     },
     // Update fund record (reset status to '开启')
     {
-      statement: `UPDATE funds SET shares = ?, current_nav = ?, cost_nav = ?, total_fee = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-      values: [newShares, buyData.nav, newCostNav, currentFund.total_fee + buyData.fee, '开启', fundId]
+      statement: `UPDATE funds SET shares = ?, current_nav = ?, cost_nav = ?, total_fee = ?, status = ?, updated_at = ? WHERE id = ?`,
+      values: [newShares, buyData.nav.toFixed(4), newCostNav.toFixed(4), (currentFund.total_fee + buyData.fee).toFixed(2), '开启', getCurrentString(), fundId]
     },
     // 使用出账接口返回的SQL语句（已包含账户更新和交易记录）
     ...debitResult.statements
@@ -242,7 +241,7 @@ export async function sellFund(fundId: string, sellData: FundSellInput): Promise
   }
 
   // Query available holdings (not fully sold and lock period expired)
-  const currentDate = getCurrentDate().toISOString()
+  const currentDate = formatDate(getCurrentDate())
   const holdings = await db.query(
     'SELECT * FROM fund_holdings WHERE fund_id = ? AND sell_status != ? AND (lock_end_date IS NULL OR lock_end_date <= ?) ORDER BY transaction_time ASC',
     [fundId, '已卖出', currentDate]
@@ -297,11 +296,11 @@ export async function sellFund(fundId: string, sellData: FundSellInput): Promise
     values: [
       transactionId,
       fundId,
-      sellData.nav,
+      sellData.nav.toFixed(4),
       sellData.shares,
       '卖出',
       soldHoldIds.join(','),
-      sellData.fee,
+      sellData.fee.toFixed(2),
       sellData.transaction_time,
       sellData.account_id
     ]
@@ -314,8 +313,8 @@ export async function sellFund(fundId: string, sellData: FundSellInput): Promise
   const isEnded = newShares === 0 ? '结束' : '开启'
 
   statements.push({
-    statement: `UPDATE funds SET shares = ?, current_nav = ?, confirmed_profit = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-    values: [newShares, sellData.nav, newConfirmedProfit, isEnded, fundId]
+    statement: `UPDATE funds SET shares = ?, current_nav = ?, confirmed_profit = ?, status = ?, updated_at = ? WHERE id = ?`,
+    values: [newShares, sellData.nav.toFixed(4), newConfirmedProfit.toFixed(2), isEnded, getCurrentString(), fundId]
   })
 
   // Calculate net proceeds
@@ -348,21 +347,21 @@ export async function getFundDetail(fundId: string): Promise<FundDetail> {
   const f = fund[0]
 
   // Calculate derived values
-  const costAmount = f.cost_nav * f.shares
-  const currentAmount = f.current_nav * f.shares
+  const costAmount = Number((f.cost_nav * f.shares).toFixed(2))
+  const currentAmount = Number((f.current_nav * f.shares).toFixed(2))
   const holdReturn = currentAmount - costAmount
-  const confirmedReturn = f.confirmed_profit || 0
-  const totalReturn = holdReturn + confirmedReturn
+  const confirmedReturn = Number((f.confirmed_profit || 0).toFixed(2))
+  const totalReturn = Number((holdReturn + confirmedReturn).toFixed(2))
 
   return {
     id: f.id,
     name: f.name,
     code: f.code,
     costAmount,
-    costFee: f.cost_fee || 0,
-    costNav: f.cost_nav,
-    currentNav: f.current_nav,
-    shares: f.shares,
+    costFee: Number((f.cost_fee || 0).toFixed(2)),
+    costNav: Number(f.cost_nav.toFixed(4)),
+    currentNav: Number(f.current_nav.toFixed(4)),
+    shares:f.shares,
     confirmedReturn,
     holdReturn,
     totalReturn
@@ -403,8 +402,8 @@ export async function updateFundNav(fundId: string, newNav: number): Promise<voi
   }
 
   await db.run(
-    'UPDATE funds SET current_nav = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-    [newNav, fundId]
+    'UPDATE funds SET current_nav = ?, updated_at = ? WHERE id = ?',
+    [newNav.toFixed(4), getCurrentString(), fundId]
   )
 }
 

@@ -22,7 +22,7 @@ export function getCurrentDate(): dayjs.Dayjs {
  * Get current ISO string in UTC+8
  */
 export function getCurrentString(): string {
-  return formatDate(getCurrentDate(), 'YYYY-MM-DDTHH:mm:ss')
+  return formatDate(getCurrentDate(), 'YYYY-MM-DD HH:mm:ss')
 }
 
 /**

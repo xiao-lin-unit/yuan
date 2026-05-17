@@ -99,7 +99,7 @@ export async function getArticleContent(article: KnowledgeArticle): Promise<stri
 
 // 添加收藏
 export async function addFavorite(articleId: string): Promise<void> {
-  const now = getCurrentDate().format('YYYY-MM-DD')
+  const now = getCurrentDate().format('YYYY-MM-DD HH:mm:ss')
   await db.run(
     `INSERT OR REPLACE INTO knowledge_favorite (article_id, create_time) VALUES (?, ?)`,
     [articleId, now]

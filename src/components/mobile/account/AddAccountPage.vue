@@ -47,9 +47,9 @@ const emit = defineEmits(['navigate'])
 const accountForm = ref({
   name: '',
   type: '',
-  balance: 0,
-  used_limit: 0,
-  total_limit: 0,
+  balance: 0.00,
+  used_limit: 0.00,
+  total_limit: 0.00,
   is_liquid: true,
   remark: ''
 })
@@ -89,9 +89,9 @@ const addAccount = async () => {
     await addAccountService({
       name: accountForm.value.name,
       type: accountForm.value.type,
-      balance: accountForm.value.balance,
-      used_limit: accountForm.value.used_limit,
-      total_limit: accountForm.value.total_limit,
+      balance: Number((accountForm.value.balance || 0.00).toFixed(2)),
+      used_limit: Number((accountForm.value.used_limit || 0.00).toFixed(2)),
+      total_limit: Number((accountForm.value.total_limit || 0.00).toFixed(2)),
       is_liquid: accountForm.value.is_liquid,
       remark: accountForm.value.remark
     })

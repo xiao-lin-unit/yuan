@@ -6,7 +6,7 @@
  * and saves a snapshot to asset_monthly_snapshots table.
  */
 import db from '../../database'
-import { getCurrentDate } from '../../utils/timezone'
+import { getCurrentDate, getCurrentString } from '../../utils/timezone'
 import { registerTask } from '../index'
 
 registerTask('monthlyFinancialSnapshot', async () => {
@@ -36,46 +36,46 @@ registerTask('monthlyFinancialSnapshot', async () => {
   // Calculate liquid funds (non-credit card accounts)
   const liquidFunds = accounts
     .filter((a: any) => a.type !== '信用卡')
-    .reduce((sum: number, a: any) => sum + (a.balance || 0), 0)
+    .reduce((sum: number, a: any) => Number((sum + (a.balance || 0)).toFixed(2)), 0.00)
 
   // Social security & provident fund
   const socialSecurity = assets
     .filter((a: any) => a.type === '社保')
-    .reduce((sum: number, a: any) => sum + (a.amount || 0), 0)
+    .reduce((sum: number, a: any) => Number((sum + (a.amount || 0)).toFixed(2)), 0.00)
 
   const providentFund = assets
     .filter((a: any) => a.type === '公积金')
-    .reduce((sum: number, a: any) => sum + (a.amount || 0), 0)
+    .reduce((sum: number, a: any) => Number((sum + (a.amount || 0)).toFixed(2)), 0.00)
 
   // Stock & fund market value
   const stockValue = stocks.reduce(
-    (sum: number, s: any) => sum + (s.current_price || 0) * (s.quantity || 0),
-    0
+    (sum: number, s: any) => Number((sum + (s.current_price || 0) * (s.quantity || 0)).toFixed(2)),
+    0.00
   )
 
   const fundValue = funds.reduce(
-    (sum: number, f: any) => sum + (f.current_nav || 0) * (f.shares || 0),
-    0
+    (sum: number, f: any) => Number((sum + (f.current_nav || 0) * (f.shares || 0)).toFixed(2)),
+    0.00
   )
 
   // Loans to friends/family
   const loans = assets
     .filter((a: any) => a.type === '亲友借款')
-    .reduce((sum: number, a: any) => sum + (a.amount || 0), 0)
+    .reduce((sum: number, a: any) => Number((sum + (a.amount || 0)).toFixed(2)), 0.00)
 
   // Total assets
   const totalAssets =
-    liquidFunds + socialSecurity + providentFund + stockValue + fundValue + loans
+    Number((liquidFunds + socialSecurity + providentFund + stockValue + fundValue + loans).toFixed(2))
 
   // Credit card used limit
   const creditCardUsed = accounts
     .filter((a: any) => a.type === '信用卡')
-    .reduce((sum: number, a: any) => sum + (a.used_limit || 0), 0)
+    .reduce((sum: number, a: any) => Number((sum + (a.used_limit || 0)).toFixed(2)), 0.00)
 
   // Total liabilities
   const liabilityPrincipal = liabilities.reduce(
-    (sum: number, l: any) => sum + (l.remaining_principal || 0),
-    0
+    (sum: number, l: any) => Number((sum + (l.remaining_principal || 0)).toFixed(2)),
+    0.00
   )
   const totalLiabilities = liabilityPrincipal + creditCardUsed
 
@@ -84,13 +84,13 @@ registerTask('monthlyFinancialSnapshot', async () => {
 
   // Confirmed profits
   const confirmedProfitStocks = stocks.reduce(
-    (sum: number, s: any) => sum + (s.confirmed_profit || 0),
-    0
+    (sum: number, s: any) => Number((sum + (s.confirmed_profit || 0)).toFixed(2)),
+    0.00
   )
 
   const confirmedProfitFunds = funds.reduce(
-    (sum: number, f: any) => sum + (f.confirmed_profit || 0),
-    0
+    (sum: number, f: any) => Number((sum + (f.confirmed_profit || 0)).toFixed(2)),
+    0.00
   )
 
   // Check if snapshot already exists for this month
@@ -104,9 +104,9 @@ registerTask('monthlyFinancialSnapshot', async () => {
     // Update existing record
     await db.run(
       `UPDATE asset_monthly_snapshots
-       SET total_assets = ?, total_liabilities = ?, net_worth = ?, confirmed_profit_stocks = ?, confirmed_profit_funds = ?, created_at = CURRENT_TIMESTAMP
+       SET total_assets = ?, total_liabilities = ?, net_worth = ?, confirmed_profit_stocks = ?, confirmed_profit_funds = ?, created_at = ?
        WHERE year = ? AND month = ?`,
-      [totalAssets, totalLiabilities, netWorth, confirmedProfitStocks, confirmedProfitFunds, year, month]
+      [totalAssets, totalLiabilities, netWorth, confirmedProfitStocks, confirmedProfitFunds, year, month, getCurrentString()]
     )
   } else {
     // Insert new record

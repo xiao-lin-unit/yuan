@@ -410,7 +410,7 @@ const saveIncome = async () => {
     // 使用账户入账接口 - 自动处理余额更新
     const creditResult = await createCreditTransaction(
       selectedAccountObj.id,
-      amountNumber,
+      Number(amountNumber.toFixed(2)),
       `收入：${selectedCategory.value?.name || ' '}${remark.value ? '：' + remark.value : ''}`,
       transactionId,
       getDate(selectedDateTime.value)
@@ -430,7 +430,7 @@ const saveIncome = async () => {
           transactionId,
           '账户收入',
           selectedCategoryId.value,
-          amountNumber,
+          Number(amountNumber.toFixed(2)),
           selectedAccountObj.id,
           relatedId,
           creditResult.balanceAfter,

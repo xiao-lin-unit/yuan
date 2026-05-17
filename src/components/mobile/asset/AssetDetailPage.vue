@@ -48,7 +48,7 @@
         </div>
         <div v-if="assetInfo.calculation_type && assetInfo.calculation_type !== '无'" class="meta-item">
           <div class="meta-label">下一收益日</div>
-          <div class="meta-value">{{ formatDate(assetInfo.next_income_date, 'YYYY/MM/DD HH:mm') }}</div>
+          <div class="meta-value">{{ formatDate(assetInfo.next_income_date, 'YYYY/MM/DD') }}</div>
         </div>
       </div>
     </div>
@@ -172,7 +172,7 @@ const activeTab = ref('income');
 const assetInfo = ref({
   name: '',
   type: '',
-  amount: 0,
+  amount: 0.00,
   period: '',
   period_count: 0,
   income_date: '',
@@ -181,16 +181,16 @@ const assetInfo = ref({
   status: '开启',
   created_at: '' as string | Date | dayjs.Dayjs,
   calculation_type: '' as '无' | '按金额计算' | '按年收益率计算' | '',
-  annual_yield_rate: 0,
-  income_amount: 0
+  annual_yield_rate: 0.00,
+  income_amount: 0.00,
 });
 
 const showEditDialog = ref(false);
 const editForm = ref({
   calculation_type: '' as '无' | '按金额计算' | '按年收益率计算' | '',
   period: '',
-  annual_yield_rate: 0,
-  income_amount: 0
+  annual_yield_rate: 0.00, 
+  income_amount: 0.00
 });
 
 const incomeRecords = ref<AssetIncomeRecord[]>([]);
@@ -287,8 +287,8 @@ const openEditDialog = () => {
   editForm.value = {
     calculation_type: assetInfo.value.calculation_type || '',
     period: assetInfo.value.period || '',
-    annual_yield_rate: assetInfo.value.annual_yield_rate * 100 || 0,
-    income_amount: assetInfo.value.income_amount || 0
+    annual_yield_rate: Number((assetInfo.value.annual_yield_rate * 100).toFixed(2)) || 0.00,
+    income_amount: Number(assetInfo.value.income_amount.toFixed(2)) || 0.00
   };
   showEditDialog.value = true;
 };
@@ -316,8 +316,8 @@ const saveEdit = async () => {
     await updateAsset(props.assetId, {
       calculation_type: editForm.value.calculation_type,
       period: isNoCalc ? '' : editForm.value.period,
-      annual_yield_rate: editForm.value.calculation_type === '按年收益率计算' ? editForm.value.annual_yield_rate / 100 : 0,
-      income_amount: editForm.value.calculation_type === '按金额计算' ? editForm.value.income_amount : 0,
+      annual_yield_rate: editForm.value.calculation_type === '按年收益率计算' ? Number((editForm.value.annual_yield_rate / 100).toFixed(4)) : 0.00,
+      income_amount: editForm.value.calculation_type === '按金额计算' ? Number(editForm.value.income_amount.toFixed(2)) : 0.00,
       next_income_date: isNoCalc ? '' : undefined
     });
 
@@ -394,7 +394,7 @@ const loadAssetDetail = async () => {
     assetInfo.value = {
       name: asset.name,
       type: asset.type,
-      amount: asset.amount,
+      amount: Number(asset.amount.toFixed(2)),
       period: asset.period || '',
       period_count: asset.period_count || 0,
       income_date: asset.income_date || '',
@@ -403,8 +403,8 @@ const loadAssetDetail = async () => {
       status: asset.status || '开启',
       created_at: asset.created_at || '',
       calculation_type: asset.calculation_type || '',
-      annual_yield_rate: asset.annual_yield_rate || 0,
-      income_amount: asset.income_amount || 0
+      annual_yield_rate: Number((asset.annual_yield_rate).toFixed(4)) || 0.00,
+      income_amount: Number(asset.income_amount.toFixed(2)) || 0.00
     };
 
     // 加载收益记录

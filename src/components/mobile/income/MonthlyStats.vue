@@ -8,7 +8,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
-import { getCurrentDate } from '../../../utils/timezone';
+import { getCurrentDate, formatDate } from '../../../utils/timezone';
 import db from '../../../database';
 import StatOverview from '../../../components/common/StatOverview.vue';
 import image from '@/assets/img/r1.jpg';
@@ -26,7 +26,7 @@ const income = ref(0);
 
 // 计算本月结余
 const balance = computed(() => {
-  return income.value - expense.value;
+  return Number((income.value - expense.value).toFixed(2));
 });
 
 // 获取指定月份的开始和结束日期
@@ -47,18 +47,18 @@ const loadMonthlyStats = async () => {
     
     // 获取本月的开始和结束日期
     const { start, end } = getMonthRange(props.year, props.month);
-    console.log('月度日期范围:', start.toISOString(), '至', end.toISOString());
+    console.log('月度日期范围:', formatDate(start), '至', formatDate(end));
     
     // 从流水表中查询类型为账户支出的记录
     const expenseTransactions = await db.query(
       'SELECT SUM(amount) as total FROM income_expense_records WHERE type = ? AND created_at BETWEEN ? AND ?',
-      ['账户支出', start.toISOString(), end.toISOString()]
+      ['账户支出', formatDate(start), formatDate(end)]
     );
     
     // 从流水表中查询类型为账户收入的记录
     const incomeTransactions = await db.query(
       'SELECT SUM(amount) as total FROM income_expense_records WHERE type = ? AND created_at BETWEEN ? AND ?',
-      ['账户收入', start.toISOString(), end.toISOString()]
+      ['账户收入', formatDate(start), formatDate(end)]
     );
     
     console.log('支出查询结果:', expenseTransactions);

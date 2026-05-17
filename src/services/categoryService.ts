@@ -1,5 +1,5 @@
 import db from '../database'
-import { getCurrentDate } from '../utils/timezone'
+import { getCurrentDate, getCurrentString } from '../utils/timezone'
 import { Category, expenseCategories, incomeCategories } from '../data/categories'
 
 /**
@@ -141,7 +141,8 @@ export class CategoryService {
         params.push(category.type)
       }
       
-      fields.push('updated_at = CURRENT_TIMESTAMP')
+      fields.push('updated_at = ?')
+      params.push(getCurrentString())
       
       if (fields.length === 0) {
         return true

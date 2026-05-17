@@ -8,7 +8,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
-import { getCurrentDate } from '../../../utils/timezone';
+import { getCurrentDate, formatDate } from '../../../utils/timezone';
 import db from '../../../database';
 import StatOverview from '../../../components/common/StatOverview.vue';
 import image from '@/assets/img/r2.jpg';
@@ -46,29 +46,24 @@ const loadMonthlyStats = async () => {
     
     // 获取本月的开始和结束日期
     const { start, end } = getMonthRange(props.year, props.month);
-    console.log('月度日期范围:', start.toISOString(), '至', end.toISOString());
+    console.log('月度日期范围:', formatDate(start), '至', formatDate(end));
     
     // 从流水表中查询类型为账户支出的记录
     const expenseTransactions = await db.query(
       'SELECT SUM(amount) as total FROM income_expense_records WHERE type = ? AND created_at BETWEEN ? AND ?',
-      ['账户支出', start.toISOString(), end.toISOString()]
+      ['账户支出', formatDate(start), formatDate(start)]
     );
     
     // 从流水表中查询类型为账户收入的记录
     const incomeTransactions = await db.query(
       'SELECT SUM(amount) as total FROM income_expense_records WHERE type = ? AND created_at BETWEEN ? AND ?',
-      ['账户收入', start.toISOString(), end.toISOString()]
+      ['账户收入', formatDate(start), formatDate(start)]
     );
     
-    console.log('支出查询结果:', expenseTransactions);
-    console.log('收入查询结果:', incomeTransactions);
-    
     // 更新收支数据
-    expense.value = expenseTransactions[0]?.total || 0;
-    income.value = incomeTransactions[0]?.total || 0;
+    expense.value = Number((expenseTransactions[0]?.total || 0).toFixed(2));
+    income.value = Number((incomeTransactions[0]?.total || 0).toFixed(2));
     
-    console.log('更新后的支出:', expense.value);
-    console.log('更新后的收入:', income.value);
   } catch (error) {
     console.error('加载月度收支数据失败:', error);
     // 出错时使用默认数据

@@ -230,14 +230,14 @@ async function loadUserFinancialData() {
 
   // 被动收入（资产收益），排除暂停状态的资产
   const passiveIncome = assets.reduce((s: number, a: any) => {
-    if (a.status === '暂停') return s
-    if (a.income_amount) return s + a.income_amount
-    if (a.annual_yield_rate && a.amount) return s + a.amount * (a.annual_yield_rate / 100) / 12
-    return s
-  }, 0)
+    if (a.status === '暂停') return Number(s.toFixed(2))
+    if (a.income_amount) return Number((s + a.income_amount).toFixed(2))
+    if (a.annual_yield_rate && a.amount) return Number((s + a.amount * (a.annual_yield_rate / 100) / 12).toFixed(2))
+    return Number(s.toFixed(2))
+  }, 0.00)
 
   // 负债收入比
-  const debtIncomeRatio = monthlyIncome > 0 ? (monthlyRepayment / monthlyIncome) * 100 : 0
+  const debtIncomeRatio = monthlyIncome > 0 ? Number(((monthlyRepayment / monthlyIncome) * 100).toFixed(2)) : 0.00
 
   return {
     totalAssets, totalLiabilities, netWorth, liquidBalance,
@@ -309,28 +309,28 @@ export async function computeSandbox(sceneType: number, params: any): Promise<{ 
       const monthlySpend = suspendExpense ? data.monthlyExpense * 0.7 + data.monthlyRepayment : data.monthlyExpense + data.monthlyRepayment
       // 失业情景下不计算社保和公积金类型的资产收益
       const monthlyIn = retainPassive ? data.assets.reduce((s: number, a: any) => {
-        if (a.status === '暂停') return s
-        if (a.type === '社保' || a.type === '公积金') return s
-        if (a.income_amount) return s + a.income_amount
-        if (a.annual_yield_rate && a.amount) return s + a.amount * (a.annual_yield_rate / 100) / 12
-        return s
-      }, 0) : 0
-      const monthlyGap = monthlyIn - monthlySpend
-      survivalMonths = monthlyGap >= 0 ? 999 : Math.floor(data.liquidBalance / Math.abs(monthlyGap))
+        if (a.status === '暂停') return Number(s.toFixed(2))
+        if (a.type === '社保' || a.type === '公积金') return Number(s.toFixed(2))
+        if (a.income_amount) return Number((s + a.income_amount).toFixed(2))
+        if (a.annual_yield_rate && a.amount) return Number((s + a.amount * (a.annual_yield_rate / 100) / 12).toFixed(2))
+        return Number(s.toFixed(2))
+      }, 0.00) : 0.00
+      const monthlyGap = Number((monthlyIn - monthlySpend).toFixed(2))
+      survivalMonths = monthlyGap >= 0 ? 999 : Number((Math.floor(data.liquidBalance / Math.abs(monthlyGap))).toFixed(0))
       if (survivalMonths > 120) survivalMonths = 120
 
       const actualMonths = Math.min(survivalMonths, 24)
       chartX = Array.from({ length: actualMonths }, (_, i) => `${i + 1}月`)
-      chartNetAssets = Array.from({ length: actualMonths }, (_, i) => Math.max(0, data.netWorth + monthlyGap * (i + 1)))
-      chartCashFlow = Array.from({ length: actualMonths }, () => monthlyGap)
+      chartNetAssets = Array.from({ length: actualMonths }, (_, i) => Number((data.netWorth + monthlyGap * (i + 1)).toFixed(2)))
+      chartCashFlow = Array.from({ length: actualMonths }, (_, i) => Number((monthlyGap * (i + 1)).toFixed(2)))
       chartDebt = Array.from({ length: actualMonths }, (_, i) => {
         const paid = data.liabilities.reduce((s: number, l: any) => s + (l.monthly_payment || 0) * (i + 1), 0)
-        return Math.max(0, data.totalLiabilities - paid)
+        return Number((Math.max(0, data.totalLiabilities - paid)).toFixed(2))
       })
 
-      netAssets = chartNetAssets[chartNetAssets.length - 1]
-      cashFlow = monthlyGap
-      debtPressureLevel = monthlyGap < -data.monthlyIncome * 0.3 ? 3 : 2
+      netAssets = Number(chartNetAssets[chartNetAssets.length - 1].toFixed(2))
+      cashFlow = Number(monthlyGap.toFixed(2))
+      debtPressureLevel = Number((monthlyGap < -data.monthlyIncome * 0.3 ? 3 : 2).toFixed(0))
       debtPressureDesc = `失业后月现金流缺口${Math.abs(monthlyGap).toFixed(0)}元，可维持${survivalMonths}个月`
       netAssetsChange = `净资产从${data.netWorth.toFixed(2)}元${monthlyGap < 0 ? '衰减' : '增长'}至${netAssets.toFixed(2)}元`
       cashFlowChange = `月现金流从${data.monthlyCashFlow.toFixed(2)}元变为${monthlyGap.toFixed(2)}元`

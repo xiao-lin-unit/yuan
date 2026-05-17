@@ -99,7 +99,7 @@
                   </div>
                   <div v-if="holding.lock_end_date" class="transaction-item">
                     <span class="item-label">锁定结束日期</span>
-                    <span class="item-value">{{ formatDate(holding.lock_end_date, 'YYYY/MM/DD HH:mm') }}</span>
+                    <span class="item-value">{{ formatDate(holding.lock_end_date, 'YYYY/MM/DD') }}</span>
                   </div>
                 </div>
               </div>
@@ -343,24 +343,22 @@ const goBack = () => {
 
 // 加载基金详情数据
 const loadFundDetail = async () => {
-  console.log('Loading fund detail for:', props.fundId);
 
   try {
     // 使用服务获取基金详情
     const fund = await getFundDetail(props.fundId);
-    console.log('Fund detail loaded:', fund);
 
     fundInfo.value = {
       name: fund.name,
       code: fund.code,
-      costAmount: fund.costAmount,
-      costFee: fund.costFee,
-      costNav: fund.costNav,
-      currentNav: fund.currentNav,
-      shares: fund.shares,
-      confirmedReturn: fund.confirmedReturn,
-      holdReturn: fund.holdReturn,
-      totalReturn: fund.totalReturn
+      costAmount: Number(fund.costAmount.toFixed(2)),
+      costFee: Number(fund.costFee.toFixed(2)),
+      costNav: Number(fund.costNav.toFixed(4)),
+      currentNav: Number(fund.currentNav.toFixed(2)),
+      shares: Number(fund.shares.toFixed(2)),
+      confirmedReturn: Number(fund.confirmedReturn.toFixed(2)),
+      holdReturn: Number(fund.holdReturn.toFixed(2)),
+      totalReturn: Number(fund.totalReturn.toFixed(2))
     };
 
     // 加载持有记录
@@ -370,24 +368,19 @@ const loadFundDetail = async () => {
     const transactions = await getFundTransactions(props.fundId);
     buyTransactions.value = transactions.buyTransactions;
     sellTransactions.value = transactions.sellTransactions;
-
-    console.log('Holdings loaded:', holdings.value);
-    console.log('Buy transactions loaded:', buyTransactions.value);
-    console.log('Sell transactions loaded:', sellTransactions.value);
   } catch (error) {
-    console.error('Error loading fund detail:', error);
     // 设置默认値，避免模板渲染错误
     fundInfo.value = {
       name: '未知基金',
       code: '',
-      costAmount: 0,
-      costFee: 0,
-      costNav: 0,
-      currentNav: 0,
-      shares: 0,
-      confirmedReturn: 0,
-      holdReturn: 0,
-      totalReturn: 0
+      costAmount: 0.00,
+      costFee: 0.00,
+      costNav: 0.0000,
+      currentNav: 0.0000,
+      shares: 0.00,
+      confirmedReturn: 0.00,
+      holdReturn: 0.00,
+      totalReturn: 0.00
     };
   }
 };
