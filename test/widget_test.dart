@@ -1,32 +1,30 @@
+// This is a basic Flutter widget test.
+//
+// To perform an interaction with a widget in your test, use the WidgetTester
+// utility in the flutter_test package. For example, you can send tap and scroll
+// gestures. You can also use WidgetTester to find child widgets in the widget
+// tree, read text, and verify that the values of widget properties are correct.
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:yuan/main.dart';
 
 void main() {
-  testWidgets('App launches and bottom nav has 5 tabs', (WidgetTester tester) async {
+  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
+    // Build our app and trigger a frame.
     await tester.pumpWidget(const YuanApp());
-    await tester.pumpAndSettle();
 
-    // 底部导航 5 个模块
-    expect(find.byType(NavigationBar), findsOneWidget);
-    expect(find.text('收支'), findsOneWidget);
-    expect(find.text('资债'), findsOneWidget);
-    expect(find.text('账户'), findsOneWidget);
-    expect(find.text('分析'), findsOneWidget);
-    expect(find.text('我的'), findsOneWidget);
-  });
+    // Verify that our counter starts at 0.
+    expect(find.text('0'), findsOneWidget);
+    expect(find.text('1'), findsNothing);
 
-  testWidgets('Entry screen has expense/income tabs and keypad', (WidgetTester tester) async {
-    await tester.pumpWidget(const YuanApp());
-    await tester.pumpAndSettle();
+    // Tap the '+' icon and trigger a frame.
+    await tester.tap(find.byIcon(Icons.add));
+    await tester.pump();
 
-    // 默认停在第一个 Tab = 收支
-    expect(find.text('支出金额'), findsOneWidget);
-    expect(find.text('收入金额'), findsNothing);
-
-    // 切换到"收入"
-    await tester.tap(find.text('收入金额').hitTestable().first);
-    await tester.pumpAndSettle();
+    // Verify that our counter has incremented.
+    expect(find.text('0'), findsNothing);
+    expect(find.text('1'), findsOneWidget);
   });
 }

@@ -1,6 +1,16 @@
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+*.iml
+*.ipr
+*.iws
+.idea/
+.DS_Store
 pat.txt
-# Widget Preview related
-.widget_preview/
-.dart_tool
 .metadata
 pubspec.lock
