@@ -1,0 +1,1275 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>元宝记账 · 交互原型</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="phone">
+
+  <!-- 状态栏 -->
+  <div class="statusbar">
+    <span>9:41</span>
+    <span class="status-icons">●●● ▮ ▣</span>
+  </div>
+
+  <!-- 页面容器 -->
+  <div class="pages">
+
+    <!-- ==================== 模块1：收支 ==================== -->
+    <section class="page active" id="page-transaction">
+      <div class="nav-top">
+        <span class="nav-title">收支</span>
+        <span class="nav-action" onclick="openSheet('date-sheet')">📅</span>
+      </div>
+
+      <div class="summary-bar">
+        <div class="summary-item">
+          <span class="summary-label">本月支出</span>
+          <span class="summary-value red">¥3,280</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">本月收入</span>
+          <span class="summary-value green">¥8,000</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">结余</span>
+          <span class="summary-value">¥4,720</span>
+        </div>
+      </div>
+
+      <div class="type-tabs">
+        <button class="type-tab active" data-type="expense" onclick="switchType('expense')">支出</button>
+        <button class="type-tab" data-type="income" onclick="switchType('income')">收入</button>
+      </div>
+
+      <div class="amount-area">
+        <span class="amount-currency">¥</span>
+        <span class="amount-display" id="amount-display">0</span>
+      </div>
+
+      <div class="field-list">
+        <div class="field-row" onclick="openSheet('account-sheet')">
+          <span class="field-icon">💳</span>
+          <span class="field-label" id="field-account-label">支出账户</span>
+          <span class="field-value" id="field-account">微信零钱 ›</span>
+        </div>
+        <div class="field-row" onclick="openSheet('category-sheet')">
+          <span class="field-icon">🏷️</span>
+          <span class="field-label" id="field-type-label">支出分类</span>
+          <span class="field-value" id="field-category">餐饮 ›</span>
+        </div>
+        <div class="field-row" onclick="openSheet('remark-sheet')">
+          <span class="field-icon">📝</span>
+          <span class="field-label">备注</span>
+          <span class="field-value">（可选） ›</span>
+        </div>
+        <div class="field-row" onclick="openSheet('photo-sheet')">
+          <span class="field-icon">📷</span>
+          <span class="field-label">凭证图片</span>
+          <span class="field-value">添加小票 ›</span>
+        </div>
+      </div>
+
+      <button class="btn-primary" onclick="saveRecord()">保 存</button>
+
+      <div class="numpad">
+        <button onclick="inputNum('1')">1</button>
+        <button onclick="inputNum('2')">2</button>
+        <button onclick="inputNum('3')">3</button>
+        <button class="numpad-del" onclick="delNum()">←</button>
+        <button onclick="inputNum('4')">4</button>
+        <button onclick="inputNum('5')">5</button>
+        <button onclick="inputNum('6')">6</button>
+        <button onclick="inputNum('.')">.</button>
+        <button onclick="inputNum('7')">7</button>
+        <button onclick="inputNum('8')">8</button>
+        <button onclick="inputNum('9')">9</button>
+        <button onclick="clearNum()">C</button>
+        <button class="numpad-zero" onclick="inputNum('0')">0</button>
+        <button class="btn-done" onclick="saveRecord()">完成</button>
+      </div>
+    </section>
+
+    <!-- ==================== 模块2：资债 ==================== -->
+    <section class="page" id="page-asset-liability">
+      <div class="nav-top">
+        <span class="nav-title">资债</span>
+        <span class="nav-action" onclick="openSheet('az-search-sheet')">🔍</span>
+      </div>
+
+      <div class="wealth-card">
+        <span class="wealth-label">总资产</span>
+        <span class="wealth-value">¥42,680</span>
+        <div class="wealth-detail">
+          <span>资产估值 ¥47,880</span>
+          <span class="red">负债 ¥5,200</span>
+        </div>
+      </div>
+
+      <div class="az-tabs">
+        <button class="az-tab active" onclick="switchAZ('asset')">资产</button>
+        <button class="az-tab" onclick="switchAZ('liability')">负债</button>
+      </div>
+
+      <!-- 资产视图 -->
+      <div id="view-asset">
+        <div class="section-header">
+          <span>实物与金融资产</span>
+          <span class="link-btn" onclick="openSheet('asset-add-sheet')">＋ 新增</span>
+        </div>
+        <div class="card-list">
+          <div class="asset-card up" onclick="switchTab('asset-detail-stock')">
+            <span class="as-name">📈 股票 A <small>600519</small></span>
+            <span class="as-value">¥5,000 <small>+2.3%</small></span>
+          </div>
+          <div class="asset-card down" onclick="switchTab('asset-detail-fund')">
+            <span class="as-name">📊 基金 B <small>110022</small></span>
+            <span class="as-value">¥3,000 <small>-1.1%</small></span>
+          </div>
+          <div class="asset-card" onclick="switchTab('asset-detail-normal')">
+            <span class="as-name">💰 借给张三</span>
+            <span class="as-value">¥2,000</span>
+          </div>
+          <div class="asset-card" onclick="switchTab('asset-detail-normal2')">
+            <span class="as-name">🏠 公积金余额</span>
+            <span class="as-value">¥28,000</span>
+          </div>
+          <div class="asset-card" onclick="switchTab('asset-detail-normal3')">
+            <span class="as-name">🏥 医保账户余额</span>
+            <span class="as-value">¥1,200</span>
+          </div>
+        </div>
+
+        <div class="section-header"><span>资产估值汇总</span></div>
+        <div class="summary-grid">
+          <div class="sg-item"><span>股票类</span><b>¥5,000</b></div>
+          <div class="sg-item"><span>基金类</span><b>¥3,000</b></div>
+          <div class="sg-item"><span>借出款</span><b>¥2,000</b></div>
+          <div class="sg-item"><span>公积金/医保</span><b>¥29,200</b></div>
+          <div class="sg-item total"><span>资产合计</span><b>¥39,200</b></div>
+        </div>
+      </div>
+
+      <!-- 负债视图 -->
+      <div id="view-liability" style="display:none;">
+        <div class="section-header">
+          <span>负债明细</span>
+          <span class="link-btn" onclick="openSheet('liability-add-sheet')">＋ 新增</span>
+        </div>
+        <div class="card-list">
+          <div class="liability-card" onclick="switchTab('liability-detail-car')">
+            <span class="lb-name">🚗 车贷</span>
+            <span class="lb-value red">剩余 ¥3,500</span>
+          </div>
+          <div class="liability-card" onclick="switchTab('liability-detail-credit')">
+            <span class="lb-name">💳 招商信用卡</span>
+            <span class="lb-value red">已用 ¥6,800</span>
+          </div>
+          <div class="liability-card" onclick="switchTab('liability-detail-friend')">
+            <span class="lb-name">👨‍💼 借同事小李</span>
+            <span class="lb-value red">¥1,700</span>
+          </div>
+        </div>
+
+        <div class="section-header"><span>负债汇总</span></div>
+        <div class="summary-grid">
+          <div class="sg-item"><span>车贷</span><b>¥3,500</b></div>
+          <div class="sg-item"><span>信用卡</span><b>¥6,800</b></div>
+          <div class="sg-item"><span>亲友借款</span><b>¥1,700</b></div>
+          <div class="sg-item total"><span>负债合计</span><b class="red">¥12,000</b></div>
+          <div class="sg-item"><span>本月待还</span><b>¥2,480</b></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== 明细：账户（储蓄卡） ==================== -->
+    <section class="page" id="page-acc-detail-bank">
+      <div class="nav-top">
+        <span class="nav-back" onclick="switchTab('account')">‹</span>
+        <span class="nav-title">🏦 工商储蓄卡</span>
+        <span class="nav-action">⋯</span>
+      </div>
+
+      <div class="detail-hero">
+        <span class="dh-label">当前余额</span>
+        <span class="dh-value">¥5,800.00</span>
+        <span class="dh-sub">流动资金账户 · 计入总资产 · 工资卡</span>
+      </div>
+
+      <div class="detail-info-grid">
+        <div class="di-cell"><span>账户类型</span><b>流动资金账户</b></div>
+        <div class="di-cell"><span>计入总资产</span><b>是</b></div>
+        <div class="di-cell"><span>关联还款</span><b>招商信用卡</b></div>
+        <div class="di-cell"><span>备注</span><b>工资入账账户</b></div>
+      </div>
+
+      <div class="ledger-header">
+        <span class="ledger-title">出入流水</span>
+        <div class="ledger-period">
+          <span class="lp-btn active">本月</span>
+          <span class="lp-btn">近3月</span>
+          <span class="lp-btn">全部 ›</span>
+        </div>
+      </div>
+
+      <div class="ledger-summary">
+        <div class="ls-cell in"><span>总入账</span><b class="green">+¥8,000</b></div>
+        <div class="ls-cell out"><span>总出账</span><b class="red">-¥1,980</b></div>
+        <div class="ls-cell net"><span>净变动</span><b>+¥6,020</b></div>
+      </div>
+
+      <div class="ledger-list">
+        <div class="ledger-date-group">10月26日 · 周日</div>
+        <div class="ledger-item in">
+          <span class="lg-icon">💰</span>
+          <span class="lg-main"><span class="lg-title">工资入账</span><span class="lg-sub">收入 · 工作收入</span></span>
+          <span class="lg-amount green">+¥8,000.00</span>
+        </div>
+        <div class="ledger-item out">
+          <span class="lg-icon">🍚</span>
+          <span class="lg-main"><span class="lg-title">超市购物</span><span class="lg-sub">支出 · 餐饮</span></span>
+          <span class="lg-amount red">-¥186.00</span>
+        </div>
+        <div class="ledger-date-group">10月25日 · 周六</div>
+        <div class="ledger-item out transfer">
+          <span class="lg-icon">🔄</span>
+          <span class="lg-main"><span class="lg-title">转入微信零钱</span><span class="lg-sub">转账 · 不计入收支</span></span>
+          <span class="lg-amount orange">-¥2,000.00</span>
+        </div>
+        <div class="ledger-item out">
+          <span class="lg-icon">💳</span>
+          <span class="lg-main"><span class="lg-title">还招商信用卡</span><span class="lg-sub">支出 · 信用卡还款</span></span>
+          <span class="lg-amount red">-¥1,000.00</span>
+        </div>
+        <div class="ledger-item out">
+          <span class="lg-icon">⚡</span>
+          <span class="lg-main"><span class="lg-title">电费自动扣款</span><span class="lg-sub">支出 · 水电</span></span>
+          <span class="lg-amount red">-¥128.00</span>
+        </div>
+        <div class="ledger-date-group">10月20日 · 周一</div>
+        <div class="ledger-item in">
+          <span class="lg-icon">🎁</span>
+          <span class="lg-main"><span class="lg-title">亲友转账</span><span class="lg-sub">收入 · 礼金赠与</span></span>
+          <span class="lg-amount green">+¥500.00</span>
+        </div>
+      </div>
+
+      <div class="floating-actions">
+        <button class="fa-btn primary" onclick="switchTab('transaction')">记一笔</button>
+        <button class="fa-btn" onclick="openSheet('transfer-sheet')">转账</button>
+      </div>
+    </section>
+
+    <!-- ==================== 明细：账户（信用卡） ==================== -->
+    <section class="page" id="page-acc-detail-credit">
+      <div class="nav-top">
+        <span class="nav-back" onclick="switchTab('account')">‹</span>
+        <span class="nav-title">💳 招商信用卡</span>
+        <span class="nav-action">⋯</span>
+      </div>
+
+      <div class="detail-hero credit-hero">
+        <span class="dh-label">已用额度 / 总额度</span>
+        <span class="dh-value">¥6,800 <small>/ ¥10,000</small></span>
+        <div class="credit-bar"><div class="cb-used" style="width:68%"></div></div>
+        <span class="dh-sub">可用 ¥3,200 · 账单日每月5号 · 还款日每月25号</span>
+      </div>
+
+      <div class="detail-info-grid">
+        <div class="di-cell"><span>账户类型</span><b>信用卡账户</b></div>
+        <div class="di-cell"><span>免息期</span><b>约 20~50 天</b></div>
+        <div class="di-cell"><span>关联还款</span><b>工商储蓄卡</b></div>
+        <div class="di-cell"><span>最低还款</span><b>¥680</b></div>
+      </div>
+
+      <div class="ledger-header">
+        <span class="ledger-title">出入流水</span>
+        <span class="lp-btn">本月 ›</span>
+      </div>
+
+      <div class="ledger-summary">
+        <div class="ls-cell in"><span>消费入账</span><b class="red">+¥3,240</b></div>
+        <div class="ls-cell out"><span>还款出账</span><b class="green">-¥1,000</b></div>
+        <div class="ls-cell net"><span>本期应还</span><b class="red">¥1,200</b></div>
+      </div>
+
+      <div class="ledger-list">
+        <div class="ledger-date-group">10月26日 · 周日</div>
+        <div class="ledger-item in credit-in">
+          <span class="lg-icon">🛒</span>
+          <span class="lg-main"><span class="lg-title">超市购物</span><span class="lg-sub">支出 · 买菜</span></span>
+          <span class="lg-amount red">+¥156.00</span>
+        </div>
+        <div class="ledger-date-group">10月24日 · 周五</div>
+        <div class="ledger-item in credit-in">
+          <span class="lg-icon">⛽</span>
+          <span class="lg-main"><span class="lg-title">加油</span><span class="lg-sub">支出 · 交通</span></span>
+          <span class="lg-amount red">+¥200.00</span>
+        </div>
+        <div class="ledger-date-group">10月20日 · 周一（还款）</div>
+        <div class="ledger-item out credit-out">
+          <span class="lg-icon">✅</span>
+          <span class="lg-main"><span class="lg-title">储蓄卡还款</span><span class="lg-sub">还款 · 工商银行</span></span>
+          <span class="lg-amount green">-¥1,000.00</span>
+        </div>
+      </div>
+
+      <div class="floating-actions">
+        <button class="fa-btn primary">立即还款</button>
+        <button class="fa-btn" onclick="switchTab('liability-detail-credit')">查看对应负债</button>
+      </div>
+    </section>
+
+    <!-- ==================== 明细：账户（受限-公积金） ==================== -->
+    <section class="page" id="page-acc-detail-gjj">
+      <div class="nav-top">
+        <span class="nav-back" onclick="switchTab('account')">‹</span>
+        <span class="nav-title">🏠 公积金</span>
+        <span class="nav-action">⋯</span>
+      </div>
+
+      <div class="detail-hero locked-hero">
+        <span class="dh-label">当前余额</span>
+        <span class="dh-value">¥28,000.00</span>
+        <span class="dh-sub">🔒 受限账户 · 仅可用于：租房提取 / 装修 / 买房 / 销户提取</span>
+      </div>
+
+      <div class="detail-info-grid">
+        <div class="di-cell"><span>账户类型</span><b>其他资金账户</b></div>
+        <div class="di-cell"><span>是否流动资金</span><b>否</b></div>
+        <div class="di-cell"><span>计入总资产</span><b>是</b></div>
+        <div class="di-cell"><span>绑定用途</span><b>4 类</b></div>
+      </div>
+
+      <div class="ledger-header">
+        <span class="ledger-title">出入流水</span>
+        <span class="lp-btn">本年 ›</span>
+      </div>
+
+      <div class="ledger-summary">
+        <div class="ls-cell in"><span>单位缴存</span><b class="green">+¥6,240</b></div>
+        <div class="ls-cell out"><span>提取出账</span><b class="red">-¥2,000</b></div>
+        <div class="ls-cell net"><span>当前余额</span><b>¥28,000</b></div>
+      </div>
+
+      <div class="ledger-list">
+        <div class="ledger-date-group">10月15日 · 周三（提取）</div>
+        <div class="ledger-item out">
+          <span class="lg-icon">🏠</span>
+          <span class="lg-main"><span class="lg-title">租房提取</span><span class="lg-sub">支出 · 符合绑定用途</span></span>
+          <span class="lg-amount red">-¥2,000.00</span>
+        </div>
+        <div class="ledger-date-group">10月1日 · 周三（缴存）</div>
+        <div class="ledger-item in">
+          <span class="lg-icon">🏢</span>
+          <span class="lg-main"><span class="lg-title">单位月度缴存</span><span class="lg-sub">收入 · 单位缴纳</span></span>
+          <span class="lg-amount green">+¥520.00</span>
+        </div>
+        <div class="ledger-item in">
+          <span class="lg-icon">👤</span>
+          <span class="lg-main"><span class="lg-title">个人月度缴存</span><span class="lg-sub">收入 · 个人缴纳</span></span>
+          <span class="lg-amount green">+¥520.00</span>
+        </div>
+      </div>
+
+      <div class="floating-actions">
+        <button class="fa-btn">修改绑定用途</button>
+        <button class="fa-btn ghost">此账户不计流水</button>
+      </div>
+    </section>
+
+    <!-- ==================== 明细：资产（普通资产-借出款） ==================== -->
+    <section class="page" id="page-asset-detail-normal">
+      <div class="nav-top">
+        <span class="nav-back" onclick="switchAZret('asset')">‹</span>
+        <span class="nav-title">💰 借给张三</span>
+        <span class="nav-action">⋯</span>
+      </div>
+
+      <div class="detail-hero asset-hero">
+        <span class="dh-label">当前金额</span>
+        <span class="dh-value">¥2,000.00</span>
+        <span class="dh-sub">普通资产 · 资产细分：亲友借款 · 计入总资产</span>
+      </div>
+
+      <div class="detail-info-grid">
+        <div class="di-cell"><span>资产名称</span><b>借给张三</b></div>
+        <div class="di-cell"><span>资产类型</span><b>亲友借款</b></div>
+        <div class="di-cell"><span>关联账户</span><b>现金</b></div>
+        <div class="di-cell"><span>计息方式</span><b>不计息</b></div>
+        <div class="di-cell"><span>约定还款</span><b>2026-12-31</b></div>
+        <div class="di-cell"><span>备注</span><b>朋友周转</b></div>
+      </div>
+
+      <div class="ledger-header">
+        <span class="ledger-title">资产出入记录</span>
+        <span class="lp-btn">全部 ›</span>
+      </div>
+
+      <div class="ledger-summary">
+        <div class="ls-cell in"><span>累计借出</span><b class="red">¥2,000</b></div>
+        <div class="ls-cell out"><span>已收回</span><b class="green">¥0</b></div>
+        <div class="ls-cell net"><span>待收回</span><b class="orange">¥2,000</b></div>
+      </div>
+
+      <div class="ledger-list">
+        <div class="ledger-date-group">2026年8月10日 · 借出</div>
+        <div class="ledger-item out asset-out">
+          <span class="lg-icon">💸</span>
+          <span class="lg-main"><span class="lg-title">借给张三</span><span class="lg-sub">资产出账 · 现金</span></span>
+          <span class="lg-amount red">-¥2,000.00</span>
+        </div>
+      </div>
+
+      <div class="floating-actions">
+        <button class="fa-btn primary">记录收回</button>
+        <button class="fa-btn">编辑</button>
+      </div>
+    </section>
+
+    <!-- ==================== 明细：资产（股票） ==================== -->
+    <section class="page" id="page-asset-detail-stock">
+      <div class="nav-top">
+        <span class="nav-back" onclick="switchAZret('asset')">‹</span>
+        <span class="nav-title">📈 股票 A（600519）</span>
+        <span class="nav-action">⋯</span>
+      </div>
+
+      <div class="detail-hero up-hero">
+        <span class="dh-label">持仓市值</span>
+        <span class="dh-value">¥5,000.00</span>
+        <span class="dh-sub up">▲ 浮盈 +¥112.00（+2.3%）· 现价 1,678.00</span>
+      </div>
+
+      <div class="detail-info-grid">
+        <div class="di-cell"><span>股票名称</span><b>股票 A</b></div>
+        <div class="di-cell"><span>股票代码</span><b>600519</b></div>
+        <div class="di-cell"><span>持有数量</span><b>300 股</b></div>
+        <div class="di-cell"><span>买入均价</span><b>1,629.63</b></div>
+        <div class="di-cell"><span>成本价</span><b>¥488,889 元</b></div>
+        <div class="di-cell"><span>关联账户</span><b>工商储蓄卡</b></div>
+      </div>
+
+      <div class="ledger-header">
+        <span class="ledger-title">买入 / 卖出记录</span>
+        <span class="lp-btn">全部 ›</span>
+      </div>
+
+      <div class="ledger-summary">
+        <div class="ls-cell in"><span>累计买入</span><b class="red">¥488,889</b></div>
+        <div class="ls-cell out"><span>累计卖出</span><b class="green">¥0</b></div>
+        <div class="ls-cell net"><span>持仓成本</span><b>¥488,889</b></div>
+      </div>
+
+      <div class="ledger-list">
+        <div class="ledger-date-group">2026年9月15日 · 买入</div>
+        <div class="ledger-item in asset-in">
+          <span class="lg-icon">📥</span>
+          <span class="lg-main"><span class="lg-title">买入 300 股</span><span class="lg-sub">买入 · 单价 1,629.63</span></span>
+          <span class="lg-amount red">-¥488,889.00</span>
+        </div>
+      </div>
+
+      <div class="floating-actions">
+        <button class="fa-btn primary">记录买入</button>
+        <button class="fa-btn">记录卖出</button>
+        <button class="fa-btn ghost">更新现价</button>
+      </div>
+    </section>
+
+    <!-- ==================== 明细：资产（基金） ==================== -->
+    <section class="page" id="page-asset-detail-fund">
+      <div class="nav-top">
+        <span class="nav-back" onclick="switchAZret('asset')">‹</span>
+        <span class="nav-title">📊 基金 B（110022）</span>
+        <span class="nav-action">⋯</span>
+      </div>
+
+      <div class="detail-hero down-hero">
+        <span class="dh-label">持仓市值</span>
+        <span class="dh-value">¥3,000.00</span>
+        <span class="dh-sub down">▼ 浮亏 -¥33.00（-1.1%）· 当前净值 1.0110</span>
+      </div>
+
+      <div class="detail-info-grid">
+        <div class="di-cell"><span>基金名称</span><b>基金 B</b></div>
+        <div class="di-cell"><span>基金代码</span><b>110022</b></div>
+        <div class="di-cell"><span>持有份额</span><b>2,966.38 份</b></div>
+        <div class="di-cell"><span>确认净值</span><b>1.0223</b></div>
+        <div class="di-cell"><span>成本价</span><b>¥3,033.00</b></div>
+        <div class="di-cell"><span>关联账户</span><b>工商储蓄卡</b></div>
+      </div>
+
+      <div class="ledger-header">
+        <span class="ledger-title">买入 / 卖出记录</span>
+        <span class="lp-btn">全部 ›</span>
+      </div>
+
+      <div class="ledger-summary">
+        <div class="ls-cell in"><span>累计买入</span><b class="red">¥3,033</b></div>
+        <div class="ls-cell out"><span>累计卖出</span><b class="green">¥0</b></div>
+        <div class="ls-cell net"><span>持仓成本</span><b>¥3,033</b></div>
+      </div>
+
+      <div class="ledger-list">
+        <div class="ledger-date-group">2026年9月20日 · 买入</div>
+        <div class="ledger-item in asset-in">
+          <span class="lg-icon">📥</span>
+          <span class="lg-main"><span class="lg-title">买入 2,966.38 份</span><span class="lg-sub">买入 · 确认净值 1.0223</span></span>
+          <span class="lg-amount red">-¥3,033.00</span>
+        </div>
+      </div>
+
+      <div class="floating-actions">
+        <button class="fa-btn primary">记录买入</button>
+        <button class="fa-btn">记录卖出</button>
+        <button class="fa-btn ghost">更新净值</button>
+      </div>
+    </section>
+
+    <!-- ==================== 明细：负债（车贷） ==================== -->
+    <section class="page" id="page-liability-detail-car">
+      <div class="nav-top">
+        <span class="nav-back" onclick="switchAZret('liability')">‹</span>
+        <span class="nav-title">🚗 车贷</span>
+        <span class="nav-action">⋯</span>
+      </div>
+
+      <div class="detail-hero debt-hero">
+        <span class="dh-label">剩余本金</span>
+        <span class="dh-value">¥3,500.00</span>
+        <span class="dh-sub">年利率 4.9% · 等额本息 · 剩余 8 期</span>
+      </div>
+
+      <div class="detail-info-grid">
+        <div class="di-cell"><span>负债类型</span><b>车贷</b></div>
+        <div class="di-cell"><span>原始本金</span><b>¥80,000</b></div>
+        <div class="di-cell"><span>已还期数</span><b>28 / 36 期</b></div>
+        <div class="di-cell"><span>每期还款</span><b>¥2,380</b></div>
+        <div class="di-cell"><span>绑定还款账户</span><b>工商储蓄卡</b></div>
+        <div class="di-cell"><span>借款日期</span><b>2024-06-01</b></div>
+      </div>
+
+      <div class="ledger-header">
+        <span class="ledger-title">还款记录</span>
+        <span class="lp-btn">全部 ›</span>
+      </div>
+
+      <div class="ledger-summary">
+        <div class="ls-cell in"><span>累计已还</span><b>¥66,640</b></div>
+        <div class="ls-cell out"><span>剩余本金</span><b class="red">¥3,500</b></div>
+        <div class="ls-cell net"><span>剩余利息</span><b class="orange">¥540</b></div>
+      </div>
+
+      <div class="repay-plan">
+        <span class="ledger-title">还款计划表</span>
+        <div class="plan-table">
+          <div class="plan-row head"><span>期数</span><span>应还本金</span><span>利息</span><span>状态</span></div>
+          <div class="plan-row done"><span>第29期</span><span>¥2,291</span><span>¥89</span><span class="green">已还</span></div>
+          <div class="plan-row current"><span>第30期</span><span>¥2,300</span><span>¥80</span><span class="orange">待还</span></div>
+          <div class="plan-row"><span>第31期</span><span>¥2,309</span><span>¥71</span><span class="gray">未到</span></div>
+          <div class="plan-row"><span>第32期</span><span>¥2,319</span><span>¥61</span><span class="gray">未到</span></div>
+        </div>
+      </div>
+
+      <div class="ledger-list" style="margin-top:16px;">
+        <div class="ledger-date-group">2026年9月1日 · 第29期</div>
+        <div class="ledger-item in debt-in">
+          <span class="lg-icon">✅</span>
+          <span class="lg-main"><span class="lg-title">第29期还款</span><span class="lg-sub">储蓄卡自动扣款</span></span>
+          <span class="lg-amount green">+¥2,380.00</span>
+        </div>
+        <div class="ledger-date-group">2026年8月1日 · 第28期</div>
+        <div class="ledger-item in debt-in">
+          <span class="lg-icon">✅</span>
+          <span class="lg-main"><span class="lg-title">第28期还款</span><span class="lg-sub">储蓄卡自动扣款</span></span>
+          <span class="lg-amount green">+¥2,380.00</span>
+        </div>
+      </div>
+
+      <div class="floating-actions">
+        <button class="fa-btn primary">记录还款</button>
+        <button class="fa-btn">提前还清</button>
+      </div>
+    </section>
+
+    <!-- ==================== 明细：负债（信用卡对应） ==================== -->
+    <section class="page" id="page-liability-detail-credit">
+      <div class="nav-top">
+        <span class="nav-back" onclick="switchAZret('liability')">‹</span>
+        <span class="nav-title">💳 招商信用卡欠款</span>
+        <span class="nav-action">⋯</span>
+      </div>
+
+      <div class="detail-hero debt-hero">
+        <span class="dh-label">本期应还</span>
+        <span class="dh-value">¥1,200.00</span>
+        <span class="dh-sub">还款日 10月25日 · 已还 ¥1,000 · 待还 ¥200</span>
+      </div>
+
+      <div class="detail-info-grid">
+        <div class="di-cell"><span>负债类型</span><b>信用卡</b></div>
+        <div class="di-cell"><span>对应账户</span><b>招商信用卡</b></div>
+        <div class="di-cell"><span>总额度</span><b>¥10,000</b></div>
+        <div class="di-cell"><span>已用额度</span><b class="red">¥6,800</b></div>
+        <div class="di-cell"><span>免息期</span><b>20~50 天</b></div>
+        <div class="di-cell"><span>计息</span><b>是（逾期后）</b></div>
+      </div>
+
+      <div class="ledger-header">
+        <span class="ledger-title">还款记录</span>
+        <span class="lp-btn">全部 ›</span>
+      </div>
+
+      <div class="ledger-summary">
+        <div class="ls-cell in"><span>本期新增</span><b class="red">¥1,200</b></div>
+        <div class="ls-cell out"><span>本期已还</span><b class="green">¥1,000</b></div>
+        <div class="ls-cell net"><span>待还</span><b class="orange">¥200</b></div>
+      </div>
+
+      <div class="ledger-list">
+        <div class="ledger-date-group">10月20日 · 还款</div>
+        <div class="ledger-item in debt-in">
+          <span class="lg-icon">✅</span>
+          <span class="lg-main"><span class="lg-title">储蓄卡还款</span><span class="lg-sub">招商信用卡</span></span>
+          <span class="lg-amount green">+¥1,000.00</span>
+        </div>
+        <div class="ledger-date-group">9月25日 · 还款</div>
+        <div class="ledger-item in debt-in">
+          <span class="lg-icon">✅</span>
+          <span class="lg-main"><span class="lg-title">储蓄卡还款</span><span class="lg-sub">招商信用卡</span></span>
+          <span class="lg-amount green">+¥1,200.00</span>
+        </div>
+      </div>
+
+      <div class="floating-actions">
+        <button class="fa-btn primary">立即还款</button>
+        <button class="fa-btn" onclick="switchTab('acc-detail-credit')">查看账户</button>
+      </div>
+    </section>
+
+    <!-- ==================== 明细：负债（亲友借款） ==================== -->
+    <section class="page" id="page-liability-detail-friend">
+      <div class="nav-top">
+        <span class="nav-back" onclick="switchAZret('liability')">‹</span>
+        <span class="nav-title">👨‍💼 借同事小李</span>
+        <span class="nav-action">⋯</span>
+      </div>
+
+      <div class="detail-hero debt-hero">
+        <span class="dh-label">剩余本金</span>
+        <span class="dh-value">¥1,700.00</span>
+        <span class="dh-sub">不计息 · 约定 2026-11-30 还清</span>
+      </div>
+
+      <div class="detail-info-grid">
+        <div class="di-cell"><span>负债类型</span><b>亲友借款</b></div>
+        <div class="di-cell"><span>借款人</span><b>同事小李</b></div>
+        <div class="di-cell"><span>原始金额</span><b>¥2,000</b></div>
+        <div class="di-cell"><span>已还</span><b>¥300</b></div>
+        <div class="di-cell"><span>是否计息</span><b>否</b></div>
+        <div class="di-cell"><span>约定还清</span><b>2026-11-30</b></div>
+      </div>
+
+      <div class="ledger-header">
+        <span class="ledger-title">还款记录</span>
+        <span class="lp-btn">全部 ›</span>
+      </div>
+
+      <div class="ledger-summary">
+        <div class="ls-cell in"><span>借入总额</span><b class="red">¥2,000</b></div>
+        <div class="ls-cell out"><span>已归还</span><b class="green">¥300</b></div>
+        <div class="ls-cell net"><span>待归还</span><b class="orange">¥1,700</b></div>
+      </div>
+
+      <div class="ledger-list">
+        <div class="ledger-date-group">2026年10月10日 · 还款</div>
+        <div class="ledger-item in debt-in">
+          <span class="lg-icon">✅</span>
+          <span class="lg-main"><span class="lg-title">小李转账归还</span><span class="lg-sub">微信零钱</span></span>
+          <span class="lg-amount green">+¥300.00</span>
+        </div>
+        <div class="ledger-date-group">2026年9月1日 · 借入</div>
+        <div class="ledger-item out debt-out">
+          <span class="lg-icon">📤</span>
+          <span class="lg-main"><span class="lg-title">借入 ¥2,000</span><span class="lg-sub">微信零钱入账</span></span>
+          <span class="lg-amount red">-¥2,000.00</span>
+        </div>
+      </div>
+
+      <div class="floating-actions">
+        <button class="fa-btn primary">记录还款</button>
+        <button class="fa-btn">编辑</button>
+      </div>
+    </section>
+
+    <!-- ==================== 模块3：账户 ==================== -->
+    <section class="page" id="page-account">
+      <div class="nav-top">
+        <span class="nav-title">账户</span>
+        <span class="nav-action" onclick="openSheet('account-add-sheet')">＋</span>
+      </div>
+
+      <div class="account-summary">
+        <span class="as-sum-label">流动资金合计</span>
+        <span class="as-sum-value">¥8,320</span>
+      </div>
+
+      <div class="section-header"><span>流动资金账户</span></div>
+      <div class="card-list">
+        <div class="account-card" onclick="openSheet('card-detail-sheet')">
+          <div class="ac-icon">💬</div>
+          <div class="ac-info">
+            <span class="ac-name">微信零钱</span>
+            <span class="ac-sub">日常消费</span>
+          </div>
+          <div class="ac-right"><span class="ac-balance">¥2,150</span></div>
+        </div>
+        <div class="account-card">
+          <div class="ac-icon">💙</div>
+          <div class="ac-info">
+            <span class="ac-name">支付宝</span>
+            <span class="ac-sub">日常消费</span>
+          </div>
+          <div class="ac-right"><span class="ac-balance">¥1,000</span></div>
+        </div>
+        <div class="account-card">
+          <div class="ac-icon">💵</div>
+          <div class="ac-info">
+            <span class="ac-name">现金</span>
+            <span class="ac-sub">日常消费</span>
+          </div>
+          <div class="ac-right"><span class="ac-balance">¥300</span></div>
+        </div>
+        <div class="account-card">
+          <div class="ac-icon">🏦</div>
+          <div class="ac-info">
+            <span class="ac-name">工商储蓄卡</span>
+            <span class="ac-sub">工资卡 / 还款账户</span>
+          </div>
+          <div class="ac-right"><span class="ac-balance">¥5,800</span></div>
+        </div>
+      </div>
+
+      <div class="section-header"><span>信用卡账户</span></div>
+      <div class="card-list">
+        <div class="account-card credit" onclick="openSheet('credit-detail-sheet')">
+          <div class="ac-icon">💳</div>
+          <div class="ac-info">
+            <span class="ac-name">招商信用卡</span>
+            <span class="ac-sub">总额度 ¥10,000 · 已用 ¥6,800</span>
+          </div>
+          <div class="ac-right">
+            <span class="ac-balance">可用 ¥3,200</span>
+            <span class="ac-badge warn">还款日25号</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-header"><span>其他资金账户（受限）</span></div>
+      <div class="card-list">
+        <div class="account-card locked">
+          <div class="ac-icon">🏥</div>
+          <div class="ac-info">
+            <span class="ac-name">医保账户</span>
+            <span class="ac-sub">🔒 仅限医疗相关用途</span>
+          </div>
+          <div class="ac-right"><span class="ac-balance">¥1,200</span></div>
+        </div>
+        <div class="account-card locked">
+          <div class="ac-icon">🏠</div>
+          <div class="ac-info">
+            <span class="ac-name">公积金</span>
+            <span class="ac-sub">🔒 仅限租房 / 装修 / 买房</span>
+          </div>
+          <div class="ac-right"><span class="ac-balance">¥28,000</span></div>
+        </div>
+      </div>
+
+      <div class="section-header"><span>账户操作</span></div>
+      <div class="tool-list">
+        <div class="tool-item" onclick="openSheet('transfer-sheet')">
+          <span class="tool-icon">🔄</span>
+          <span class="tool-text">账户转账<small>资金在账户间划转</small></span>
+          <span class="tool-arrow">›</span>
+        </div>
+        <div class="tool-item" onclick="openSheet('adjust-sheet')">
+          <span class="tool-icon">⚖️</span>
+          <span class="tool-text">余额调整<small>修正账户实际余额</small></span>
+          <span class="tool-arrow">›</span>
+        </div>
+        <div class="tool-item">
+          <span class="tool-icon">🗄️</span>
+          <span class="tool-text">归档账户<small>不再使用但保留历史</small></span>
+          <span class="tool-arrow">›</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== 模块4：分析 ==================== -->
+    <section class="page" id="page-analyze">
+      <div class="nav-top">
+        <span class="nav-title">分析</span>
+        <span class="nav-action" onclick="openSheet('month-sheet')">本月 ▾</span>
+      </div>
+
+      <div class="balance-card">
+        <span class="balance-label">本月结余</span>
+        <span class="balance-value">¥4,720</span>
+        <span class="balance-trend up">↑ 比上月多 ¥1,200</span>
+      </div>
+
+      <div class="two-cards">
+        <div class="mini-card">
+          <span class="mc-label">收入</span>
+          <span class="mc-value green">¥8,000</span>
+          <span class="mc-sub">4笔</span>
+        </div>
+        <div class="mini-card">
+          <span class="mc-label">支出</span>
+          <span class="mc-value red">¥3,280</span>
+          <span class="mc-sub">23笔</span>
+        </div>
+      </div>
+
+      <div class="section-header"><span>支出分类占比</span></div>
+      <div class="category-bars">
+        <div class="cat-bar"><span class="cb-name">🍚 餐饮</span><div class="cb-track"><div class="cb-fill" style="width:35%"></div></div><span class="cb-amount">¥1,148</span></div>
+        <div class="cat-bar"><span class="cb-name">🚗 交通</span><div class="cb-track"><div class="cb-fill" style="width:20%"></div></div><span class="cb-amount">¥656</span></div>
+        <div class="cat-bar"><span class="cb-name">🛒 买菜</span><div class="cb-track"><div class="cb-fill" style="width:15%"></div></div><span class="cb-amount">¥492</span></div>
+        <div class="cat-bar"><span class="cb-name">👕 服饰</span><div class="cb-track"><div class="cb-fill" style="width:12%"></div></div><span class="cb-amount">¥394</span></div>
+        <div class="cat-bar"><span class="cb-name">📦 其他</span><div class="cb-track"><div class="cb-fill" style="width:18%"></div></div><span class="cb-amount">¥590</span></div>
+      </div>
+
+      <div class="section-header"><span>财务健康</span></div>
+      <div class="health-card">
+        <div class="health-score">
+          <span class="hs-circle green">72</span>
+          <div class="hs-info">
+            <span class="hs-grade">良好</span>
+            <span class="hs-label">财务健康评分</span>
+          </div>
+        </div>
+        <div class="health-tips">
+          <div class="tip-item ok">✓ 紧急备用金够 3 个月</div>
+          <div class="tip-item warn">⚠ 信用卡已用额度偏高</div>
+          <div class="tip-item suggest">💡 建议：减少弹性支出</div>
+        </div>
+      </div>
+
+      <div class="section-header"><span>工具</span></div>
+      <div class="tool-list">
+        <div class="tool-item" onclick="switchTab('sandbox')">
+          <span class="tool-icon">🔮</span>
+          <span class="tool-text">情景推演<small>如果……会怎样</small></span>
+          <span class="tool-arrow">›</span>
+        </div>
+        <div class="tool-item">
+          <span class="tool-icon">📊</span>
+          <span class="tool-text">全年趋势图<small>近12个月</small></span>
+          <span class="tool-arrow">›</span>
+        </div>
+        <div class="tool-item">
+          <span class="tool-icon">📈</span>
+          <span class="tool-text">资产负债结构<small>资产分布占比</small></span>
+          <span class="tool-arrow">›</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== 模块5：我的 ==================== -->
+    <section class="page" id="page-mine">
+      <div class="nav-top"><span class="nav-title">我的</span></div>
+
+      <div class="user-card">
+        <div class="user-avatar">👤</div>
+        <div class="user-info">
+          <span class="user-name">未设置名字</span>
+          <span class="user-sub">📱 数据全部保存在本设备</span>
+        </div>
+      </div>
+
+      <div class="section-header"><span>功能</span></div>
+      <div class="menu-list">
+        <div class="menu-item" onclick="switchTab('knowledge')">
+          <span class="mn-icon">📖</span><span class="mn-text">财务小知识<small>边用边学</small></span><span class="mn-arrow">›</span>
+        </div>
+        <div class="menu-item">
+          <span class="mn-icon">🔔</span><span class="mn-text">提醒设置<small>还款日 / 到期提醒</small></span><span class="mn-arrow">›</span>
+        </div>
+        <div class="menu-item">
+          <span class="mn-icon">🔒</span><span class="mn-text">应用锁<small>打开软件要密码</small></span><span class="mn-arrow">›</span>
+        </div>
+        <div class="menu-item">
+          <span class="mn-icon">📤</span><span class="mn-text">导出数据<small>CSV / Excel</small></span><span class="mn-arrow">›</span>
+        </div>
+        <div class="menu-item">
+          <span class="mn-icon">📥</span><span class="mn-text">导入数据<small>从其他软件迁移</small></span><span class="mn-arrow">›</span>
+        </div>
+        <div class="menu-item">
+          <span class="mn-icon">🎨</span><span class="mn-text">外观<small>深色 / 浅色</small></span><span class="mn-arrow">›</span>
+        </div>
+      </div>
+
+      <div class="section-header"><span>管理</span></div>
+      <div class="menu-list">
+        <div class="menu-item">
+          <span class="mn-icon">📂</span><span class="mn-text">分类管理<small>自定义收支分类</small></span><span class="mn-arrow">›</span>
+        </div>
+        <div class="menu-item">
+          <span class="mn-icon">🗑️</span><span class="mn-text">回收站<small>误删可恢复</small></span><span class="mn-arrow">›</span>
+        </div>
+      </div>
+
+      <div class="section-header"><span>关于</span></div>
+      <div class="about-list">
+        <span>版本 1.0.0</span>
+        <span>关于本软件</span>
+      </div>
+    </section>
+
+    <!-- ========== 页面：情景推演 ========== -->
+    <section class="page" id="page-sandbox">
+      <div class="nav-top">
+        <span class="nav-back" onclick="switchTab('analyze')">‹</span>
+        <span class="nav-title">情景推演</span>
+      </div>
+
+      <div class="sandbox-intro">
+        选一个你想试的情况，看看钱会怎么变 👇
+      </div>
+
+      <div class="sandbox-list">
+        <div class="sandbox-item" onclick="openSheet('unemployed-sheet')">
+          <span class="sb-icon">💼</span>
+          <span class="sb-text">如果失业了<small>手上的钱能撑几个月</small></span>
+          <span class="sb-arrow">›</span>
+        </div>
+        <div class="sandbox-item" onclick="openSheet('income-down-sheet')">
+          <span class="sb-icon">📉</span>
+          <span class="sb-text">如果收入减少了<small>比如降薪20%</small></span>
+          <span class="sb-arrow">›</span>
+        </div>
+        <div class="sandbox-item" onclick="openSheet('income-up-sheet')">
+          <span class="sb-icon">📈</span>
+          <span class="sb-text">如果收入增加了<small>比如涨薪</small></span>
+          <span class="sb-arrow">›</span>
+        </div>
+        <div class="sandbox-item" onclick="openSheet('rate-up-sheet')">
+          <span class="sb-icon">💳</span>
+          <span class="sb-text">如果利率涨了<small>信用卡/贷款利息变化</small></span>
+          <span class="sb-arrow">›</span>
+        </div>
+        <div class="sandbox-item" onclick="openSheet('prepay-sheet')">
+          <span class="sb-icon">🏦</span>
+          <span class="sb-text">如果提前还清一笔债<small>能省多少利息</small></span>
+          <span class="sb-arrow">›</span>
+        </div>
+        <div class="sandbox-item" onclick="openSheet('combo-sheet')">
+          <span class="sb-icon">🎲</span>
+          <span class="sb-text">组合情景<small>多件事同时发生</small></span>
+          <span class="sb-arrow">›</span>
+        </div>
+      </div>
+
+      <div class="section-header"><span>历史推演</span></div>
+      <div class="history-list">
+        <div class="history-item">
+          <span class="hy-text">失业推演</span>
+          <span class="hy-result">可撑 5.2 个月</span>
+          <span class="hy-date">10-20</span>
+        </div>
+        <div class="history-item">
+          <span class="hy-text">降薪推演</span>
+          <span class="hy-result red">结余 -¥200/月</span>
+          <span class="hy-date">10-15</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== 页面：知识 ========== -->
+    <section class="page" id="page-knowledge">
+      <div class="nav-top">
+        <span class="nav-back" onclick="switchTab('mine')">‹</span>
+        <span class="nav-title">财务小知识</span>
+      </div>
+
+      <div class="featured-card">
+        <span class="ft-tag">🔥 推荐阅读</span>
+        <span class="ft-title">什么是"必要支出"？</span>
+        <span class="ft-desc">教你分清"要花的"和"想花的"</span>
+        <span class="ft-meta">📖 3分钟读完</span>
+      </div>
+
+      <div class="section-header"><span>按主题</span></div>
+      <div class="topic-grid">
+        <div class="topic-item">📌<span>基础管理</span></div>
+        <div class="topic-item">🛡️<span>风险管控</span></div>
+        <div class="topic-item">📈<span>投资入门</span></div>
+        <div class="topic-item">🏠<span>重大决策</span></div>
+        <div class="topic-item">⚠️<span>陷阱规避</span></div>
+        <div class="topic-item">📚<span>书籍分享</span></div>
+      </div>
+
+      <div class="search-box">🔍 搜索文章...</div>
+
+      <div class="article-list">
+        <div class="article-item"><span class="ar-title">记账到底记什么？</span><span class="ar-meta">基础管理 · 2分钟</span></div>
+        <div class="article-item"><span class="ar-title">为什么要留"救命钱"？</span><span class="ar-meta">风险管控 · 4分钟</span></div>
+        <div class="article-item"><span class="ar-title">第一次买基金怎么选</span><span class="ar-meta">投资入门 · 5分钟</span></div>
+        <div class="article-item"><span class="ar-title">这些借钱套路要小心</span><span class="ar-meta">陷阱规避 · 3分钟</span></div>
+      </div>
+    </section>
+
+    <!-- ========== 页面：推演结果 ========== -->
+    <section class="page" id="page-result">
+      <div class="nav-top">
+        <span class="nav-back" onclick="switchTab('sandbox')">‹</span>
+        <span class="nav-title">如果失业了</span>
+      </div>
+
+      <div class="result-input-summary">
+        <span class="ri-label">推演参数：</span>
+        <span class="ri-line">· 每月必要支出 ¥3,500</span>
+        <span class="ri-line">· 流动资金 ¥8,320</span>
+      </div>
+
+      <div class="result-main">
+        <span class="rm-label">📊 推演结论</span>
+        <span class="rm-conclusion">你的钱能撑约 <b>2.4</b> 个月</span>
+        <div class="rm-timeline">
+          <div class="tl-item"><span class="tl-month">第1个月末</span><span class="tl-balance">剩 ¥4,820</span></div>
+          <div class="tl-item"><span class="tl-month">第2个月末</span><span class="tl-balance">剩 ¥1,320</span></div>
+          <div class="tl-item danger"><span class="tl-month">第3个月中</span><span class="tl-balance warn">资金耗尽 ⚠️</span></div>
+        </div>
+      </div>
+
+      <div class="result-suggest">
+        <span class="rs-title">💡 建议</span>
+        <div class="rs-list">
+          <span>· 紧急备用金建议至少留 ¥10,500</span>
+          <span>· 目前缺口 ¥2,180</span>
+          <span>· 可削减的弹性支出约 ¥800/月</span>
+          <span>· 削减后可延长支撑时间至 3.1 个月</span>
+        </div>
+      </div>
+
+      <div class="result-actions">
+        <button class="btn-secondary" onclick="openSheet('edit-scenario-sheet')">调整参数再试</button>
+        <button class="btn-primary" onclick="saveSimulation()">保存推演</button>
+      </div>
+    </section>
+
+  </div><!-- /pages -->
+
+  <!-- 底部 Tab：5个 -->
+  <div class="tabbar five">
+    <div class="tab active" data-tab="transaction" onclick="switchTab('transaction')">
+      <span class="tab-icon">✏️</span><span class="tab-label">收支</span>
+    </div>
+    <div class="tab" data-tab="asset-liability" onclick="switchTab('asset-liability')">
+      <span class="tab-icon">💼</span><span class="tab-label">资债</span>
+    </div>
+    <div class="tab" data-tab="account" onclick="switchTab('account')">
+      <span class="tab-icon">🏦</span><span class="tab-label">账户</span>
+    </div>
+    <div class="tab" data-tab="analyze" onclick="switchTab('analyze')">
+      <span class="tab-icon">📊</span><span class="tab-label">分析</span>
+    </div>
+    <div class="tab" data-tab="mine" onclick="switchTab('mine')">
+      <span class="tab-icon">👤</span><span class="tab-label">我的</span>
+    </div>
+  </div>
+</div>
+
+<!-- ========== 弹层：收支分类选择 ========== -->
+<div class="sheet-mask" id="sheet-mask" onclick="closeSheet()"></div>
+
+<div class="sheet" id="category-sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <span class="sheet-title" id="sheet-cat-title">选择支出分类</span>
+    <span class="sheet-close" onclick="closeSheet()">✕</span>
+  </div>
+  <div class="sheet-section-label">最近使用</div>
+  <div class="recent-chips">
+    <span class="chip">餐饮</span><span class="chip">交通</span><span class="chip">买菜</span>
+  </div>
+  <div class="sheet-section-label">全部</div>
+  <div class="cat-grid">
+    <div class="cat-cell" onclick="selectCategory('🍚 餐饮')"><span>🍚</span>餐饮</div>
+    <div class="cat-cell" onclick="selectCategory('🚗 交通')"><span>🚗</span>交通</div>
+    <div class="cat-cell" onclick="selectCategory('🛒 买菜')"><span>🛒</span>买菜</div>
+    <div class="cat-cell" onclick="selectCategory('🏠 住房')"><span>🏠</span>住房</div>
+    <div class="cat-cell" onclick="selectCategory('⚡ 水电')"><span>⚡</span>水电</div>
+    <div class="cat-cell" onclick="selectCategory('👕 服饰')"><span>👕</span>服饰</div>
+    <div class="cat-cell" onclick="selectCategory('🎮 娱乐')"><span>🎮</span>娱乐</div>
+    <div class="cat-cell" onclick="selectCategory('💊 医疗')"><span>💊</span>医疗</div>
+    <div class="cat-cell" onclick="selectCategory('📚 学习')"><span>📚</span>学习</div>
+    <div class="cat-cell" onclick="selectCategory('🎁 人情')"><span>🎁</span>人情</div>
+    <div class="cat-cell" onclick="selectCategory('💰 金融')"><span>💰</span>金融</div>
+    <div class="cat-cell" onclick="selectCategory('📦 其他')"><span>📦</span>其他</div>
+  </div>
+  <div class="sheet-footer-btn" onclick="closeSheet()">＋ 添加新分类</div>
+</div>
+
+<!-- ========== 弹层：账户选择（含受限账户过滤逻辑说明） ========== -->
+<div class="sheet" id="account-sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <span class="sheet-title" id="account-sheet-title">选择账户</span>
+    <span class="sheet-close" onclick="closeSheet()">✕</span>
+  </div>
+  <div class="account-pick-list" id="account-pick-list">
+    <div class="ap-item" onclick="selectAccount('微信零钱')"><span>💬</span>微信零钱<span class="ap-balance">¥2,150</span></div>
+    <div class="ap-item" onclick="selectAccount('支付宝')"><span>💙</span>支付宝<span class="ap-balance">¥1,000</span></div>
+    <div class="ap-item" onclick="selectAccount('现金')"><span>💵</span>现金<span class="ap-balance">¥300</span></div>
+    <div class="ap-item" onclick="selectAccount('工商储蓄卡')"><span>🏦</span>工商储蓄卡<span class="ap-balance">¥5,800</span></div>
+    <div class="ap-item locked" onclick="selectAccount('医保账户')"><span>🏥</span>医保账户<span class="ap-badge-small">受限</span></div>
+    <div class="ap-item locked" onclick="selectAccount('公积金')"><span>🏠</span>公积金<span class="ap-badge-small">受限</span></div>
+  </div>
+  <div class="sheet-hint" id="account-sheet-hint">受限账户仅可用于被允许的支出分类。</div>
+</div>
+
+<!-- ========== 弹层：储蓄卡账户详情 ========== -->
+<div class="sheet sheet-large" id="card-detail-sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <span class="sheet-title">🏦 工商储蓄卡</span>
+    <span class="sheet-close" onclick="closeSheet()">✕</span>
+  </div>
+  <div class="detail-rows">
+    <div class="dt-row"><span>账户类型</span><span>流动资金账户</span></div>
+    <div class="dt-row"><span>余额</span><span>¥5,800</span></div>
+    <div class="dt-row"><span>计入总资产</span><span>是</span></div>
+    <div class="dt-row"><span>关联还款</span><span>招商信用卡还款账户</span></div>
+  </div>
+  <div class="sheet-section-label">最近流水</div>
+  <div class="mini-record-list">
+    <div class="record-item"><span class="rc-icon">💰</span><span class="rc-info">工资入账</span><span class="rc-amount green">+¥8,000</span></div>
+    <div class="record-item"><span class="rc-icon">💸</span><span class="rc-info">还信用卡</span><span class="rc-amount red">-¥1,000</span></div>
+  </div>
+  <div class="detail-actions">
+    <button class="btn-primary" onclick="openSheet('transfer-sheet')">转账</button>
+    <button class="btn-secondary">编辑</button>
+    <button class="btn-ghost">归档</button>
+  </div>
+</div>
+
+<!-- ========== 弹层：信用卡详情 ========== -->
+<div class="sheet sheet-large" id="credit-detail-sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <span class="sheet-title">💳 招商信用卡</span>
+    <span class="sheet-close" onclick="closeSheet()">✕</span>
+  </div>
+  <div class="detail-rows">
+    <div class="dt-row"><span>总额度</span><span>¥10,000</span></div>
+    <div class="dt-row"><span>已用额度</span><span class="red">¥6,800</span></div>
+    <div class="dt-row"><span>可用额度</span><span>¥3,200</span></div>
+    <div class="dt-row"><span>账单日</span><span>每月 5 号</span></div>
+    <div class="dt-row"><span>还款日</span><span>每月 25 号</span></div>
+    <div class="dt-row"><span>关联还款账户</span><span>工商储蓄卡</span></div>
+  </div>
+  <div class="sheet-section-label">还款计划</div>
+  <div class="mini-record-list">
+    <div class="record-item"><span class="rc-icon">📅</span><span class="rc-info">本月应还</span><span class="rc-amount red">¥1,200</span></div>
+    <div class="record-item"><span class="rc-icon">📅</span><span class="rc-info">下月应还</span><span class="rc-amount red">¥1,200</span></div>
+  </div>
+  <div class="detail-actions">
+    <button class="btn-primary">还款</button>
+    <button class="btn-secondary">调整额度</button>
+  </div>
+</div>
+
+<!-- ========== 弹层：账户转账 ========== -->
+<div class="sheet sheet-large" id="transfer-sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <span class="sheet-title">🔄 账户转账</span>
+    <span class="sheet-close" onclick="closeSheet()">✕</span>
+  </div>
+  <div class="scenario-desc">资金在账户之间划转，不产生收支，不影响本月结余。</div>
+  <div class="field-list-plain">
+    <div class="field-row-plain"><span>转出账户</span><b>工商储蓄卡 ›</b></div>
+    <div class="field-row-plain"><span>转入账户</span><b>微信零钱 ›</b></div>
+    <div class="field-row-plain"><span>转账金额</span><b class="amount-input">¥ 2,000</b></div>
+    <div class="field-row-plain"><span>转账日期</span><b>今天</b></div>
+    <div class="field-row-plain"><span>备注</span><b>（可选）›</b></div>
+  </div>
+  <div class="transfer-effect">
+    💡 转账完成后：储蓄卡 -¥2,000，微信零钱 +¥2,000，流动资金合计不变。
+  </div>
+  <div class="sheet-footer-btn primary" onclick="closeSheet()">确认转账</div>
+</div>
+
+<!-- ========== 弹层：余额调整 ========== -->
+<div class="sheet" id="adjust-sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <span class="sheet-title">⚖️ 余额调整</span>
+    <span class="sheet-close" onclick="closeSheet()">✕</span>
+  </div>
+  <div class="scenario-desc">当账户实际余额与软件记录不一致时使用，差额记为余额调整，不产生收支流水。</div>
+  <div class="field-list-plain">
+    <div class="field-row-plain"><span>调整账户</span><b>微信零钱 ›</b></div>
+    <div class="field-row-plain"><span>当前记录</span><b>¥2,150</b></div>
+    <div class="field-row-plain"><span>实际余额</span><b class="amount-input">¥2,080</b></div>
+    <div class="field-row-plain"><span>差额</span><b class="red">-¥70</b></div>
+  </div>
+  <div class="sheet-footer-btn primary" onclick="closeSheet()">确认调整</div>
+</div>
+
+<!-- ========== 弹层：失业推演参数 ========== -->
+<div class="sheet sheet-large" id="unemployed-sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <span class="sheet-title">💼 如果失业了</span>
+    <span class="sheet-close" onclick="closeSheet()">✕</span>
+  </div>
+  <div class="scenario-desc">软件会自动读取你目前的流动资金和每月必要支出，也可以手动调整：</div>
+  <div class="detail-rows">
+    <div class="dt-row editable"><span>每月必要支出</span><span class="editable-val">¥3,500 <small>点击修改</small></span></div>
+    <div class="dt-row editable"><span>流动资金</span><span class="editable-val">¥8,320 <small>点击修改</small></span></div>
+    <div class="dt-row editable"><span>失业时长（月）</span><span class="editable-val">3 <small>点击修改</small></span></div>
+  </div>
+  <div class="sheet-footer-btn primary" onclick="runSimulation()">开始推演 →</div>
+</div>
+
+<!-- ========== 弹层：组合情景 ========== -->
+<div class="sheet sheet-large" id="combo-sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <span class="sheet-title">🎲 组合情景</span>
+    <span class="sheet-close" onclick="closeSheet()">✕</span>
+  </div>
+  <div class="scenario-desc">同时叠加多个情况，看综合影响。已选：</div>
+  <div class="combo-tags">
+    <span class="combo-tag selected">💼 失业 <span class="tag-remove">×</span></span>
+    <span class="combo-tag selected">📉 收入减少20% <span class="tag-remove">×</span></span>
+    <span class="combo-tag add">＋ 添加情景</span>
+  </div>
+  <div class="conflict-tip warn">⚠️ 已自动处理冲突：失业期间不计入工资收入</div>
+  <div class="sheet-footer-btn primary" onclick="runSimulation()">开始推演 →</div>
+</div>
+
+<!-- ========== 弹层：首次引导 ========== -->
+<div class="sheet sheet-large" id="onboard-sheet">
+  <div class="sheet-handle"></div>
+  <div class="onboard-emoji">👋</div>
+  <div class="onboard-title">欢迎使用</div>
+  <div class="onboard-text">这是帮你管理财务的软件。先花 30 秒，把你的账户加进来吧。</div>
+  <div class="onboard-steps">
+    <div class="ob-step current"><span>1</span> 告诉我你有哪些账户</div>
+    <div class="ob-step"><span>2</span> 花钱或收入时点这里记一笔</div>
+    <div class="ob-step"><span>3</span> 试试记录第一笔收支</div>
+  </div>
+  <div class="sheet-footer-btn primary" onclick="closeSheet()">开始 →</div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

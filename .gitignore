@@ -1,1 +1,6 @@
 pat.txt
+# Widget Preview related
+.widget_preview/
+.dart_tool
+.metadata
+pubspec.lock
