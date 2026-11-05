@@ -40,7 +40,7 @@ class YuanApp extends StatelessWidget {
         navigationBarTheme: NavigationBarThemeData(
           height: 56, // ← 控制高度
           backgroundColor: Colors.white70, // 背景色
-          labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected, // 标签行为，可选是否展示
+          labelBehavior: NavigationDestinationLabelBehavior.alwaysShow, // 标签行为，可选是否展示
           indicatorShape: const CircleBorder(side: BorderSide(width: 1.0, style: BorderStyle.none), eccentricity: 0.0), // 选中背景的形状控制
           indicatorColor: Colors.white70.withValues(alpha: 0.15), // 选中项背景颜色
           shadowColor: Colors.white70.withValues(alpha: 0.3), // 导航栏整体阴影颜色
@@ -49,7 +49,7 @@ class YuanApp extends StatelessWidget {
           iconTheme: WidgetStateProperty.resolveWith((states) {
             if (states.contains(WidgetState.selected)) {
               return IconThemeData(
-                  size: 30,
+                  size: 26,
                   color: colorSetting.navbarColor,  // 选中图标颜色
                   shadows: [
                     Shadow(
@@ -61,8 +61,23 @@ class YuanApp extends StatelessWidget {
               );
             }
             return IconThemeData(
-                size: 28,
+                size: 22,
                 color: colorSetting.textColor
+            );
+          }),
+
+          labelTextStyle: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
+              return TextStyle(
+                color: colorSetting.navbarColor,  // ← 选中颜色
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              );
+            }
+            return TextStyle(
+              color: colorSetting.textColor,                 // ← 未选中颜色
+              fontSize: 12,
+              fontWeight: FontWeight.normal,
             );
           }),
         ),
