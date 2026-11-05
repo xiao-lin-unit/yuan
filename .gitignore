@@ -14,3 +14,7 @@ build/
 pat.txt
 .metadata
 pubspec.lock
+
+android/gradle/wrapper/gradle-9.3.1-all.zip
+android/gradle/wrapper/gradle-9.3.1-bin.zip
+

@@ -24,11 +24,11 @@ class RouteNavigation {
 }
 
 const List<RouteNavigation> tabs = [
-  RouteNavigation('记账', '/', 0, EntryScreen(), const Icon(Icons.edit_square)),
-  RouteNavigation('资产负债', '/ledger', 1, LedgerScreen(), const Icon(Icons.account_balance_wallet)),
-  RouteNavigation('账户', '/accounts', 2, AccountsScreen(), const Icon(Icons.account_balance)),
-  RouteNavigation('分析', '/analysis', 3, AnalysisScreen(), const Icon(Icons.insights)),
-  RouteNavigation('我的', '/profile', 4, ProfileScreen(), const Icon(Icons.person_outline)),
+  RouteNavigation('记账', '/', 0, EntryScreen(), Icon(Icons.edit_square)),
+  RouteNavigation('资产负债', '/ledger', 1, LedgerScreen(), Icon(Icons.account_balance_wallet)),
+  RouteNavigation('账户', '/accounts', 2, AccountsScreen(), Icon(Icons.account_balance)),
+  RouteNavigation('分析', '/analysis', 3, AnalysisScreen(), Icon(Icons.insights)),
+  RouteNavigation('我的', '/profile', 4, ProfileScreen(), Icon(Icons.person_outline)),
 ];
 
 // const paths = tabs.map((t) => t.path).toList();
@@ -40,13 +40,15 @@ class AppShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final location = GoRouterState.of(context).uri.toString();
-    print("location: $location");
-    print("context: $context");
+    debugPrint ("location: $location");
+    debugPrint ("context: $context");
+    
+    debugPrint ("child: $child");
     return Scaffold(
       resizeToAvoidBottomInset: false,
       body: child,
       bottomNavigationBar: NavigationBar(
-        onDestinationSelected: (i) => context.go(tabs[0].path),
+        onDestinationSelected: (i) => context.go(location),
         destinations: tabs.map((t) => NavigationDestination(icon: t.icon, label: t.label,)).toList(),
       ),
     );
