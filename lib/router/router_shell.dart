@@ -24,8 +24,8 @@ class RouteNavigation {
 }
 
 const List<RouteNavigation> tabs = [
-  RouteNavigation('记账', '/', 0, EntryScreen(), Icon(Icons.edit_square)),
-  RouteNavigation('资产负债', '/ledger', 1, LedgerScreen(), Icon(Icons.currency_yuan_outlined)),
+  RouteNavigation('记账', '/', 0, EntryScreen(), Icon(Icons.mode_edit_outline_outlined)),
+  RouteNavigation('资产负债', '/ledger', 1, LedgerScreen(), Icon(Icons.currency_yen_outlined)),
   RouteNavigation('账户', '/accounts', 2, AccountsScreen(), Icon(Icons.account_balance_wallet_outlined)),
   RouteNavigation('分析', '/analysis', 3, AnalysisScreen(), Icon(Icons.analytics_outlined)),
   RouteNavigation('我的', '/profile', 4, ProfileScreen(), Icon(Icons.person_outline)),

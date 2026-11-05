@@ -72,6 +72,7 @@ dev_dependencies:
   riverpod_generator: ^4.0.9
   riverpod_lint: ^3.1.9
   build_runner: ^2.16.1
+  flutter_launcher_icons: ^0.13.1
 flutter:
 
   # The following line ensures that the Material Icons font is
@@ -109,3 +110,13 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+flutter_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon/favicon.png"
+  # Android 自适应图标（可选，效果更好）
+  adaptive_icon_background: "#FFFFFF"   # 背景层
+  adaptive_icon_foreground: "assets/icon/favicon.png"   # 前景层
+  adaptive_icon_foreground_inset: 12 #默认16，调小=图标变大，调大=变小
+  min_sdk_android: 21
