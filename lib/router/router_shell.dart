@@ -25,9 +25,9 @@ class RouteNavigation {
 
 const List<RouteNavigation> tabs = [
   RouteNavigation('记账', '/', 0, EntryScreen(), Icon(Icons.edit_square)),
-  RouteNavigation('资产负债', '/ledger', 1, LedgerScreen(), Icon(Icons.account_balance_wallet)),
-  RouteNavigation('账户', '/accounts', 2, AccountsScreen(), Icon(Icons.account_balance)),
-  RouteNavigation('分析', '/analysis', 3, AnalysisScreen(), Icon(Icons.insights)),
+  RouteNavigation('资产负债', '/ledger', 1, LedgerScreen(), Icon(Icons.currency_yuan_outlined)),
+  RouteNavigation('账户', '/accounts', 2, AccountsScreen(), Icon(Icons.account_balance_wallet_outlined)),
+  RouteNavigation('分析', '/analysis', 3, AnalysisScreen(), Icon(Icons.analytics_outlined)),
   RouteNavigation('我的', '/profile', 4, ProfileScreen(), Icon(Icons.person_outline)),
 ];
 
@@ -48,20 +48,26 @@ class AppShell extends StatelessWidget {
       resizeToAvoidBottomInset: false,
       body: child,
       bottomNavigationBar: NavigationBar(
-        onDestinationSelected: (i) => context.go(location),
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
+        selectedIndex: tabs.indexWhere((t) => location == t.path), // 高亮当前tab
+        onDestinationSelected: (i) {
+          final path = tabs[i].path;
+          debugPrint('tap → $path');
+          context.go(path);  // ← 关键！这才是跳转
+        },
         destinations: tabs.map((t) => NavigationDestination(icon: t.icon, label: t.label,)).toList(),
       ),
     );
   }
 }
 
-final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
+// final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
 final appRouter = GoRouter(
   initialLocation: '/',
   routes: [
     ShellRoute(
-      navigatorKey: GlobalKey<NavigatorState>(),
+      // navigatorKey: GlobalKey<NavigatorState>(),
       builder: (context, state, child) => AppShell(child: child),
       routes: tabs.map((t) => GoRoute(path: t.path, builder: (context, state) => t.widget)).toList(),
     ),
