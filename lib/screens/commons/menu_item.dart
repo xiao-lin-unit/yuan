@@ -34,7 +34,7 @@ class MenuItem extends StatelessWidget {
         child: Container(
           margin: const EdgeInsets.only(bottom: 8),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-          decoration: AppStyles.itemDecoration,
+          decoration: AppStyles.itemDecoration(context),
           child: Row(
             children: [
               Text(data.emoji, style: const TextStyle(fontSize: 22)),

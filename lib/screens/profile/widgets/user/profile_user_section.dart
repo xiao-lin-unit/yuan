@@ -54,7 +54,7 @@ class _ProfileUserSectionState extends State<ProfileUserSection> {
       ),
       child: Container(
         padding: const EdgeInsets.all(18),
-        decoration: AppStyles.cardDecoration,
+        decoration: AppStyles.cardDecoration(context),
         child: Row(
           children: [
             Text(_avatar, style: const TextStyle(fontSize: 40)),

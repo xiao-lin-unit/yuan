@@ -14,25 +14,14 @@ class ColorSetting {
     'black54': Colors.black54,
   };
 
-  final Color _themeColor;
-
-  ColorSetting(this._themeColor);
-
-  static ColorSetting config({String themeColor = 'blue'}) {
-    return ColorSetting(colors[themeColor]!);
-  }
-
-  Color get themeColor => _themeColor;
+  static Color themeColor(String code) => colors[code] ?? Color(0xFF4FC3F7);
 }
 
-final String? font = GoogleFonts.notoSansSc().fontFamily;
+Color defaultColor = ColorSetting.themeColor("blue");
 
-final colorSetting = ColorSetting.config(themeColor: 'pink');
+ThemeMode defaultMode = ThemeMode.light;
 
-final colorScheme = ColorScheme.fromSeed(
-  seedColor: colorSetting.themeColor,
-  brightness: Brightness.dark,
-);
+final String? defaultFont = GoogleFonts.notoSansSc().fontFamily;
 
 class ThemeSetting {
   static TextTheme get textTheme => TextTheme(
@@ -192,7 +181,6 @@ class ThemeSetting {
     filled: true,
     contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
     hintStyle: ThemeSetting.textTheme.bodyMedium?.copyWith(
-      // color: colorScheme.onSurfaceVariant,
     ),
     border: OutlineInputBorder(
       borderRadius: BorderRadius.circular(12),
@@ -218,8 +206,6 @@ class ThemeSetting {
 
   /// ===== 列表 =====
   static ListTileThemeData get listTileTheme => ListTileThemeData(
-    // iconColor: colorScheme.onSurfaceVariant,
-    // textColor: colorScheme.onSurface,
     titleTextStyle: ThemeSetting.textTheme.bodyLarge,
     subtitleTextStyle: ThemeSetting.textTheme.bodyMedium,
   );
@@ -230,23 +216,19 @@ class ThemeSetting {
 
   /// ===== Divider =====
   static DividerThemeData get dividerTheme => DividerThemeData(
-    // color: colorScheme.outlineVariant,
     thickness: 1,
     space: 1,
   );
 
   /// ===== BottomSheet =====
   static BottomSheetThemeData get bottomSheetTheme => BottomSheetThemeData(
-    // backgroundColor: Colors.white,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
-    // modalBarrierColor: Colors.black54,
   );
 
   /// ===== Dialog =====
   static DialogThemeData get dialogTheme => DialogThemeData(
-    // backgroundColor: Colors.white,
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
     titleTextStyle: ThemeSetting.textTheme.titleLarge,
     contentTextStyle: ThemeSetting.textTheme.bodyMedium,
@@ -254,9 +236,7 @@ class ThemeSetting {
 
   /// ===== SnackBar =====
   static SnackBarThemeData get snackBarTheme => SnackBarThemeData(
-    // backgroundColor: colorScheme.inverseSurface,
     contentTextStyle: ThemeSetting.textTheme.bodyMedium?.copyWith(
-      // color: colorScheme.onInverseSurface,
     ),
     behavior: SnackBarBehavior.floating,
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -264,60 +244,30 @@ class ThemeSetting {
 
   /// ===== Switch / Checkbox / Radio =====
   static SwitchThemeData get switchTheme => SwitchThemeData(
-    // thumbColor: WidgetStateProperty.resolveWith((states) {
-    //   if (states.contains(WidgetState.selected)) {
-    //     return colorScheme.onPrimary;
-    //   }
-    //   return colorScheme.outline;
-    // }),
-    // trackColor: WidgetStateProperty.resolveWith((states) {
-    //   if (states.contains(WidgetState.selected)) {
-    //     return colorScheme.primary;
-    //   }
-    //   return colorScheme.surfaceContainerHighest;
-    // }),
   );
 
   static CheckboxThemeData get checkboxTheme => CheckboxThemeData(
-    // fillColor: WidgetStateProperty.resolveWith((states) {
-    //   if (states.contains(WidgetState.selected)) {
-    //     return colorScheme.primary;
-    //   }
-    //   return Colors.transparent;
-    // }),
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
   );
 
   static RadioThemeData get radioTheme => RadioThemeData(
-    // fillColor: WidgetStateProperty.resolveWith((states) {
-    //   if (states.contains(WidgetState.selected)) {
-    //     return colorScheme.primary;
-    //   }
-    //   return colorScheme.outline;
-    // }),
   );
 
   /// ===== Tooltip =====
   static TooltipThemeData get tooltipTheme => TooltipThemeData(
     textStyle: ThemeSetting.textTheme.bodySmall,
     decoration: BoxDecoration(
-      // color: colorScheme.inverseSurface,
       borderRadius: BorderRadius.circular(8),
     ),
   );
 
   /// ===== 滑动条 =====
   static SliderThemeData get sliderTheme => SliderThemeData(
-    // activeTrackColor: colorScheme.primary,
-    // inactiveTrackColor: colorScheme.surfaceContainerHighest,
-    // thumbColor: colorScheme.primary,
   );
 
   /// ===== 进度条 =====
   static ProgressIndicatorThemeData get progressIndicatorTheme =>
       ProgressIndicatorThemeData(
-        // color: colorScheme.primary,
-        // linearTrackColor: colorScheme.surfaceContainerHighest,
       );
 
   static PageTransitionsTheme get pageTransitionsTheme => PageTransitionsTheme(

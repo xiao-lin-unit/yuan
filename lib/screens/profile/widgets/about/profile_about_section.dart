@@ -20,7 +20,7 @@ class ProfileAboutSection extends StatelessWidget {
           child: Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            decoration: AppStyles.itemDecoration,
+            decoration: AppStyles.itemDecoration(context),
             child: Column(
               children: [
                 const _AboutRow(text: '版本 1.0.0'),

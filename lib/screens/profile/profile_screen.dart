@@ -41,7 +41,7 @@ class ProfileScreen extends StatelessWidget {
               const SizedBox(height: 12),
               // ② 功能
               ProfileFunctionSection(
-                onItemTap: (item) => _onItemTap(context, item.key),
+                // onItemTap: (item) => _onItemTap(context, item.key),
               ),
               // 间隔
               const SizedBox(height: 4),
