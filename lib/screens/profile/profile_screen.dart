@@ -24,16 +24,14 @@ class ProfileScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppStyles.bg,
-      appBar: AppBar(
-        // title: const Text('我的'),
-        backgroundColor: AppStyles.bg,
-        elevation: 0,
-        foregroundColor: AppStyles.text,
-      ),
+      // backgroundColor: AppStyles.bg,
+      // appBar: AppBar(
+      //   elevation: 0,
+      // ),
       body: SafeArea(
         // 滚动视图
         child: SingleChildScrollView(
+          padding: EdgeInsets.only(top: 18.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

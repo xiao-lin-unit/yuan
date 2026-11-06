@@ -123,7 +123,7 @@ class ThemeSetting {
   );
 
   static AppBarTheme get appBarTheme => AppBarTheme(
-    backgroundColor: const Color(0xFFF2F3F5),
+    // backgroundColor: const Color(0xFFF2F3F5),
     elevation: 0,
     centerTitle: false,
     titleTextStyle: ThemeSetting.textTheme.titleLarge,
