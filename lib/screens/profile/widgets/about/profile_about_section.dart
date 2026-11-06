@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../section_header.dart';
-import '../profile_styles.dart';
+import '../../../commons/section_header.dart';
+import '../../../commons/app_styles.dart';
 
 /// ④ 关于分区（对应 .about-list）
 class ProfileAboutSection extends StatelessWidget {
@@ -16,11 +16,11 @@ class ProfileAboutSection extends StatelessWidget {
       children: [
         const SectionHeader(title: '关于'),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: ProfileStyles.pageHPadding),
+          padding: const EdgeInsets.symmetric(horizontal: AppStyles.pageHPadding),
           child: Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            decoration: ProfileStyles.itemDecoration,
+            decoration: AppStyles.itemDecoration,
             child: Column(
               children: [
                 const _AboutRow(text: '版本 1.0.0'),
@@ -48,7 +48,7 @@ class _AboutRow extends StatelessWidget {
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
-        child: Text(text, style: ProfileStyles.aboutTextStyle),
+        child: Text(text, style: AppStyles.aboutTextStyle),
       ),
     );
   }

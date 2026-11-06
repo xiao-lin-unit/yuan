@@ -4,7 +4,7 @@ import 'widgets/user/profile_user_section.dart';
 import 'widgets/function/profile_function_section.dart';
 import 'widgets/manage/profile_manage_section.dart';
 import 'widgets/about/profile_about_section.dart';
-import 'widgets/profile_styles.dart';
+import '../commons/app_styles.dart';
 
 // 「我的」页面：组装用户 / 功能 / 管理 / 关于四个分区
 class ProfileScreen extends StatelessWidget {
@@ -24,12 +24,12 @@ class ProfileScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: ProfileStyles.bg,
+      backgroundColor: AppStyles.bg,
       appBar: AppBar(
         // title: const Text('我的'),
-        backgroundColor: ProfileStyles.bg,
+        backgroundColor: AppStyles.bg,
         elevation: 0,
-        foregroundColor: ProfileStyles.text,
+        foregroundColor: AppStyles.text,
       ),
       body: SafeArea(
         // 滚动视图

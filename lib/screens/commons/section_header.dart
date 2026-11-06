@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'profile_styles.dart';
+import 'app_styles.dart';
 
 /// 公共分组标题（对应 .section-header）
 class SectionHeader extends StatelessWidget {
@@ -11,9 +11,9 @@ class SectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(
-        ProfileStyles.pageHPadding, 18, ProfileStyles.pageHPadding, 10,
+        AppStyles.pageHPadding, 18, AppStyles.pageHPadding, 10,
       ),
-      child: Text(title, style: ProfileStyles.sectionHeaderStyle),
+      child: Text(title, style: AppStyles.sectionHeaderStyle),
     );
   }
 }

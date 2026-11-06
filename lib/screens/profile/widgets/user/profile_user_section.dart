@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'edit_profile_screen.dart';
-import '../profile_styles.dart';
+import 'edit_profile_sheet.dart';
+import '../../../commons/app_styles.dart';
+import '../../../commons/bottom_sheet.dart';
 
 class ProfileUserSection extends StatefulWidget {
   final String avatar;
@@ -32,37 +33,28 @@ class _ProfileUserSectionState extends State<ProfileUserSection> {
   }
 
   Future<void> _openEdit() async {
-    final result = await Navigator.of(context).push<Map<String, String>>(
-      MaterialPageRoute(
-        builder: (context) => EditProfileScreen(
-          initialName: _userName,
-          initialSub: _userSub,
-        ),
-      ),
-    );
-
-    // 返回了数据才更新
-    if (result != null) {
-      setState(() {
-        if (result['name']?.isNotEmpty == true) {
+    await showEditProfileSheet(
+      context,
+      initialName: _userName,
+      initialSub: _userSub,
+      onSave: (result) {
+        setState(() {
           _userName = result['name']!;
-        }
-        if (result['sub']?.isNotEmpty == true) {
           _userSub = result['sub']!;
-        }
-      });
-    }
+        });
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(
-        ProfileStyles.pageHPadding, 4, ProfileStyles.pageHPadding, 4,
+        AppStyles.pageHPadding, 4, AppStyles.pageHPadding, 4,
       ),
       child: Container(
         padding: const EdgeInsets.all(18),
-        decoration: ProfileStyles.cardDecoration,
+        decoration: AppStyles.cardDecoration,
         child: Row(
           children: [
             Text(_avatar, style: const TextStyle(fontSize: 40)),
@@ -71,9 +63,9 @@ class _ProfileUserSectionState extends State<ProfileUserSection> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(_userName, style: ProfileStyles.userNameStyle),
+                  Text(_userName, style: AppStyles.userNameStyle),
                   const SizedBox(height: 3),
-                  Text(_userSub, style: ProfileStyles.userSubStyle),
+                  Text(_userSub, style: AppStyles.userSubStyle),
                 ],
               ),
             ),
@@ -94,4 +86,44 @@ class _ProfileUserSectionState extends State<ProfileUserSection> {
       ),
     );
   }
+}
+
+Future<void> showEditProfileSheet(
+    BuildContext context, {
+      required String initialName,
+      required String initialSub,
+      required ValueChanged<Map<String, String>> onSave,
+    }) async {
+  final nameCtrl = TextEditingController(text: initialName);
+  final subCtrl = TextEditingController(text: initialSub);
+
+  await CommonBottomSheet.show(
+    context,
+    title: '编辑资料',
+    showCloseButton: true,
+    showConfirmButton: true,
+    enableDragToDismiss: true,
+    onConfirm: () {
+      final name = nameCtrl.text.trim();
+      final sub = subCtrl.text.trim();
+
+      if (name.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('昵称不能为空')),
+        );
+        return;
+      }
+
+      onSave({
+        'name': name,
+        'sub': sub,
+      });
+
+      Navigator.pop(context);
+    },
+    child: EditProfileSheet(
+      nameCtrl: nameCtrl,
+      subCtrl: subCtrl,
+    ),
+  );
 }

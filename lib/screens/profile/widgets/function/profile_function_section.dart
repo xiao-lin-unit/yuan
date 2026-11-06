@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import '../menu_item.dart';
-import '../menu_list.dart';
-import '../section_header.dart';
+import '../../../commons/menu_item.dart';
+import '../../../commons/menu_list.dart';
+import '../../../commons/section_header.dart';
 
 /// ② 功能分区
 class ProfileFunctionSection extends StatelessWidget {

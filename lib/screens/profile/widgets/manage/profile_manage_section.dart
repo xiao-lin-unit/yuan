@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import '../menu_item.dart';
-import '../menu_list.dart';
-import '../section_header.dart';
+import '../../../commons/menu_item.dart';
+import '../../../commons/menu_list.dart';
+import '../../../commons/section_header.dart';
 
 /// ③ 管理分区
 class ProfileManageSection extends StatelessWidget {

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 /// 对应 styles.css 的 :root 变量与公共样式
-class ProfileStyles {
+class AppStyles {
   // === 颜色（对应 :root） ===
   static const Color bg = Color(0xFFF2F3F5);
   static const Color white = Color(0xFFFFFFFF);
