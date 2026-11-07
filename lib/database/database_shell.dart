@@ -1,11 +1,18 @@
+import 'package:flutter/cupertino.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-import 'package:path/path.dart';  
+import 'package:path/path.dart';
+import 'package:yuan/database/db_module.dart';
+import 'package:yuan/database/user/user_db.dart';
 
 /// 数据库服务：只负责建库建表，不存任何业务表
 class DatabaseService {
   static const _dbName = 'yuan.db';
   static const _dbVersion = 1;
   Database? _db;
+
+  final List<DbModule> _modules = [
+    UserDb()
+  ];
 
   Future<Database> get database async {
     if (_db != null) return _db!;
@@ -24,7 +31,17 @@ class DatabaseService {
   }
 
   Future<void> _onCreate(Database db, int version) async {
-    // 后续按模块建表，先空着
+    try {
+      await db.transaction((txn) async {
+            for(final module in _modules) {
+              await module.onCreate(txn);
+            }
+          });
+    } catch (e, st) {
+      debugPrint('❌ 数据库初始化失败: $e');
+      debugPrint(st.toString());
+      rethrow; // ✅ 非常关键
+    }
   }
 
   Future<void> _onUpgrade(Database db, int oldV, int newV) async {
