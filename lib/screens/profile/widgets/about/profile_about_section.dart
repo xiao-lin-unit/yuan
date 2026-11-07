@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import '../../../commons/section_header.dart';
-import '../../../commons/app_styles.dart';
+import '../../../commons/header/section_header.dart';
+import '../../../commons/styles/app_styles.dart';
+import '../../../commons/icons/app_icons.dart';
 
 /// ④ 关于分区（对应 .about-list）
 class ProfileAboutSection extends StatelessWidget {
@@ -14,7 +15,9 @@ class ProfileAboutSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SectionHeader(title: '关于'),
+        const SectionHeader(title: '关于', trailing: Icon(
+          AppIcons.about,
+        )),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: AppStyles.pageHPadding),
           child: Container(

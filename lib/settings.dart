@@ -212,7 +212,7 @@ class ThemeSetting {
 
   /// ===== 图标 =====
   static IconThemeData get iconTheme =>
-      IconThemeData(size: 24);
+      IconThemeData(size: 16, weight: 400.0);
 
   /// ===== Divider =====
   static DividerThemeData get dividerTheme => DividerThemeData(

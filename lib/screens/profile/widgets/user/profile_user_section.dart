@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'edit_profile_sheet.dart';
-import '../../../commons/app_styles.dart';
-import '../../../commons/bottom_sheet.dart';
+import '../../../commons/styles/app_styles.dart';
+import '../../../commons/sheet/bottom_sheet.dart';
 
 class ProfileUserSection extends StatefulWidget {
   final String avatar;

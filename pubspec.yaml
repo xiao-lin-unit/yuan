@@ -114,6 +114,31 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+  # 自注册Font Awesome Icons
+  fonts:
+    - family: FASolid
+      fonts:
+        - asset: assets/fonts/icon/f_a_7_solid_900.otf
+    - family: FABrands
+      fonts:
+        - asset: assets/fonts/icon/f_a_7_brands_regular_400.otf
+    - family: FARegular
+      fonts:
+        - asset: assets/fonts/icon/f_a_7_regular_400.otf
+
+icon_fonts:
+  - family: FaSolidIcons
+    outputFile: lib/screens/commons/icons/fa_solid_icons.g.dart
+    naming: snake
+    className: FaSolidIcons
+  - family: FABrands
+    outputFile: lib/screens/commons/icons/fa_brands_icons.g.dart
+    naming: snake
+    className: FaBrandsIcons
+  - family: FARegular
+    outputFile: lib/screens/commons/icons/fa_regular_icons.g.dart
+    naming: snake
+    className: FaRegularIcons
 
 flutter_icons:
   android: true

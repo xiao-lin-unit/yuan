@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'app_styles.dart';
+import '../styles/app_styles.dart';
 
 /// 列表项数据模型：新增功能只需在分区组件的数据数组里加一条
 class MenuItemData {
@@ -32,12 +32,12 @@ class MenuItem extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppStyles.itemRadius),
         onTap: data.onTap,
         child: Container(
-          margin: const EdgeInsets.only(bottom: 8),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          margin: const EdgeInsets.only(bottom: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
           decoration: AppStyles.itemDecoration(context),
           child: Row(
             children: [
-              Text(data.emoji, style: const TextStyle(fontSize: 22)),
+              SizedBox(width: 30,child: Text(data.emoji, style: const TextStyle(fontSize: 22))),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(

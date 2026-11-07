@@ -59,7 +59,7 @@ abstract class AppTheme {
       listTileTheme: ThemeSetting.listTileTheme,
 
       /// ===== 图标 =====
-      iconTheme: ThemeSetting.iconTheme,
+      iconTheme: ThemeSetting.iconTheme.copyWith(color: colorScheme.onSurfaceVariant),
 
       /// ===== Divider =====
       dividerTheme: ThemeSetting.dividerTheme,

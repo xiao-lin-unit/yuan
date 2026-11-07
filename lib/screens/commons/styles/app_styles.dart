@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:path/path.dart';
-import '../../settings.dart';
 
 /// 对应 styles.css 的 :root 变量与公共样式
 class AppStyles {

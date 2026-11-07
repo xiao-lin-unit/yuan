@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'menu_item.dart';
-import 'app_styles.dart';
+import '../styles/app_styles.dart';
 
 /// 公共列表组件：渲染一组 MenuItem（对应 .menu-list）
 class MenuList extends StatelessWidget {
