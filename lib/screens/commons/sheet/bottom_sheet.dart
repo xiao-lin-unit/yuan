@@ -17,7 +17,7 @@ class CommonBottomSheet extends StatelessWidget {
   final String confirmText;
 
   /// 确认回调（由使用方处理逻辑）
-  final VoidCallback? onConfirm;
+  final Future<void> Function()? onConfirm;
 
   /// 点击遮罩是否关闭
   final bool barrierDismissible;
@@ -44,7 +44,7 @@ class CommonBottomSheet extends StatelessWidget {
     bool showCloseButton = true,
     bool showConfirmButton = true,
     String confirmText = '确认',
-    VoidCallback? onConfirm,
+  Future<void> Function()? onConfirm,
     bool barrierDismissible = true,
     bool enableDragToDismiss = true,
   }) {
@@ -130,7 +130,14 @@ class CommonBottomSheet extends StatelessWidget {
                         /// 保存按钮
                         if (showConfirmButton)
                           TextButton(
-                            onPressed: onConfirm,
+                            onPressed: () async {
+                              if (onConfirm != null) {
+                                await onConfirm!();
+                              }
+                              if (context.mounted) {
+                                Navigator.pop(context);
+                              }
+                            },
                             child: Text(confirmText, style: TextStyle(color: Colors.black54)),
                           )
                         else

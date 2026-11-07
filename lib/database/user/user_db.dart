@@ -1,5 +1,5 @@
 import '../db_module.dart';
-import 'package:sqflite/sqflite.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 class UserDb implements DbModule {
   static const tableName = 'user_info';

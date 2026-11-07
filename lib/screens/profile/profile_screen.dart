@@ -35,7 +35,7 @@ class ProfileScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // ① 用户
-              const ProfileUserSection(avatar: '👤', userName: '小琳', userSub: '懒死你吧'),
+              const ProfileUserSection(),
               // 间隔
               const SizedBox(height: 12),
               // ② 功能

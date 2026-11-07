@@ -1,3 +1,4 @@
+
 import 'package:flutter/cupertino.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:path/path.dart';
@@ -6,6 +7,9 @@ import 'package:yuan/database/user/user_db.dart';
 
 /// 数据库服务：只负责建库建表，不存任何业务表
 class DatabaseService {
+  DatabaseService._internal();
+  static final DatabaseService instance = DatabaseService._internal();
+
   static const _dbName = 'yuan.db';
   static const _dbVersion = 1;
   Database? _db;
@@ -22,6 +26,9 @@ class DatabaseService {
 
   Future<Database> _open() async {
     final dbPath = join(await getDatabasesPath(), _dbName);
+    debugPrint('📱 DB PATH = $dbPath');
+    final exists = await databaseFactory.databaseExists(dbPath);
+    debugPrint('📱 DB EXISTS = $exists');
     return await openDatabase(
       dbPath,
       version: _dbVersion,
