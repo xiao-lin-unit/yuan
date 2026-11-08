@@ -11,6 +11,7 @@ import 'edit_profile_sheet.dart';
 class ProfileUserSection extends StatelessWidget {
   const ProfileUserSection({super.key});
 
+  // 打开编辑框操作
   Future<void> _openEdit(BuildContext context, UserInfo user) async {
     await showEditProfileSheet(
       context,
@@ -25,6 +26,7 @@ class ProfileUserSection extends StatelessWidget {
     );
   }
 
+  // 展示sheet框
   Future<void> showEditProfileSheet(
       BuildContext context, {
         required String initialName,
@@ -75,8 +77,10 @@ class ProfileUserSection extends StatelessWidget {
         decoration: AppStyles.cardDecoration(context),
         child: Row(
           children: [
+            // 头像
             UserAvatar(base64: user.avatar),
             const SizedBox(width: 14),
+            // 内容
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -87,6 +91,7 @@ class ProfileUserSection extends StatelessWidget {
                 ],
               ),
             ),
+            // 设置按钮
             Material(
               color: Colors.transparent,
               child: InkWell(

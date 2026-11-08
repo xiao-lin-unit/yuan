@@ -157,7 +157,7 @@ function openSheet(id) {
 }
 function closeSheet() {
   document.getElementById('sheet-mask').classList.remove('show');
-  document.querySelectorAll('.sheet').forEach(s => s.classList.remove('show'));
+  document.querySelectorAll('.sheet').forEach(sh => sh.classList.remove('show'));
 }
 
 // ============ 选分类 ============
@@ -189,6 +189,121 @@ function saveSimulation() {
   const old = btn.textContent;
   btn.textContent = '✓ 已保存';
   setTimeout(() => { btn.textContent = old; switchTab('sandbox'); }, 1000);
+}
+
+// ============ 修改用户信息 ============
+const AVATAR_MAX_SIZE = 2 * 1024 * 1024;              // 2MB
+const AVATAR_MAX_EDGE = 1080;                          // 最长边压缩上限
+const AVATAR_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+
+let userProfile = { name: '未设置名字', intro: '', avatar: '' };
+let pendingAvatar = null;   // 本次弹层中待保存的头像（dataURL）
+
+function userInfoBlock(id) {
+  return document.getElementById(id).closest('.form-block');
+}
+
+// 打开弹层时回填当前信息
+function openUserInfoSheet() {
+  pendingAvatar = userProfile.avatar;
+  document.getElementById('uname-input').value = userProfile.name === '未设置名字' ? '' : userProfile.name;
+  document.getElementById('uintro-input').value = userProfile.intro;
+  document.querySelectorAll('#userinfo-sheet .form-block').forEach(b => b.classList.remove('invalid'));
+  renderAvatarPreview();
+  countUserInfo();
+  openSheet('userinfo-sheet');
+}
+
+function pickAvatar() {
+  document.getElementById('avatar-input').click();
+}
+
+function onAvatarPicked(e) {
+  const file = e.target.files && e.target.files[0];
+  e.target.value = '';                                 // 允许重复选同一张
+  if (!file) return;
+
+  const tip = document.getElementById('avatar-tip');
+  if (AVATAR_TYPES.indexOf(file.type) === -1) {
+    tip.textContent = '格式不支持，请选 JPG / PNG / WEBP';
+    return;
+  }
+  if (file.size > AVATAR_MAX_SIZE) {
+    tip.textContent = '图片超过 2MB，换一张小一点的';
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = () => compressImage(reader.result, dataUrl => {
+    pendingAvatar = dataUrl;
+    renderAvatarPreview();
+  });
+  reader.readAsDataURL(file);
+}
+
+// 正方裁切 + 压缩，避免原图过大占用本地存储
+function compressImage(dataUrl, done) {
+  const img = new Image();
+  img.onload = () => {
+    const side = Math.min(img.width, img.height);
+    const scale = Math.min(1, AVATAR_MAX_EDGE / side);
+    const size = Math.round(side * scale);
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, size, size);
+    done(canvas.toDataURL('image/jpeg', 0.85));
+  };
+  img.src = dataUrl;
+}
+
+function renderAvatarPreview() {
+  const box = document.getElementById('avatar-preview');
+  const tip = document.getElementById('avatar-tip');
+  box.innerHTML = pendingAvatar ? '<img src="' + pendingAvatar + '" alt="头像">' : '👤';
+  tip.textContent = pendingAvatar ? '点击重新上传' : '点击上传头像';
+  tip.classList.toggle('done', !!pendingAvatar);
+}
+
+function countUserInfo() {
+  document.getElementById('uname-count').textContent = document.getElementById('uname-input').value.length;
+  document.getElementById('uintro-count').textContent = document.getElementById('uintro-input').value.length;
+}
+
+document.getElementById('uname-input').addEventListener('input', () => {
+  userInfoBlock('uname-input').classList.remove('invalid');
+  countUserInfo();
+});
+document.getElementById('uintro-input').addEventListener('input', () => {
+  userInfoBlock('uintro-input').classList.remove('invalid');
+  countUserInfo();
+});
+
+function saveUserInfo() {
+  const nameInput = document.getElementById('uname-input');
+  const introInput = document.getElementById('uintro-input');
+  const name = nameInput.value.trim();
+  const intro = introInput.value.trim();
+  let ok = true;
+
+  if (name.length < 1 || name.length > 12) { userInfoBlock('uname-input').classList.add('invalid'); ok = false; }
+  if (intro.length > 60) { userInfoBlock('uintro-input').classList.add('invalid'); ok = false; }
+  if (!ok) return;
+
+  userProfile = { name: name, intro: intro, avatar: pendingAvatar || '' };
+
+  const nameEl = document.getElementById('user-name');
+  const avaEl = document.getElementById('user-avatar');
+  nameEl.textContent = userProfile.name;
+  if (userProfile.avatar) {
+    avaEl.classList.add('photo');
+    avaEl.innerHTML = '<img src="' + userProfile.avatar + '" alt="头像">';
+  } else {
+    avaEl.classList.remove('photo');
+    avaEl.textContent = '👤';
+  }
+  closeSheet();
+  flashBtn();
 }
 
 // 首次引导

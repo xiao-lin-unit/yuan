@@ -884,12 +884,13 @@
     <section class="page" id="page-mine">
       <div class="nav-top"><span class="nav-title">我的</span></div>
 
-      <div class="user-card">
-        <div class="user-avatar">👤</div>
+      <div class="user-card" onclick="openUserInfoSheet()">
+        <div class="user-avatar" id="user-avatar">👤</div>
         <div class="user-info">
-          <span class="user-name">未设置名字</span>
+          <span class="user-name" id="user-name">未设置名字</span>
           <span class="user-sub">📱 数据全部保存在本设备</span>
         </div>
+        <span class="user-edit">修改 ›</span>
       </div>
 
       <div class="section-header"><span>功能</span></div>
@@ -1256,7 +1257,44 @@
   <div class="sheet-footer-btn primary" onclick="runSimulation()">开始推演 →</div>
 </div>
 
-<!-- ========== 弹层：首次引导 ========== -->
+<!-- ========== 弹层：修改用户信息 ========== -->
+<div class="sheet sheet-large" id="userinfo-sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <span class="sheet-title">✏️ 修改用户信息</span>
+    <span class="sheet-close" onclick="closeSheet()">✕</span>
+  </div>
+
+  <div class="avatar-uploader" onclick="pickAvatar()">
+    <div class="au-preview" id="avatar-preview">👤</div>
+    <div class="au-text">
+      <span class="au-main" id="avatar-tip">点击上传头像</span>
+      <span class="au-sub">支持 JPG / PNG / WEBP，不超过 2MB，建议正方形</span>
+    </div>
+    <span class="au-arrow">›</span>
+  </div>
+  <input type="file" id="avatar-input" accept="image/jpeg,image/png,image/webp" onchange="onAvatarPicked(event)">
+
+  <div class="form-block">
+    <label class="form-label" for="uname-input">名称</label>
+    <input class="form-input" id="uname-input" type="text" maxlength="12" placeholder="怎么称呼你？">
+    <span class="form-count"><i id="uname-count">0</i>/12</span>
+    <span class="form-err" id="uname-err">请输入 1~12 个字符的名称</span>
+  </div>
+
+  <div class="form-block">
+    <label class="form-label" for="uintro-input">介绍</label>
+    <textarea class="form-input form-textarea" id="uintro-input" maxlength="60" placeholder="一句话介绍自己，例如：月薪族，正在攒钱买车"></textarea>
+    <span class="form-count"><i id="uintro-count">0</i>/60</span>
+    <span class="form-err" id="uintro-err">介绍不超过 60 个字符</span>
+  </div>
+
+  <div class="sheet-hint">头像仅保存在本设备，不会上传云端。</div>
+
+  <div class="sheet-footer-btn primary" onclick="saveUserInfo()">保 存</div>
+</div>
+
+<!-- ========== 弹层：头像裁切预览 ========== --><!-- ========== 弹层：首次引导 ========== -->
 <div class="sheet sheet-large" id="onboard-sheet">
   <div class="sheet-handle"></div>
   <div class="onboard-emoji">👋</div>
