@@ -3,10 +3,12 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:yuan/screens/commons/icons/app_icons.dart';
 
-class UserAvatar extends StatelessWidget {
-  final String? base64;
+import '../../../commons/image/image_picker_widget.dart';
 
-  const UserAvatar({super.key, required this.base64});
+class UserAvatar extends StatelessWidget {
+  final String? avatar;
+
+  const UserAvatar({super.key, required this.avatar});
 
   @override
   Widget build(BuildContext context) {
@@ -15,7 +17,7 @@ class UserAvatar extends StatelessWidget {
       child: SizedBox(
         width: 38,
         height: 38,
-        child: base64 == null || base64 == ''
+        child: avatar == null || avatar == ''
             ? FittedBox(
                 fit: BoxFit.cover,
                 child: Icon(
@@ -24,7 +26,13 @@ class UserAvatar extends StatelessWidget {
               )
             : FittedBox(
                 fit: BoxFit.cover,
-                child: Image.memory(base64Decode(base64!)),
+                child: SingleImagePickerWidget(
+                  initialBase64: avatar,
+                  enableUpload: false,
+                  size: 56,
+                  shape: ImageShape.circle,
+                  onImageChanged: (_) {},
+                ),
               ),
       ),
     );

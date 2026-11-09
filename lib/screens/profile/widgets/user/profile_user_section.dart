@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:yuan/screens/profile/widgets/user/user_avatar.dart';
+import '../../../commons/image/image_picker_widget.dart';
 
 import '../../../../database/user/user_info.dart';
 import '../../../../service/user_controller.dart';
@@ -17,10 +18,12 @@ class ProfileUserSection extends StatelessWidget {
       context,
       initialName: user.username,
       initialSub: user.userSub,
-      onSave: (name, sub) {
+      initialAvatar: user.avatar,
+      onSave: (name, sub, avatar) {
         context.read<UserController>().updateProfile(
           username: name,
           userSub: sub,
+          avatar: avatar,
         );
       },
     );
@@ -31,7 +34,8 @@ class ProfileUserSection extends StatelessWidget {
       BuildContext context, {
         required String initialName,
         required String initialSub,
-        required void Function(String name, String sub) onSave,
+        required String? initialAvatar,
+        required void Function(String name, String sub, String? avatar) onSave,
       }) async {
     final nameCtrl = TextEditingController(text: initialName);
     final subCtrl = TextEditingController(text: initialSub);
@@ -51,11 +55,18 @@ class ProfileUserSection extends StatelessWidget {
           return;
         }
 
-        onSave(name, sub);
+        // 【关键】从EditProfileSheet内部拿到临时的头像值
+        final editSheetState = context
+            .findAncestorStateOfType<EditProfileSheetState>();
+        final avatar = editSheetState?.tempAvatar ?? initialAvatar;
+
+        onSave(name, sub, avatar);
       },
       child: EditProfileSheet(
+        key: GlobalObjectKey(UniqueKey()),
         nameCtrl: nameCtrl,
         subCtrl: subCtrl,
+        initialAvatar: initialAvatar,
       ),
     );
   }
@@ -65,7 +76,7 @@ class ProfileUserSection extends StatelessWidget {
     final user = context.watch<UserController>().user;
 
     if (user == null) {
-      return const SizedBox(height: 80); // 或 loading placeholder
+      return const SizedBox(height: 80);
     }
 
     return Padding(
@@ -77,9 +88,11 @@ class ProfileUserSection extends StatelessWidget {
         decoration: AppStyles.cardDecoration(context),
         child: Row(
           children: [
-            // 头像
-            UserAvatar(base64: user.avatar),
+            // 头像：仅展示，禁止直接编辑
+            UserAvatar(avatar: user.avatar),
+
             const SizedBox(width: 14),
+
             // 内容
             Expanded(
               child: Column(
@@ -91,6 +104,7 @@ class ProfileUserSection extends StatelessWidget {
                 ],
               ),
             ),
+
             // 设置按钮
             Material(
               color: Colors.transparent,

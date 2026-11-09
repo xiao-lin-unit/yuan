@@ -1,14 +1,32 @@
 import 'package:flutter/material.dart';
+import '../../../commons/image/image_picker_widget.dart';
 
-class EditProfileSheet extends StatelessWidget {
+class EditProfileSheet extends StatefulWidget {
   final TextEditingController nameCtrl;
   final TextEditingController subCtrl;
+  final String? initialAvatar;
 
   const EditProfileSheet({
     super.key,
     required this.nameCtrl,
     required this.subCtrl,
+    required this.initialAvatar,
   });
+
+  @override
+  State<EditProfileSheet> createState() => EditProfileSheetState();
+}
+
+class EditProfileSheetState extends State<EditProfileSheet> {
+  /// 临时头像：弹窗内所有改动只存在这里
+  /// 确认才对外提交；关闭弹窗直接销毁，不会影响线上/本地原图
+  String? tempAvatar;
+
+  @override
+  void initState() {
+    super.initState();
+    tempAvatar = widget.initialAvatar;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -19,11 +37,37 @@ class EditProfileSheet extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        /// 头像选择区域
+        Center(
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 20),
+            child: SingleImagePickerWidget(
+              initialBase64: tempAvatar,
+              enableUpload: true,
+              size: 88,
+              shape: ImageShape.circle,
+              // 限制头像图片参数，防止超大图占用存储
+              maxFileSize: 2 * 1024 * 1024,
+              pickMaxWidth: 512,
+              pickMaxHeight: 512,
+              allowedExtensions: const ['jpg', 'jpeg', 'png', 'webp'],
+              maxWidth: 512,
+              maxHeight: 512,
+              imageQuality: 85,
+              onImageChanged: (b64) {
+                setState(() {
+                  tempAvatar = b64;
+                });
+              },
+            ),
+          ),
+        ),
+
         /// 名称
         _LabeledField(
           label: '名称',
           maxLength: 12,
-          controller: nameCtrl,
+          controller: widget.nameCtrl,
           hintText: '怎么称呼你？',
           textInputAction: TextInputAction.next,
         ),
@@ -34,7 +78,7 @@ class EditProfileSheet extends StatelessWidget {
         _LabeledField(
           label: '介绍',
           maxLength: 60,
-          controller: subCtrl,
+          controller: widget.subCtrl,
           hintText: '一句话介绍自己，例如：月薪族，正在攒钱买车',
           textInputAction: TextInputAction.done,
           maxLines: 3,
