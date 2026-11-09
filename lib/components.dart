@@ -1,5 +1,5 @@
 import 'package:provider/provider.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:sqflite/sqflite.dart';
 import 'package:yuan/service/user_controller.dart';
 
 import 'database/user/user_dao.dart';

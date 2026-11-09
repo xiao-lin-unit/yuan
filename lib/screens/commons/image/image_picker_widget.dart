@@ -403,7 +403,7 @@ class _MultiImagePickerWidgetState extends State<MultiImagePickerWidget> {
           height: widget.size,
           decoration: BoxDecoration(
             borderRadius: _borderRadius,
-            border: Border.all(color: Colors.grey.withOpacity(0.35)),
+            border: Border.all(color: Colors.grey.withValues(alpha: 0.35)),
             color: Colors.grey[100],
           ),
           child: Icon(Icons.block, size: 22, color: Colors.grey[400]),

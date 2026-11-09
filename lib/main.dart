@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:sqflite/sqflite.dart';
 import 'database/database_shell.dart';
-import 'dart:io';
 import 'router/router_shell.dart';
 import 'theme.dart';
 import 'components.dart';
@@ -37,12 +35,12 @@ class YuanApp extends StatelessWidget {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  if (!kIsWeb) {
-    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-      sqfliteFfiInit();
-      databaseFactory = databaseFactoryFfi;
-    }
-  }
+  // if (!kIsWeb) {
+  //   if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+  //     sqfliteFfiInit();
+  //     databaseFactory = databaseFactoryFfi;
+  //   }
+  // }
 
   Database? db;
 

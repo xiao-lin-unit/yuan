@@ -94,7 +94,7 @@ class _FormRow extends StatelessWidget {
       decoration: BoxDecoration(
         border: Border(
           bottom: BorderSide(
-            color: Theme.of(context).dividerColor.withOpacity(0.6),
+            color: Theme.of(context).dividerColor.withValues(alpha: 0.6),
           ),
         ),
       ),
@@ -261,7 +261,7 @@ class _TextFieldState extends State<_TextField> {
                 decoration: InputDecoration(
                   hintText: widget.hintText,
                   hintStyle: tt.bodyMedium?.copyWith(
-                    color: cs.onSurfaceVariant.withOpacity(0.6),
+                    color: cs.onSurfaceVariant.withValues(alpha: 0.6),
                   ),
                   counterText: '',
                   isDense: true,
@@ -276,7 +276,7 @@ class _TextFieldState extends State<_TextField> {
                 Text(
                   '$_length/${widget.maxLength}',
                   style: tt.bodySmall?.copyWith(
-                    color: cs.onSurfaceVariant.withOpacity(0.8),
+                    color: cs.onSurfaceVariant.withValues(alpha: 0.8),
                   ),
                 ),
               ],
