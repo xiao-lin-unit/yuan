@@ -10,30 +10,29 @@ class UserAvatar extends StatelessWidget {
 
   const UserAvatar({super.key, required this.avatar});
 
+  static const double _size = 38;
+
   @override
   Widget build(BuildContext context) {
+    final hasAvatar = avatar != null && avatar!.isNotEmpty;
 
-    return ClipOval(
-      child: SizedBox(
-        width: 38,
-        height: 38,
-        child: avatar == null || avatar == ''
-            ? FittedBox(
-                fit: BoxFit.cover,
-                child: Icon(
-                  AppIcons.user,
-                ),
-              )
-            : FittedBox(
-                fit: BoxFit.cover,
-                child: SingleImagePickerWidget(
-                  initialBase64: avatar,
-                  enableUpload: false,
-                  size: 56,
-                  shape: ImageShape.circle,
-                  onImageChanged: (_) {},
-                ),
-              ),
+    return SizedBox(
+      width: _size,
+      height: _size,
+      child: hasAvatar
+          ? SingleImagePickerWidget(
+        initialBase64: avatar,
+        enableUpload: false,          // 主页只展示，编辑走弹窗
+        size: _size,                  // 与外层一致，不再需要 FittedBox 缩放
+        shape: ImageShape.circle,
+        onImageChanged: (_) {},
+      )
+          : ClipOval(
+        child: Container(
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+          alignment: Alignment.center,
+          child: Icon(AppIcons.user, size: _size * 0.6),
+        ),
       ),
     );
   }

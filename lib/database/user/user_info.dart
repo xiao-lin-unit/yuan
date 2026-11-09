@@ -1,3 +1,6 @@
+
+const Object avatarUndefined = Object();
+
 class UserInfo {
   final int? id;
   final String? avatar; // base64 or null
@@ -30,15 +33,14 @@ class UserInfo {
   }
 
   UserInfo copyWith({
-    String? avatar,
     String? username,
     String? userSub,
+    Object? avatar = avatarUndefined,
   }) {
     return UserInfo(
-      id: id,
-      avatar: avatar ?? this.avatar,
       username: username ?? this.username,
       userSub: userSub ?? this.userSub,
+      avatar: identical(avatar, avatarUndefined) ? this.avatar : avatar as String?,
     );
   }
 }

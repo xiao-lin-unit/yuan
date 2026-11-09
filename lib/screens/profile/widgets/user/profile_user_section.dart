@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:yuan/screens/profile/widgets/user/user_avatar.dart';
-import '../../../commons/image/image_picker_widget.dart';
 
 import '../../../../database/user/user_info.dart';
 import '../../../../service/user_controller.dart';
@@ -29,7 +28,7 @@ class ProfileUserSection extends StatelessWidget {
     );
   }
 
-  // 展示sheet框
+  // 展示 sheet 框
   Future<void> showEditProfileSheet(
       BuildContext context, {
         required String initialName,
@@ -39,6 +38,9 @@ class ProfileUserSection extends StatelessWidget {
       }) async {
     final nameCtrl = TextEditingController(text: initialName);
     final subCtrl = TextEditingController(text: initialSub);
+
+    // 临时头像由「弹窗的持有者」保管，不再跨层去找 State
+    String? tempAvatar = initialAvatar;
 
     await CommonBottomSheet.show(
       context,
@@ -55,20 +57,21 @@ class ProfileUserSection extends StatelessWidget {
           return;
         }
 
-        // 【关键】从EditProfileSheet内部拿到临时的头像值
-        final editSheetState = context
-            .findAncestorStateOfType<EditProfileSheetState>();
-        final avatar = editSheetState?.tempAvatar ?? initialAvatar;
-
-        onSave(name, sub, avatar);
+        onSave(name, sub, tempAvatar);
       },
       child: EditProfileSheet(
-        key: GlobalObjectKey(UniqueKey()),
+        // 注意：不要传 GlobalObjectKey(UniqueKey())，
+        // 每次 build 换新 key 会销毁 State，选的头像会丢
         nameCtrl: nameCtrl,
         subCtrl: subCtrl,
         initialAvatar: initialAvatar,
+        onAvatarChanged: (b64) => tempAvatar = b64,
       ),
     );
+
+    // 弹窗关闭后释放控制器
+    nameCtrl.dispose();
+    subCtrl.dispose();
   }
 
   @override
