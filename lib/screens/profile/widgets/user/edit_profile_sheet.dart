@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:yuan/service/image/image_category.dart';
 import 'package:yuan/service/image/image_ref.dart';
+import 'package:yuan/styles/theme_tokens.dart';
 
 import '../../../commons/image/image_picker_widget.dart';
 
@@ -30,8 +31,8 @@ class EditProfileSheet extends StatelessWidget {
     // BottomSheet 高度无界，Column(mainAxisSize.min) 必须套一层 ScrollView
     return SingleChildScrollView(
       padding: EdgeInsets.only(
-        top: 8,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+        top: AppSpacing.xs,
+        bottom: MediaQuery.of(context).viewInsets.bottom + AppSpacing.md,
       ),
       child: Column(
         children: [
@@ -64,7 +65,10 @@ class EditProfileSheet extends StatelessWidget {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.only(top: 12, right: 4),
+            padding: const EdgeInsets.only(
+              top: AppSpacing.sm,
+              right: AppSpacing.xxs,
+            ),
             child: Text(
               '头像仅保存在本设备，不会上传云端。',
               textAlign: TextAlign.right,
@@ -84,7 +88,7 @@ class _FormRow extends StatelessWidget {
   final CrossAxisAlignment align;
 
   static const double _labelWidth = 72;
-  static const double _minHeight = 56;
+  static const double _minHeight = 64;
 
   const _FormRow({
     required this.label,
@@ -95,14 +99,11 @@ class _FormRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tt = Theme.of(context).textTheme;
+    final t = context.tokens;
 
     return Container(
       decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(
-            color: Theme.of(context).dividerColor.withValues(alpha: 0.6),
-          ),
-        ),
+        border: Border(bottom: BorderSide(color: t.divider)),
       ),
       constraints: const BoxConstraints(minHeight: _minHeight),
       child: Row(
@@ -119,7 +120,7 @@ class _FormRow extends StatelessWidget {
           ),
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 10),
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxs),
               child: child,
             ),
           ),
@@ -130,21 +131,18 @@ class _FormRow extends StatelessWidget {
 }
 
 /// 头像字段：只是「统一单图组件 + 一个业务分类」，没有任何头像专用逻辑。
-/// 以后账单凭证换成 ImageCategory.receipt 即可，组件与校验完全复用。
 class _AvatarField extends StatelessWidget {
   final ImageRef? initialRef;
   final ValueChanged<Object?> onAvatarChanged;
 
   static const double _size = 48;
 
-  const _AvatarField({
-    required this.initialRef,
-    required this.onAvatarChanged,
-  });
+  const _AvatarField({required this.initialRef, required this.onAvatarChanged});
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final t = context.tokens;
 
     return Stack(
       clipBehavior: Clip.none,
@@ -162,10 +160,7 @@ class _AvatarField extends StatelessWidget {
             onImageChanged: onAvatarChanged,
             placeholder: Container(
               alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: cs.surfaceContainerHighest,
-                shape: BoxShape.circle,
-              ),
+              decoration: BoxDecoration(color: t.field, shape: BoxShape.circle),
               child: Icon(
                 Icons.person,
                 size: _size * 0.5,
@@ -179,7 +174,12 @@ class _AvatarField extends StatelessWidget {
   }
 }
 
-/// 无边框输入框：右侧清除按钮，多行时底部显示字数
+/// 输入框：不再自己写 `InputBorder.none` + `contentPadding: zero`。
+///
+/// 旧版局部覆盖把主题的 filled 背景留着、边框去掉，结果是一块没有边界、
+/// 文字贴边的深色矩形；聚焦时也没有任何视觉反馈。
+/// 现在只传业务字段（hint / counter），容器、填充色、指示线、
+/// 内外边距、错误态全部由 ThemeSetting.inputDecorationTheme 统一提供。
 class _TextField extends StatefulWidget {
   final TextEditingController controller;
   final String? hintText;
@@ -223,12 +223,12 @@ class _TextFieldState extends State<_TextField> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
-
     final multiLine = widget.maxLines > 1;
 
     return Row(
-      crossAxisAlignment:
-      multiLine ? CrossAxisAlignment.start : CrossAxisAlignment.center,
+      crossAxisAlignment: multiLine
+          ? CrossAxisAlignment.start
+          : CrossAxisAlignment.center,
       children: [
         Expanded(
           child: Column(
@@ -240,45 +240,36 @@ class _TextFieldState extends State<_TextField> {
                 maxLines: widget.maxLines,
                 minLines: widget.minLines,
                 textInputAction: widget.textInputAction,
-                style: tt.bodyMedium,
+                style: tt.bodyLarge?.copyWith(color: cs.onSurface),
                 decoration: InputDecoration(
                   hintText: widget.hintText,
-                  hintStyle: tt.bodyMedium?.copyWith(
-                    color: cs.onSurfaceVariant.withValues(alpha: 0.6),
-                  ),
                   counterText: '',
-                  isDense: true,
-                  contentPadding: EdgeInsets.zero,
-                  border: InputBorder.none,
-                  enabledBorder: InputBorder.none,
-                  focusedBorder: InputBorder.none,
+                  alignLabelWithHint: multiLine,
+                  // 刻意不覆盖 border / filled / fillColor / contentPadding
                 ),
               ),
               if (multiLine) ...[
-                const SizedBox(height: 4),
+                const SizedBox(height: AppSpacing.xxs),
                 Text(
                   '$_length/${widget.maxLength}',
-                  style: tt.bodySmall?.copyWith(
-                    color: cs.onSurfaceVariant.withValues(alpha: 0.8),
-                  ),
+                  style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                 ),
               ],
             ],
           ),
         ),
 
-        // 清除按钮：有内容才出现
+        // 清除按钮：48dp 热区 + 语义图标 + tooltip
         if (_length > 0)
-          GestureDetector(
-            onTap: () => widget.controller.clear(),
-            behavior: HitTestBehavior.opaque,
-            child: Padding(
-              padding: const EdgeInsets.only(left: 8, top: 2),
-              child: Icon(
-                Icons.cancel,
-                size: 18,
-                color: cs.onSurfaceVariant.withValues(alpha: 0.55),
-              ),
+          IconButton(
+            onPressed: () => widget.controller.clear(),
+            tooltip: '清空',
+            icon: const Icon(Icons.close, size: 18),
+            color: cs.onSurfaceVariant,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints.tightFor(
+              width: kMinTapTarget,
+              height: kMinTapTarget,
             ),
           ),
       ],

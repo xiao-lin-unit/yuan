@@ -127,6 +127,7 @@ class _SingleImagePickerWidgetState extends State<SingleImagePickerWidget> {
       : BorderRadius.circular(widget.radius);
 
   Widget _buildUploadBox() {
+    final cs = Theme.of(context).colorScheme;
     return GestureDetector(
       onTap: _busy ? null : _pickImage,
       child: Container(
@@ -134,8 +135,8 @@ class _SingleImagePickerWidgetState extends State<SingleImagePickerWidget> {
         height: widget.size,
         decoration: BoxDecoration(
           borderRadius: _borderRadius,
-          border: Border.all(color: Colors.grey, width: 1),
-          color: Colors.grey[50],
+          border: Border.all(color: cs.outlineVariant, width: 1),
+          color: cs.surfaceContainerLow,
         ),
         child: _busy
             ? Center(
@@ -145,13 +146,14 @@ class _SingleImagePickerWidgetState extends State<SingleImagePickerWidget> {
                   child: const CircularProgressIndicator(strokeWidth: 2),
                 ),
               )
-            : const Icon(Icons.add, size: 32, color: Colors.grey),
+            : Icon(Icons.add, size: 32, color: cs.onSurfaceVariant),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final candidate = _candidate;
     final hasNew = candidate != null;
     final hasStored = !_cleared && widget.initialRef != null;
@@ -197,11 +199,11 @@ class _SingleImagePickerWidgetState extends State<SingleImagePickerWidget> {
                   behavior: HitTestBehavior.opaque,
                   child: Container(
                     padding: const EdgeInsets.all(6),
-                    decoration: const BoxDecoration(
-                      color: Colors.black54,
+                    decoration: BoxDecoration(
+                      color: cs.inverseSurface,
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.close, size: 14, color: Colors.white),
+                    child: Icon(Icons.close, size: 14, color: cs.onInverseSurface),
                   ),
                 ),
               ),
@@ -218,7 +220,7 @@ class _SingleImagePickerWidgetState extends State<SingleImagePickerWidget> {
       child: widget.placeholder ??
           ClipRRect(
             borderRadius: _borderRadius,
-            child: Container(color: Colors.grey[100]),
+            child: Container(color: cs.surfaceContainerHighest),
           ),
     );
   }
@@ -348,6 +350,7 @@ class _MultiImagePickerWidgetState extends State<MultiImagePickerWidget> {
   }
 
   Widget _buildUploadBox() {
+    final cs = Theme.of(context).colorScheme;
     return GestureDetector(
       onTap: _busy ? null : _pickImages,
       child: Container(
@@ -357,8 +360,8 @@ class _MultiImagePickerWidgetState extends State<MultiImagePickerWidget> {
           borderRadius: BorderRadius.circular(
             widget.shape == ImageShape.circle ? widget.size / 2 : widget.radius,
           ),
-          border: Border.all(color: Colors.grey, width: 1),
-          color: Colors.grey[50],
+          border: Border.all(color: cs.outlineVariant, width: 1),
+          color: cs.surfaceContainerLow,
         ),
         child: _busy
             ? Center(
@@ -368,27 +371,29 @@ class _MultiImagePickerWidgetState extends State<MultiImagePickerWidget> {
                   child: const CircularProgressIndicator(strokeWidth: 2),
                 ),
               )
-            : const Icon(Icons.add, size: 32, color: Colors.grey),
+            : Icon(Icons.add, size: 32, color: cs.onSurfaceVariant),
       ),
     );
   }
 
   Widget _buildDisabledBox() {
+    final cs = Theme.of(context).colorScheme;
     return widget.fullPlaceholder ??
         Container(
           width: widget.size,
           height: widget.size,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(widget.radius),
-            border: Border.all(color: Colors.grey.withValues(alpha: 0.35)),
-            color: Colors.grey[100],
+            border: Border.all(color: cs.outlineVariant),
+            color: cs.surfaceContainerLow,
           ),
-          child: Icon(Icons.block, size: 22, color: Colors.grey[400]),
+          child: Icon(Icons.block, size: 22, color: cs.onSurfaceVariant.withValues(alpha: 0.38)),
         );
   }
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final children = <Widget>[];
 
     for (var i = 0; i < _entries.length; i++) {
@@ -432,11 +437,11 @@ class _MultiImagePickerWidgetState extends State<MultiImagePickerWidget> {
                     behavior: HitTestBehavior.opaque,
                     child: Container(
                       padding: const EdgeInsets.all(6),
-                      decoration: const BoxDecoration(
-                        color: Colors.black54,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.close, size: 14, color: Colors.white),
+                      decoration: BoxDecoration(
+                      color: cs.inverseSurface,
+                      shape: BoxShape.circle,
+                    ),
+                      child: Icon(Icons.close, size: 14, color: cs.onInverseSurface),
                     ),
                   ),
                 ),

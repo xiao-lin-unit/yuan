@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:yuan/styles/theme_tokens.dart';
 
 class CommonBottomSheet extends StatefulWidget {
   /// 标题（可为 null）
@@ -99,8 +100,11 @@ class _CommonBottomSheetState extends State<CommonBottomSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final t = context.tokens;
+    final tt = Theme.of(context).textTheme;
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-    // 滚动sheet
+
     return DraggableScrollableSheet(
       expand: false,
       initialChildSize: 0.5,
@@ -115,82 +119,105 @@ class _CommonBottomSheetState extends State<CommonBottomSheet> {
             }
             return false;
           },
-          child: Container(
-            padding: EdgeInsets.only(bottom: bottomInset),
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-            ),
-            child: Column(
-              children: [
-                /// ===== 顶部栏 =====
-                if (widget.title != null ||
-                    widget.showCloseButton ||
-                    widget.showConfirmButton)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 8,
-                    ),
-                    child: Row(
-                      children: [
-                        /// 关闭按钮
-                        if (widget.showCloseButton)
-                          IconButton(
-                            icon: const Icon(Icons.close),
-                            color: Colors.black54,
-                            onPressed: () => Navigator.pop(context),
-                          )
-                        else
-                          const SizedBox(width: 48),
-
-                        /// 标题
-                        Expanded(
-                          child: widget.title == null
-                              ? const SizedBox()
-                              : Text(
-                                  widget.title!,
-                                  textAlign: TextAlign.center,
-                                  style: const TextStyle(
-                                    color: Colors.black54,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                        ),
-
-                        /// 保存按钮
-                        if (widget.showConfirmButton)
-                          TextButton(
-                            onPressed: _saving ? null : _onConfirmPressed,
-                            child: _saving
-                                ? const SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(
-                                        strokeWidth: 2),
-                                  )
-                                : Text(widget.confirmText,
-                                    style: const TextStyle(
-                                        color: Colors.black54)),
-                          )
-                        else
-                          const SizedBox(width: 48),
-                      ],
-                    ),
-                  ),
-
-                const Divider(height: 1),
-
-                /// ===== 内容区（可滚动） =====
-                Expanded(
-                  child: SingleChildScrollView(
-                    controller: scrollController,
-                    padding: const EdgeInsets.all(16),
-                    child: widget.child,
-                  ),
+          child: SafeArea(
+            top: false,
+            child: Container(
+              padding: EdgeInsets.only(bottom: bottomInset),
+              decoration: BoxDecoration(
+                // ❌ 旧版写死 Colors.white：暗色模式下弹层白得刺眼，
+                // 而输入框又跟着主题变深，出现「白纸 + 深灰块」的割裂。
+                color: t.sheet,
+                borderRadius: BorderRadius.vertical(
+                  top: Radius.circular(t.radiusSheet),
                 ),
-              ],
+                boxShadow: <BoxShadow>[
+                  BoxShadow(
+                    color: t.shadow.withValues(alpha: 0.12),
+                    blurRadius: 16,
+                    offset: const Offset(0, -2),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  // M3 拖拽把手：32×4，onSurfaceVariant 低透明
+                  Padding(
+                    padding: const EdgeInsets.only(top: AppSpacing.sm, bottom: AppSpacing.xs),
+                    child: Container(
+                      width: 32,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: cs.onSurfaceVariant.withValues(alpha: 0.4),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+
+                  /// ===== 顶部栏 =====
+                  if (widget.title != null ||
+                      widget.showCloseButton ||
+                      widget.showConfirmButton)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
+                      child: Row(
+                        children: [
+                          if (widget.showCloseButton)
+                            IconButton(
+                              icon: const Icon(Icons.close),
+                              color: cs.onSurfaceVariant,
+                              tooltip: '关闭',
+                              onPressed: () => Navigator.pop(context),
+                            )
+                          else
+                            const SizedBox(width: kMinTapTarget),
+
+                          Expanded(
+                            child: widget.title == null
+                                ? const SizedBox()
+                                : Text(
+                                    widget.title!,
+                                    textAlign: TextAlign.center,
+                                    style: tt.titleMedium
+                                        ?.copyWith(color: cs.onSurface),
+                                  ),
+                          ),
+
+                          if (widget.showConfirmButton)
+                            TextButton(
+                              onPressed: _saving ? null : _onConfirmPressed,
+                              child: _saving
+                                  ? SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: cs.primary,
+                                      ),
+                                    )
+                                  : Text(
+                                      widget.confirmText,
+                                      style: tt.labelLarge
+                                          ?.copyWith(color: cs.primary),
+                                    ),
+                            )
+                          else
+                            const SizedBox(width: kMinTapTarget),
+                        ],
+                      ),
+                    ),
+
+                  Divider(color: t.divider, height: 1, thickness: 1),
+
+                  /// ===== 内容区（可滚动） =====
+                  Expanded(
+                    child: SingleChildScrollView(
+                      controller: scrollController,
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      child: widget.child,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         );

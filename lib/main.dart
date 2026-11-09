@@ -22,8 +22,10 @@ class YuanApp extends StatelessWidget {
         child: Consumer<ThemeController>(
           builder: (context, t, _) => MaterialApp.router(
             title: '裕安',
-            theme: AppTheme.light(t.seed),
-            darkTheme: AppTheme.dark(t.seed),
+            // AppTheme 内部按 (seed, brightness, contrast) 缓存，
+            // 切颜色时不会再重算整套 ColorScheme + 组件主题。
+            theme: AppTheme.light(t.seed, contrast: t.contrast),
+            darkTheme: AppTheme.dark(t.seed, contrast: t.contrast),
             themeMode: t.mode,
             routerConfig: appRouter,
           )

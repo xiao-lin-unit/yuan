@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:yuan/screens/profile/widgets/user/user_avatar.dart';
 import 'package:yuan/service/image/image_ref.dart';
+import 'package:yuan/styles/theme_tokens.dart';
 
 import '../../../../database/user/user_info.dart';
 import '../../../../service/user_controller.dart';
@@ -42,7 +45,6 @@ class ProfileUserSection extends StatelessWidget {
     final subCtrl = TextEditingController(text: initialSub);
 
     // 统一哨兵：没动过 / 清空(null) / 新图(ImageCandidate)
-    // 不再需要把文件路径读成 base64 —— 图片层自己会按引用展示。
     Object? tempAvatar = imageUndefined;
 
     await CommonBottomSheet.show(
@@ -62,8 +64,6 @@ class ProfileUserSection extends StatelessWidget {
         await onSave(name, sub, tempAvatar);
       },
       child: EditProfileSheet(
-        // 注意：不要传 GlobalObjectKey(UniqueKey())，
-        // 每次 build 换新 key 会销毁 State，选的图会丢
         nameCtrl: nameCtrl,
         subCtrl: subCtrl,
         initialRef: initialRef,
@@ -71,7 +71,6 @@ class ProfileUserSection extends StatelessWidget {
       ),
     );
 
-    // 弹窗关闭后释放控制器
     nameCtrl.dispose();
     subCtrl.dispose();
   }
@@ -79,6 +78,7 @@ class ProfileUserSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final user = context.watch<UserController>().user;
+    final cs = Theme.of(context).colorScheme;
 
     if (user == null) {
       return const SizedBox(height: 80);
@@ -86,40 +86,50 @@ class ProfileUserSection extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(
-        AppStyles.pageHPadding, 4, AppStyles.pageHPadding, 4,
+        AppStyles.pageHPadding,
+        AppSpacing.xxs,
+        AppStyles.pageHPadding,
+        AppSpacing.xxs,
       ),
       child: Container(
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.all(AppSpacing.md + 2),
         decoration: AppStyles.cardDecoration(context),
         child: Row(
           children: [
-            // 头像：仅展示，禁止直接编辑
             UserAvatar(avatarRef: user.avatarRef),
 
-            const SizedBox(width: 14),
+            const SizedBox(width: AppSpacing.sm + 2),
 
-            // 内容
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(user.username, style: AppStyles.userNameStyle),
+                  Text(
+                    user.username,
+                    style: AppStyles.userNameStyle.copyWith(color: cs.onSurface),
+                  ),
                   const SizedBox(height: 3),
-                  Text(user.userSub, style: AppStyles.userSubStyle),
+                  Text(
+                    user.userSub,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppStyles.userSubStyle.copyWith(
+                      color: cs.onSurfaceVariant,
+                    ),
+                  ),
                 ],
               ),
             ),
 
-            // 设置按钮
-            Material(
-              color: Colors.transparent,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(20),
-                onTap: () => _openEdit(context, user),
-                child: const Padding(
-                  padding: EdgeInsets.all(4),
-                  child: Text('⚙️', style: TextStyle(fontSize: 20)),
-                ),
+            // 矢量图标替代 emoji：跨设备字形一致、随主题取色、48dp 热区
+            IconButton(
+              onPressed: () => unawaited(_openEdit(context, user)),
+              tooltip: '编辑资料',
+              icon: const Icon(Icons.settings_outlined),
+              color: cs.onSurfaceVariant,
+              constraints: const BoxConstraints.tightFor(
+                width: kMinTapTarget,
+                height: kMinTapTarget,
               ),
             ),
           ],
