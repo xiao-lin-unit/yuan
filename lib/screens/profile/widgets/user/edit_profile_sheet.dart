@@ -1,18 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:yuan/service/image/image_category.dart';
+import 'package:yuan/service/image/image_ref.dart';
 
 import '../../../commons/image/image_picker_widget.dart';
 
 class EditProfileSheet extends StatelessWidget {
   final TextEditingController nameCtrl;
   final TextEditingController subCtrl;
-  final String? initialAvatar;
-  final ValueChanged<String?> onAvatarChanged;
+
+  /// 已持久化的图片引用，由统一图片组件自己解析展示
+  final ImageRef? initialRef;
+
+  /// ImageCandidate = 新图；null = 删除/清空
+  final ValueChanged<Object?> onAvatarChanged;
 
   const EditProfileSheet({
     super.key,
     required this.nameCtrl,
     required this.subCtrl,
-    required this.initialAvatar,
+    required this.initialRef,
     required this.onAvatarChanged,
   });
 
@@ -32,7 +38,7 @@ class EditProfileSheet extends StatelessWidget {
           _FormRow(
             label: '头像',
             child: _AvatarField(
-              initialBase64: initialAvatar,
+              initialRef: initialRef,
               onAvatarChanged: onAvatarChanged,
             ),
           ),
@@ -123,15 +129,16 @@ class _FormRow extends StatelessWidget {
   }
 }
 
-/// 头像：圆形 + 右下角相机角标
+/// 头像字段：只是「统一单图组件 + 一个业务分类」，没有任何头像专用逻辑。
+/// 以后账单凭证换成 ImageCategory.receipt 即可，组件与校验完全复用。
 class _AvatarField extends StatelessWidget {
-  final String? initialBase64;
-  final ValueChanged<String?> onAvatarChanged;
+  final ImageRef? initialRef;
+  final ValueChanged<Object?> onAvatarChanged;
 
   static const double _size = 48;
 
   const _AvatarField({
-    required this.initialBase64,
+    required this.initialRef,
     required this.onAvatarChanged,
   });
 
@@ -147,14 +154,11 @@ class _AvatarField extends StatelessWidget {
           width: _size,
           height: _size,
           child: SingleImagePickerWidget(
-            initialBase64: initialBase64,
+            initialRef: initialRef,
             enableUpload: true,
+            category: ImageCategory.avatar,
             size: _size,
             shape: ImageShape.circle,
-            maxLongSide: 512,
-            imageQuality: 85,
-            maxFileSize: 2 * 1024 * 1024,
-            allowedExtensions: const ['jpg', 'jpeg', 'png', 'webp'],
             onImageChanged: onAvatarChanged,
             placeholder: Container(
               alignment: Alignment.center,
@@ -170,28 +174,6 @@ class _AvatarField extends StatelessWidget {
             ),
           ),
         ),
-
-        // 相机角标：IgnorePointer 让点击穿透到下面的头像
-        // Positioned(
-        //   right: -2,
-        //   bottom: -2,
-        //   child: IgnorePointer(
-        //     child: Container(
-        //       width: 22,
-        //       height: 22,
-        //       decoration: BoxDecoration(
-        //         color: cs.primary,
-        //         shape: BoxShape.circle,
-        //         border: Border.all(color: cs.surface, width: 2),
-        //       ),
-        //       child: Icon(
-        //         Icons.photo_camera_outlined,
-        //         size: 12,
-        //         color: cs.onPrimary,
-        //       ),
-        //     ),
-        //   ),
-        // ),
       ],
     );
   }
@@ -241,6 +223,7 @@ class _TextFieldState extends State<_TextField> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
+
     final multiLine = widget.maxLines > 1;
 
     return Row(

@@ -59,8 +59,9 @@ void main() async {
 
   final themeController = ThemeController();
   await themeController.load();
-  List<ChangeNotifierProvider> svc = Services.initServices(db);
+
+  // ✅ 等用户数据加载完再 runApp，首帧不再闪空白
+  final svc = await Services.initServices(db);
 
   runApp(YuanApp(theme: themeController, svc: svc));
 }
-

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-class CommonBottomSheet extends StatelessWidget {
+class CommonBottomSheet extends StatefulWidget {
   /// 标题（可为 null）
   final String? title;
 
@@ -16,7 +16,7 @@ class CommonBottomSheet extends StatelessWidget {
   /// 确认按钮文本
   final String confirmText;
 
-  /// 确认回调（由使用方处理逻辑）
+  /// 确认回调（由使用方处理逻辑，抛异常 = 保存失败，弹窗不关闭）
   final Future<void> Function()? onConfirm;
 
   /// 点击遮罩是否关闭
@@ -44,7 +44,7 @@ class CommonBottomSheet extends StatelessWidget {
     bool showCloseButton = true,
     bool showConfirmButton = true,
     String confirmText = '确认',
-  Future<void> Function()? onConfirm,
+    Future<void> Function()? onConfirm,
     bool barrierDismissible = true,
     bool enableDragToDismiss = true,
   }) {
@@ -68,6 +68,36 @@ class CommonBottomSheet extends StatelessWidget {
   }
 
   @override
+  State<CommonBottomSheet> createState() => _CommonBottomSheetState();
+}
+
+class _CommonBottomSheetState extends State<CommonBottomSheet> {
+  bool _saving = false;
+
+  Future<void> _onConfirmPressed() async {
+    if (_saving) return;
+    if (widget.onConfirm == null) {
+      if (mounted) Navigator.pop(context);
+      return;
+    }
+
+    setState(() => _saving = true);
+    try {
+      await widget.onConfirm!();
+      // ✅ 只有保存成功才关闭弹窗
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('保存失败：$e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     // 滚动sheet
@@ -79,7 +109,7 @@ class CommonBottomSheet extends StatelessWidget {
       builder: (context, scrollController) {
         return NotificationListener<DraggableScrollableNotification>(
           onNotification: (notification) {
-            if (enableDragToDismiss &&
+            if (widget.enableDragToDismiss &&
                 notification.extent <= notification.minExtent + 0.01) {
               Navigator.pop(context);
             }
@@ -94,7 +124,9 @@ class CommonBottomSheet extends StatelessWidget {
             child: Column(
               children: [
                 /// ===== 顶部栏 =====
-                if (title != null || showCloseButton || showConfirmButton)
+                if (widget.title != null ||
+                    widget.showCloseButton ||
+                    widget.showConfirmButton)
                   Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 8,
@@ -103,7 +135,7 @@ class CommonBottomSheet extends StatelessWidget {
                     child: Row(
                       children: [
                         /// 关闭按钮
-                        if (showCloseButton)
+                        if (widget.showCloseButton)
                           IconButton(
                             icon: const Icon(Icons.close),
                             color: Colors.black54,
@@ -114,12 +146,12 @@ class CommonBottomSheet extends StatelessWidget {
 
                         /// 标题
                         Expanded(
-                          child: title == null
+                          child: widget.title == null
                               ? const SizedBox()
                               : Text(
-                                  title!,
+                                  widget.title!,
                                   textAlign: TextAlign.center,
-                                  style: TextStyle(
+                                  style: const TextStyle(
                                     color: Colors.black54,
                                     fontSize: 16,
                                     fontWeight: FontWeight.w600,
@@ -128,17 +160,19 @@ class CommonBottomSheet extends StatelessWidget {
                         ),
 
                         /// 保存按钮
-                        if (showConfirmButton)
+                        if (widget.showConfirmButton)
                           TextButton(
-                            onPressed: () async {
-                              if (onConfirm != null) {
-                                await onConfirm!();
-                              }
-                              if (context.mounted) {
-                                Navigator.pop(context);
-                              }
-                            },
-                            child: Text(confirmText, style: TextStyle(color: Colors.black54)),
+                            onPressed: _saving ? null : _onConfirmPressed,
+                            child: _saving
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2),
+                                  )
+                                : Text(widget.confirmText,
+                                    style: const TextStyle(
+                                        color: Colors.black54)),
                           )
                         else
                           const SizedBox(width: 48),
@@ -153,7 +187,7 @@ class CommonBottomSheet extends StatelessWidget {
                   child: SingleChildScrollView(
                     controller: scrollController,
                     padding: const EdgeInsets.all(16),
-                    child: child,
+                    child: widget.child,
                   ),
                 ),
               ],

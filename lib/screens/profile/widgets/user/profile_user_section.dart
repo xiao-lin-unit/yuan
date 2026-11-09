@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:yuan/screens/profile/widgets/user/user_avatar.dart';
+import 'package:yuan/service/image/image_ref.dart';
 
 import '../../../../database/user/user_info.dart';
 import '../../../../service/user_controller.dart';
@@ -17,9 +18,10 @@ class ProfileUserSection extends StatelessWidget {
       context,
       initialName: user.username,
       initialSub: user.userSub,
-      initialAvatar: user.avatar,
-      onSave: (name, sub, avatar) {
-        context.read<UserController>().updateProfile(
+      initialRef: user.avatarRef,
+      onSave: (name, sub, avatar) async {
+        // ✅ await 到底；异常上抛给 BottomSheet，保存失败时弹窗不关闭
+        await context.read<UserController>().updateProfile(
           username: name,
           userSub: sub,
           avatar: avatar,
@@ -33,39 +35,39 @@ class ProfileUserSection extends StatelessWidget {
       BuildContext context, {
         required String initialName,
         required String initialSub,
-        required String? initialAvatar,
-        required void Function(String name, String sub, String? avatar) onSave,
+        required ImageRef? initialRef,
+        required Future<void> Function(String name, String sub, Object? avatar) onSave,
       }) async {
     final nameCtrl = TextEditingController(text: initialName);
     final subCtrl = TextEditingController(text: initialSub);
 
-    // 临时头像由「弹窗的持有者」保管，不再跨层去找 State
-    String? tempAvatar = initialAvatar;
+    // 统一哨兵：没动过 / 清空(null) / 新图(ImageCandidate)
+    // 不再需要把文件路径读成 base64 —— 图片层自己会按引用展示。
+    Object? tempAvatar = imageUndefined;
 
     await CommonBottomSheet.show(
       context,
       title: '编辑资料',
       showConfirmButton: true,
       onConfirm: () async {
+        if (!context.mounted) return;
         final name = nameCtrl.text.trim();
         final sub = subCtrl.text.trim();
 
         if (name.isEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('昵称不能为空')),
-          );
-          return;
+          // 交给 BottomSheet 统一提示，保持弹窗打开且不重复弹 SnackBar
+          throw StateError('昵称不能为空');
         }
 
-        onSave(name, sub, tempAvatar);
+        await onSave(name, sub, tempAvatar);
       },
       child: EditProfileSheet(
         // 注意：不要传 GlobalObjectKey(UniqueKey())，
-        // 每次 build 换新 key 会销毁 State，选的头像会丢
+        // 每次 build 换新 key 会销毁 State，选的图会丢
         nameCtrl: nameCtrl,
         subCtrl: subCtrl,
-        initialAvatar: initialAvatar,
-        onAvatarChanged: (b64) => tempAvatar = b64,
+        initialRef: initialRef,
+        onAvatarChanged: (v) => tempAvatar = v,
       ),
     );
 
@@ -92,7 +94,7 @@ class ProfileUserSection extends StatelessWidget {
         child: Row(
           children: [
             // 头像：仅展示，禁止直接编辑
-            UserAvatar(avatar: user.avatar),
+            UserAvatar(avatarRef: user.avatarRef),
 
             const SizedBox(width: 14),
 

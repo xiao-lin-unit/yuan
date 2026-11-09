@@ -4,6 +4,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:yuan/database/db_module.dart';
 import 'package:yuan/database/user/user_db.dart';
+import 'package:yuan/service/image/image_migration.dart';
 
 /// 数据库服务：只负责建库建表，不存任何业务表
 class DatabaseService {
@@ -11,7 +12,8 @@ class DatabaseService {
   static final DatabaseService instance = DatabaseService._internal();
 
   static const _dbName = 'yuan.db';
-  static const _dbVersion = 1;
+  // v1: 头像存 base64；v2: 统一图片引用（ImageRef），由 ImageMigration 收编旧数据
+  static const _dbVersion = 2;
   Database? _db;
 
   final List<DbModule> _modules = [
@@ -47,12 +49,15 @@ class DatabaseService {
     } catch (e, st) {
       debugPrint('❌ 数据库初始化失败: $e');
       debugPrint(st.toString());
-      rethrow; // ✅ 非常关键
+      rethrow;
     }
   }
 
   Future<void> _onUpgrade(Database db, int oldV, int newV) async {
-    // 后续版本迁移用
+    if (oldV < 2) {
+      // 统一图片迁移：任何表的旧图片列都走同一套逻辑
+      await ImageMigration.run(db);
+    }
   }
 
   Future<void> close() async {
@@ -60,4 +65,3 @@ class DatabaseService {
     _db = null;
   }
 }
-
