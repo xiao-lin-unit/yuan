@@ -81,7 +81,20 @@ class AppTheme {
       snackBarTheme: ThemeSetting.snackBarTheme(cs),
       tooltipTheme: ThemeSetting.tooltipTheme(cs),
 
-      // Switch / Checkbox / Radio / Slider / ProgressIndicator 故意不设置：
+      // ── 第二批：圆角 / 间距 / 选中态统一接管 ──────────────────
+      // 这些控件默认虽跟随 colorScheme，但圆角档位与内边距和项目里的
+      // 卡片 / 列表 / 按钮对不上；现在全部从同一套令牌派生。
+      chipTheme: ThemeSetting.chipTheme(cs, tokens),
+      tabBarTheme: ThemeSetting.tabBarTheme(cs, tokens),
+      floatingActionButtonTheme: ThemeSetting.floatingActionButtonTheme(cs),
+      drawerTheme: ThemeSetting.drawerTheme(cs, tokens),
+      datePickerTheme: ThemeSetting.datePickerTheme(cs, tokens),
+      popupMenuTheme: ThemeSetting.popupMenuTheme(cs, tokens),
+      segmentedButtonTheme: ThemeSetting.segmentedButtonTheme(cs, tokens),
+      badgeTheme: ThemeSetting.badgeTheme(cs),
+      progressIndicatorTheme: ThemeSetting.progressIndicatorTheme(cs),
+
+      // Switch / Checkbox / Radio / Slider 故意不设置：
       // 传空 ThemeData 会把 M3 的内建样式覆盖掉。
 
       splashFactory: InkRipple.splashFactory,

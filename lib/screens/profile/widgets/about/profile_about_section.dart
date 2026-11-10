@@ -1,9 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:yuan/styles/theme_tokens.dart';
 
+import '../../../../styles/app_decorations.dart';
+import '../../../../styles/app_typography.dart';
+import '../../../../styles/theme_tokens.dart';
 import '../../../commons/header/section_header.dart';
-import '../../../commons/styles/app_styles.dart';
 import '../../../commons/icons/app_icons.dart';
+
+// ── 组件私有样式（只服务本文件）────────────────────────────────
+const double _kRowHorizontalPadding = AppSpacing.sm;
+const double _kRowVerticalPadding = AppSpacing.sm;
+const double _kChevronSize = AppIconSize.medium;
+const String _kSectionTitle = '关于';
 
 /// ④ 关于分区
 class ProfileAboutSection extends StatelessWidget {
@@ -22,14 +29,14 @@ class ProfileAboutSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SectionHeader(
-          title: '关于',
+          title: _kSectionTitle,
           trailing: Icon(AppIcons.about),
         ),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppStyles.pageHPadding),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
           child: Container(
             width: double.infinity,
-            decoration: AppStyles.itemDecoration(context),
+            decoration: AppDecorations.item(context),
             clipBehavior: Clip.antiAlias,
             child: Column(
               children: [
@@ -53,7 +60,8 @@ class _AboutRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final t = context.tokens;
+    final appText = context.appText;
+    final tokens = context.tokens;
     return Column(
       children: [
         InkWell(
@@ -62,32 +70,32 @@ class _AboutRow extends StatelessWidget {
             width: double.infinity,
             constraints: const BoxConstraints(minHeight: kMinTapTarget),
             padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.sm,
-              vertical: AppSpacing.sm,
+              horizontal: _kRowHorizontalPadding,
+              vertical: _kRowVerticalPadding,
             ),
             child: Row(
               children: [
                 Expanded(
                   child: Text(
                     text,
-                    style: AppStyles.aboutTextStyle.copyWith(
-                      color: onTap == null
-                          ? cs.onSurfaceVariant
-                          : cs.onSurface,
-                    ),
+                    style: onTap == null ? appText.caption : appText.body,
                   ),
                 ),
                 if (onTap != null)
                   Icon(
-                    Icons.chevron_right,
-                    size: 20,
+                    AppIcons.chevronRight,
+                    size: _kChevronSize,
                     color: cs.onSurfaceVariant,
                   ),
               ],
             ),
           ),
         ),
-        Divider(color: t.divider, height: 1, thickness: 1),
+        Divider(
+          color: tokens.divider,
+          height: AppBorder.thin,
+          thickness: AppBorder.thin,
+        ),
       ],
     );
   }

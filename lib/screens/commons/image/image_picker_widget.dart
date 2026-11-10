@@ -6,11 +6,22 @@ import 'package:yuan/service/image/image_category.dart';
 import 'package:yuan/service/image/image_policy.dart';
 import 'package:yuan/service/image/image_ref.dart';
 import 'package:yuan/service/image/image_validator.dart';
+import '../../../styles/theme_tokens.dart';
+
+import '../icons/app_icons.dart';
 
 import 'app_image.dart';
 
+// ── 组件私有样式（只服务本文件）────────────────────────────────
+const double _kAddIconSize = 32;
+const double _kCloseIconSize = 14;
+const double _kBadgePadding = 6;
+const double _kBadgeOffset = -6;
+const double _kProgressRatio = 0.32;
+const int _kCacheScale = 2;
+
 // 兼容旧 import：ImageShape 现在由统一展示组件定义
-export 'app_image.dart' show ImageShape, AppImage;
+// export 'app_image.dart' show ImageShape, AppImage;
 
 /// ================== 单图组件 ==================
 ///
@@ -135,18 +146,18 @@ class _SingleImagePickerWidgetState extends State<SingleImagePickerWidget> {
         height: widget.size,
         decoration: BoxDecoration(
           borderRadius: _borderRadius,
-          border: Border.all(color: cs.outlineVariant, width: 1),
+          border: Border.all(color: cs.outlineVariant, width: AppBorder.thin),
           color: cs.surfaceContainerLow,
         ),
         child: _busy
             ? Center(
                 child: SizedBox(
-                  width: widget.size * 0.32,
-                  height: widget.size * 0.32,
+                  width: widget.size * _kProgressRatio,
+                  height: widget.size * _kProgressRatio,
                   child: const CircularProgressIndicator(strokeWidth: 2),
                 ),
               )
-            : Icon(Icons.add, size: 32, color: cs.onSurfaceVariant),
+            : Icon(AppIcons.add, size: _kAddIconSize, color: cs.onSurfaceVariant),
       ),
     );
   }
@@ -166,9 +177,9 @@ class _SingleImagePickerWidgetState extends State<SingleImagePickerWidget> {
               width: widget.size,
               height: widget.size,
               fit: BoxFit.cover,
-              cacheWidth: (widget.size * 2).toInt(),
+              cacheWidth: (widget.size * _kCacheScale).toInt(),
               gaplessPlayback: true,
-              errorBuilder: (_, __, ___) => const Icon(Icons.broken_image),
+              errorBuilder: (_, __, ___) => const Icon(AppIcons.brokenImage),
             )
           : AppImage(
               ref: widget.initialRef,
@@ -192,18 +203,18 @@ class _SingleImagePickerWidgetState extends State<SingleImagePickerWidget> {
                   ),
             if (widget.enableUpload)
               Positioned(
-                top: -6,
-                right: -6,
+                top: _kBadgeOffset,
+                right: _kBadgeOffset,
                 child: GestureDetector(
                   onTap: _removeImage,
                   behavior: HitTestBehavior.opaque,
                   child: Container(
-                    padding: const EdgeInsets.all(6),
+                    padding: const EdgeInsets.all(_kBadgePadding),
                     decoration: BoxDecoration(
                       color: cs.inverseSurface,
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(Icons.close, size: 14, color: cs.onInverseSurface),
+                    child: Icon(AppIcons.clear, size: _kCloseIconSize, color: cs.onInverseSurface),
                   ),
                 ),
               ),
@@ -360,18 +371,18 @@ class _MultiImagePickerWidgetState extends State<MultiImagePickerWidget> {
           borderRadius: BorderRadius.circular(
             widget.shape == ImageShape.circle ? widget.size / 2 : widget.radius,
           ),
-          border: Border.all(color: cs.outlineVariant, width: 1),
+          border: Border.all(color: cs.outlineVariant, width: AppBorder.thin),
           color: cs.surfaceContainerLow,
         ),
         child: _busy
             ? Center(
                 child: SizedBox(
-                  width: widget.size * 0.32,
-                  height: widget.size * 0.32,
+                  width: widget.size * _kProgressRatio,
+                  height: widget.size * _kProgressRatio,
                   child: const CircularProgressIndicator(strokeWidth: 2),
                 ),
               )
-            : Icon(Icons.add, size: 32, color: cs.onSurfaceVariant),
+            : Icon(AppIcons.add, size: _kAddIconSize, color: cs.onSurfaceVariant),
       ),
     );
   }
@@ -387,7 +398,7 @@ class _MultiImagePickerWidgetState extends State<MultiImagePickerWidget> {
             border: Border.all(color: cs.outlineVariant),
             color: cs.surfaceContainerLow,
           ),
-          child: Icon(Icons.block, size: 22, color: cs.onSurfaceVariant.withValues(alpha: 0.38)),
+          child: Icon(AppIcons.block, size: AppIconSize.medium + 2, color: cs.onSurfaceVariant.withValues(alpha: AppOpacity.disabled)),
         );
   }
 
@@ -410,9 +421,9 @@ class _MultiImagePickerWidgetState extends State<MultiImagePickerWidget> {
               width: widget.size,
               height: widget.size,
               fit: BoxFit.cover,
-              cacheWidth: (widget.size * 2).toInt(),
+              cacheWidth: (widget.size * _kCacheScale).toInt(),
               gaplessPlayback: true,
-              errorBuilder: (_, __, ___) => const Icon(Icons.broken_image),
+              errorBuilder: (_, __, ___) => const Icon(AppIcons.brokenImage),
             );
 
       children.add(
@@ -430,18 +441,18 @@ class _MultiImagePickerWidgetState extends State<MultiImagePickerWidget> {
                     ),
               if (widget.enableUpload)
                 Positioned(
-                  top: -6,
-                  right: -6,
+                  top: _kBadgeOffset,
+                  right: _kBadgeOffset,
                   child: GestureDetector(
                     onTap: () => _removeImage(i),
                     behavior: HitTestBehavior.opaque,
                     child: Container(
-                      padding: const EdgeInsets.all(6),
+                      padding: const EdgeInsets.all(_kBadgePadding),
                       decoration: BoxDecoration(
                       color: cs.inverseSurface,
                       shape: BoxShape.circle,
                     ),
-                      child: Icon(Icons.close, size: 14, color: cs.onInverseSurface),
+                      child: Icon(AppIcons.clear, size: _kCloseIconSize, color: cs.onInverseSurface),
                     ),
                   ),
                 ),

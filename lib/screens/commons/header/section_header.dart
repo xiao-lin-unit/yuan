@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:yuan/styles/theme_tokens.dart';
 
-import '../styles/app_styles.dart';
+import '../../../styles/app_typography.dart';
+import '../../../styles/theme_tokens.dart';
 
-/// 公共分组标题
+// ── 组件私有样式（只服务本文件）────────────────────────────────
+const double _kTrailingGap = 6;
+const double _kTrailingIconSize = 18;
+
+/// 公共分组标题：统一所有分区的上下留白与文字层级。
 class SectionHeader extends StatelessWidget {
   final String title;
   final Widget? trailing;
@@ -15,21 +19,21 @@ class SectionHeader extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.fromLTRB(
-        AppStyles.pageHPadding,
-        18,
-        AppStyles.pageHPadding,
-        AppSpacing.sm,
+        AppSpacing.md,
+        AppLayout.sectionHeaderTop,
+        AppSpacing.md,
+        AppLayout.sectionHeaderBottom,
       ),
       child: Row(
         children: [
-          Text(
-            title,
-            style: AppStyles.sectionHeaderStyle.copyWith(color: cs.onSurface),
-          ),
+          Text(title, style: context.appText.sectionHeader),
           if (trailing != null) ...[
-            const SizedBox(width: 6),
+            const SizedBox(width: _kTrailingGap),
             IconTheme(
-              data: IconThemeData(size: 18, color: cs.onSurfaceVariant),
+              data: IconThemeData(
+                size: _kTrailingIconSize,
+                color: cs.onSurfaceVariant,
+              ),
               child: trailing!,
             ),
           ],

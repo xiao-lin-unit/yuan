@@ -28,6 +28,89 @@ abstract final class AppMotion {
   static const Duration long = Duration(milliseconds: 300);
 }
 
+/// 状态层透明度：hover / pressed / focus / disabled / 描边 / 提示文字
+/// 全部集中在这里，禁止组件里再写 0.35 / 0.38 / 0.6 这类魔法小数。
+abstract final class AppOpacity {
+  static const double hover = 0.04;
+  static const double pressed = 0.08;
+  static const double selected = 0.10;
+  static const double disabled = 0.38;
+  static const double disabledContainer = 0.12;
+  static const double outline = 0.5;
+  static const double outlineDark = 0.35;
+  static const double hint = 0.7;
+  static const double scrim = 0.4;
+}
+
+/// 组件尺寸阶梯：Material 组件的固定尺寸统一放这里，
+/// 避免 32 / 40 / 48 / 56 / 304 这类数字散落在各个 ThemeData 工厂里。
+///
+/// 判定：只定义「跨多个组件复用」的尺度；只属于某个组件的尺寸
+/// 仍留在组件文件顶部的 `_k*` 私有常量区。
+abstract final class AppComponentSize {
+  static const double chipHeight = 32;
+  static const double chipAvatar = 24;
+  static const double chipDeleteIcon = 18;
+
+  static const double tabBarHeight = 48;
+  static const double tabIndicatorHeight = 3;
+
+  static const double segmentedButtonHeight = 40;
+
+  static const double fabSize = 56;
+  static const double fabSmallSize = 40;
+  static const double fabExtendedHeight = 56;
+
+  static const double drawerWidth = 304;
+  static const double popupMenuMinWidth = 224;
+
+  static const double badgeSmallSize = 6;
+  static const double badgeLargeSize = 16;
+  static const double linearProgressHeight = 4;
+
+  static const double calendarMarkerSize = 6;
+}
+
+/// 阴影：亮色用极轻的真实阴影，暗色以 tonal elevation（容器色差）为主
+abstract final class AppElevation {
+  static const double cardBlur = 8;
+  static const double sheetBlur = 16;
+  static const double cardAlpha = 0.08;
+  static const double sheetAlpha = 0.12;
+  static const Offset cardOffset = Offset(0, 2);
+  static const Offset sheetOffset = Offset(0, -2);
+}
+
+/// 图标尺寸阶梯：同一层级只用同一档
+abstract final class AppIconSize {
+  static const double small = 16;
+  static const double medium = 20;
+  static const double large = 24;
+  static const double badge = 22;
+  static const double empty = 32;
+}
+
+/// 描边宽度：常规 1dp，聚焦 2dp（M3 filled text field 规范）
+abstract final class AppBorder {
+  static const double thin = 1;
+  static const double focused = 2;
+}
+
+/// 页面级布局节奏：统一所有页面的留白与最小高度，
+/// 避免 ProfileScreen 里 18 / 12 / 4 / 4 / 24 这类无规律数字。
+abstract final class AppLayout {
+  static const double pageTop = 16;
+  static const double pageBottom = 32;
+  static const double sectionGap = 16;
+  static const double sectionHeaderTop = 16;
+  static const double sectionHeaderBottom = 8;
+  static const double navigationBarHeight = 72;
+  static const double fieldMinHeight = 56;
+  static const double listItemMinHeight = 56;
+  static const double formRowMinHeight = 64;
+  static const double maxContentWidth = 640;
+}
+
 /// 最小可点击区域（Material 无障碍 48dp，WCAG 2.2 AAA 44px）
 const double kMinTapTarget = 48.0;
 

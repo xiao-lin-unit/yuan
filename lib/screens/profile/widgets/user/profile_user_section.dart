@@ -4,18 +4,25 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:yuan/screens/profile/widgets/user/user_avatar.dart';
 import 'package:yuan/service/image/image_ref.dart';
+import 'package:yuan/styles/app_decorations.dart';
+import 'package:yuan/styles/app_typography.dart';
 import 'package:yuan/styles/theme_tokens.dart';
 
 import '../../../../database/user/user_info.dart';
 import '../../../../service/user_controller.dart';
+import '../../../commons/icons/app_icons.dart';
 import '../../../commons/sheet/bottom_sheet.dart';
-import '../../../commons/styles/app_styles.dart';
 import 'edit_profile_sheet.dart';
+
+// ── 组件私有样式（只服务本文件）────────────────────────────────
+const double _kCardPadding = AppSpacing.md + 2;
+const double _kAvatarTextGap = AppSpacing.sm + 2;
+const double _kNameSubGap = 3;
+const int _kSubMaxLines = 2;
 
 class ProfileUserSection extends StatelessWidget {
   const ProfileUserSection({super.key});
 
-  // 打开编辑框操作
   Future<void> _openEdit(BuildContext context, UserInfo user) async {
     await showEditProfileSheet(
       context,
@@ -23,7 +30,6 @@ class ProfileUserSection extends StatelessWidget {
       initialSub: user.userSub,
       initialRef: user.avatarRef,
       onSave: (name, sub, avatar) async {
-        // ✅ await 到底；异常上抛给 BottomSheet，保存失败时弹窗不关闭
         await context.read<UserController>().updateProfile(
           username: name,
           userSub: sub,
@@ -33,7 +39,6 @@ class ProfileUserSection extends StatelessWidget {
     );
   }
 
-  // 展示 sheet 框
   Future<void> showEditProfileSheet(
       BuildContext context, {
         required String initialName,
@@ -44,7 +49,6 @@ class ProfileUserSection extends StatelessWidget {
     final nameCtrl = TextEditingController(text: initialName);
     final subCtrl = TextEditingController(text: initialSub);
 
-    // 统一哨兵：没动过 / 清空(null) / 新图(ImageCandidate)
     Object? tempAvatar = imageUndefined;
 
     await CommonBottomSheet.show(
@@ -57,10 +61,8 @@ class ProfileUserSection extends StatelessWidget {
         final sub = subCtrl.text.trim();
 
         if (name.isEmpty) {
-          // 交给 BottomSheet 统一提示，保持弹窗打开且不重复弹 SnackBar
           throw StateError('昵称不能为空');
         }
-
         await onSave(name, sub, tempAvatar);
       },
       child: EditProfileSheet(
@@ -79,53 +81,43 @@ class ProfileUserSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final user = context.watch<UserController>().user;
     final cs = Theme.of(context).colorScheme;
+    final appText = context.appText;
 
     if (user == null) {
-      return const SizedBox(height: 80);
+      return const SizedBox(height: AppLayout.listItemMinHeight + AppSpacing.lg);
     }
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppStyles.pageHPadding,
-        AppSpacing.xxs,
-        AppStyles.pageHPadding,
-        AppSpacing.xxs,
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.xxs,
       ),
       child: Container(
-        padding: const EdgeInsets.all(AppSpacing.md + 2),
-        decoration: AppStyles.cardDecoration(context),
+        padding: const EdgeInsets.all(_kCardPadding),
+        decoration: AppDecorations.card(context),
         child: Row(
           children: [
             UserAvatar(avatarRef: user.avatarRef),
-
-            const SizedBox(width: AppSpacing.sm + 2),
-
+            const SizedBox(width: _kAvatarTextGap),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    user.username,
-                    style: AppStyles.userNameStyle.copyWith(color: cs.onSurface),
-                  ),
-                  const SizedBox(height: 3),
+                  Text(user.username, style: appText.userName),
+                  const SizedBox(height: _kNameSubGap),
                   Text(
                     user.userSub,
-                    maxLines: 2,
+                    maxLines: _kSubMaxLines,
                     overflow: TextOverflow.ellipsis,
-                    style: AppStyles.userSubStyle.copyWith(
-                      color: cs.onSurfaceVariant,
-                    ),
+                    style: appText.userSub,
                   ),
                 ],
               ),
             ),
-
-            // 矢量图标替代 emoji：跨设备字形一致、随主题取色、48dp 热区
             IconButton(
               onPressed: () => unawaited(_openEdit(context, user)),
               tooltip: '编辑资料',
-              icon: const Icon(Icons.settings_outlined),
+              icon: const Icon(AppIcons.edit),
               color: cs.onSurfaceVariant,
               constraints: const BoxConstraints.tightFor(
                 width: kMinTapTarget,

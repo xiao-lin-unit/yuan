@@ -1,6 +1,7 @@
 import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
 
+import '../screens/commons/icons/app_icons.dart';
 import '../screens/entry/entry_screen.dart';
 import '../screens/ledger/ledger_screen.dart';
 import '../screens/accounts/accounts_screen.dart';
@@ -23,16 +24,14 @@ class RouteNavigation {
   );
 }
 
-/// 用矢量图标替代 emoji。
-/// emoji 在不同系统/字体下字形、大小、颜色都不一致，且不吃主题的
-/// iconTheme，暗色模式下尤其突兀；Material Icons 会随 NavigationBarTheme
-/// 自动切换选中/未选中色，视觉更统一。
+/// 图标一律取自 AppIcons（全软件唯一语义表），
+/// 不再在路由层直接写 Icons.xxx 或 emoji。
 const List<RouteNavigation> tabs = [
-  RouteNavigation('记账', '/', 0, EntryScreen(), Icon(Icons.edit_outlined)),
-  RouteNavigation('资债', '/ledger', 1, LedgerScreen(), Icon(Icons.account_balance_outlined)),
-  RouteNavigation('账户', '/accounts', 2, AccountsScreen(), Icon(Icons.account_balance_wallet_outlined)),
-  RouteNavigation('分析', '/analysis', 3, AnalysisScreen(), Icon(Icons.analytics_outlined)),
-  RouteNavigation('我的', '/profile', 4, ProfileScreen(), Icon(Icons.person_outline)),
+  RouteNavigation('记账', '/', 0, EntryScreen(), Icon(AppIcons.entry)),
+  RouteNavigation('资债', '/ledger', 1, LedgerScreen(), Icon(AppIcons.ledger)),
+  RouteNavigation('账户', '/accounts', 2, AccountsScreen(), Icon(AppIcons.accounts)),
+  RouteNavigation('分析', '/analysis', 3, AnalysisScreen(), Icon(AppIcons.analysis)),
+  RouteNavigation('我的', '/profile', 4, ProfileScreen(), Icon(AppIcons.profile)),
 ];
 
 class AppShell extends StatelessWidget {

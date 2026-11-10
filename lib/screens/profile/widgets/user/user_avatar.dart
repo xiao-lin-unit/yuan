@@ -1,27 +1,36 @@
 import 'package:flutter/material.dart';
-import 'package:yuan/screens/commons/icons/app_icons.dart';
-import 'package:yuan/screens/commons/image/app_image.dart';
+
+import '../../../commons/icons/app_icons.dart';
+import '../../../../styles/theme_tokens.dart';
+import '../../../commons/image/app_image.dart';
 import 'package:yuan/service/image/image_ref.dart';
 
+// ── 组件私有样式（只服务本文件）────────────────────────────────
+const double _kAvatarSize = 38;
+const double _kPlaceholderIconRatio = 0.6;
+
 class UserAvatar extends StatelessWidget {
-  /// 统一图片引用，由 AppImage 负责解析与展示
   final ImageRef? avatarRef;
 
   const UserAvatar({super.key, required this.avatarRef});
 
-  static const double _size = 38;
-
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tokens = context.tokens;
     return AppImage(
       ref: avatarRef,
-      size: _size,
+      size: _kAvatarSize,
       shape: ImageShape.circle,
       placeholder: ClipOval(
         child: Container(
-          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+          color: tokens.field,
           alignment: Alignment.center,
-          child: Icon(AppIcons.user, size: _size * 0.6),
+          child: Icon(
+            AppIcons.user,
+            size: _kAvatarSize * _kPlaceholderIconRatio,
+            color: cs.onSurfaceVariant,
+          ),
         ),
       ),
     );

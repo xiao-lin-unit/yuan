@@ -1,5 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:yuan/screens/commons/icons/app_icons.dart';
+import 'package:yuan/styles/app_typography.dart';
 import 'package:yuan/styles/theme_tokens.dart';
 
 /// 主题种子预设。
@@ -25,10 +27,10 @@ class ColorSetting {
   static const Map<String, String> labels = <String, String>{
     'blue': '晴空蓝',
     'teal': '青碧',
-    'green': '原谅绿',// '竹绿',
-    'violet': '韵味紫',// '紫藤',
-    'rose': '姨妈红',// '胭脂',
-    'pink': '猛男粉',// '樱粉',
+    'green': '原谅绿',
+    'violet': '韵味紫',
+    'rose': '姨妈红',
+    'pink': '猛男粉',
     'amber': '琥珀',
     'slate': '石板灰',
   };
@@ -87,23 +89,9 @@ const List<String> defaultFontFallback = <String>[
 class ThemeSetting {
   ThemeSetting._();
 
-  static TextTheme get textTheme => const TextTheme(
-    displayLarge: TextStyle(fontSize: 57, fontWeight: FontWeight.w400, height: 1.12),
-    displayMedium: TextStyle(fontSize: 45, fontWeight: FontWeight.w400, height: 1.15),
-    displaySmall: TextStyle(fontSize: 36, fontWeight: FontWeight.w400, height: 1.22),
-    headlineLarge: TextStyle(fontSize: 32, fontWeight: FontWeight.w600, height: 1.25),
-    headlineMedium: TextStyle(fontSize: 28, fontWeight: FontWeight.w600, height: 1.28),
-    headlineSmall: TextStyle(fontSize: 24, fontWeight: FontWeight.w600, height: 1.33),
-    titleLarge: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, height: 1.4),
-    titleMedium: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, height: 1.45),
-    titleSmall: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, height: 1.5),
-    bodyLarge: TextStyle(fontSize: 16, fontWeight: FontWeight.w400, height: 1.5),
-    bodyMedium: TextStyle(fontSize: 14, fontWeight: FontWeight.w400, height: 1.43),
-    bodySmall: TextStyle(fontSize: 12, fontWeight: FontWeight.w400, height: 1.33),
-    labelLarge: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, height: 1.43),
-    labelMedium: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, height: 1.33),
-    labelSmall: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, height: 1.27),
-  );
+  /// 全局排版唯一来源，见 AppTypography。此处不再重复定义 15 档字号。
+  static TextTheme get textTheme => AppTypography.textTheme;
+
 
   static AppBarTheme appBarTheme(ColorScheme cs) => AppBarTheme(
     backgroundColor: cs.surface,
@@ -114,7 +102,7 @@ class ThemeSetting {
     scrolledUnderElevation: 2,
     centerTitle: false,
     titleTextStyle: textTheme.titleLarge?.copyWith(color: cs.onSurface),
-    iconTheme: IconThemeData(color: cs.onSurfaceVariant, size: 24),
+    iconTheme: IconThemeData(color: cs.onSurfaceVariant, size: AppIconSize.large),
   );
 
   static NavigationBarThemeData navigationBarTheme(ColorScheme cs) =>
@@ -123,14 +111,14 @@ class ThemeSetting {
         surfaceTintColor: cs.surfaceTint,
         // M3 底导靠 tonal elevation 分层，硬阴影 elevation:2 会在暗色下发灰
         elevation: 0,
-        height: 72,
+        height: AppLayout.navigationBarHeight,
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         indicatorColor: cs.secondaryContainer,
         indicatorShape: const StadiumBorder(),
         iconTheme: WidgetStateProperty.resolveWith((states) {
           final selected = states.contains(WidgetState.selected);
           return IconThemeData(
-            size: 24,
+            size: AppIconSize.large,
             color: selected ? cs.onSecondaryContainer : cs.onSurfaceVariant,
           );
         }),
@@ -152,8 +140,8 @@ class ThemeSetting {
         style: ElevatedButton.styleFrom(
           backgroundColor: cs.primary,
           foregroundColor: cs.onPrimary,
-          disabledBackgroundColor: cs.onSurface.withValues(alpha: 0.12),
-          disabledForegroundColor: cs.onSurface.withValues(alpha: 0.38),
+          disabledBackgroundColor: cs.onSurface.withValues(alpha: AppOpacity.disabledContainer),
+          disabledForegroundColor: cs.onSurface.withValues(alpha: AppOpacity.disabled),
           elevation: 0,
           // 旧版 minimumSize: Size(infinity,48) 会让每个按钮都被迫撑满父宽
           minimumSize: Size(t.tapTarget, t.tapTarget),
@@ -169,7 +157,7 @@ class ThemeSetting {
       TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: cs.primary,
-          disabledForegroundColor: cs.onSurface.withValues(alpha: 0.38),
+          disabledForegroundColor: cs.onSurface.withValues(alpha: AppOpacity.disabled),
           textStyle: textTheme.labelLarge,
           minimumSize: const Size(kMinTapTarget, kMinTapTarget),
         ),
@@ -213,20 +201,20 @@ class ThemeSetting {
       filled: true,
       fillColor: t.field,
       focusColor: t.field,
-      hoverColor: cs.primary.withValues(alpha: 0.04),
+      hoverColor: cs.primary.withValues(alpha: AppOpacity.hover),
       contentPadding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.md,
-        vertical: 14,
+        vertical: AppSpacing.sm,
       ),
-      constraints: const BoxConstraints(minHeight: 56),
+      constraints: const BoxConstraints(minHeight: AppLayout.fieldMinHeight),
       isDense: false,
       alignLabelWithHint: true,
-      border: line(cs.onSurfaceVariant, 1),
-      enabledBorder: line(cs.onSurfaceVariant, 1),
-      focusedBorder: line(cs.primary, 2),
-      errorBorder: line(cs.error, 1),
-      focusedErrorBorder: line(cs.error, 2),
-      disabledBorder: line(cs.onSurface.withValues(alpha: 0.12), 1),
+      border: line(cs.onSurfaceVariant, AppBorder.thin),
+      enabledBorder: line(cs.onSurfaceVariant, AppBorder.thin),
+      focusedBorder: line(cs.primary, AppBorder.focused),
+      errorBorder: line(cs.error, AppBorder.thin),
+      focusedErrorBorder: line(cs.error, AppBorder.focused),
+      disabledBorder: line(cs.onSurface.withValues(alpha: AppOpacity.disabledContainer), AppBorder.thin),
       hintStyle: textTheme.bodyLarge?.copyWith(color: cs.onSurfaceVariant),
       labelStyle: textTheme.bodyLarge?.copyWith(color: cs.onSurfaceVariant),
       floatingLabelStyle: textTheme.bodyMedium?.copyWith(color: cs.primary),
@@ -265,11 +253,11 @@ class ThemeSetting {
       );
 
   static IconThemeData iconTheme(ColorScheme cs) =>
-      IconThemeData(size: 24, color: cs.onSurfaceVariant);
+      IconThemeData(size: AppIconSize.large, color: cs.onSurfaceVariant);
 
   static DividerThemeData dividerTheme(AppThemeTokens t) => DividerThemeData(
     color: t.divider,
-    thickness: 1,
+    thickness: AppBorder.thin,
     space: 1,
   );
 
@@ -316,9 +304,403 @@ class ThemeSetting {
       color: cs.inverseSurface,
       borderRadius: BorderRadius.circular(AppRadius.small),
     ),
-    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
     margin: const EdgeInsets.all(AppSpacing.xs),
   );
+
+
+  // ════════════════════════════════════════════════════════════════
+  // 第二批组件主题
+  //
+  // 覆盖：Chip / TabBar / FloatingActionButton / Drawer / DatePicker /
+  //       PopupMenu / SegmentedButton，顺手补 Badge / ProgressIndicator。
+  //
+  // 三条统一规则（与全局设计系统对齐）：
+  //  1. 圆角只取 AppRadius（small / item / card / sheet / dialog），不写魔法数；
+  //  2. 间距只取 AppSpacing（8pt 网格）与 kMinTapTarget（48dp 热区）；
+  //  3. 选中态统一用 cs.secondaryContainer / cs.onSecondaryContainer 或
+  //     cs.primary / cs.onPrimary，状态层透明度统一取 AppOpacity。
+  //
+  // 这些控件此前走 Flutter M3 默认值，虽然跟随 colorScheme，但圆角档位、
+  // 内边距、选中态容器色与项目里其它组件（卡片 / 列表 / 按钮）并不一致。
+  // 现在全部从同一套令牌派生，换主题色或切明暗时一处重算、全软件同步。
+  // ════════════════════════════════════════════════════════════════
+
+  /// 状态色解析器：所有 `WidgetStateProperty<Color?>` 字段共用一套优先级，
+  /// 避免 Chip / DatePicker / SegmentedButton 各自写一遍判断顺序。
+  static WidgetStateProperty<Color?> _stateColor({
+    required Color base,
+    required Color selected,
+    required Color disabled,
+    Color? hovered,
+    Color? pressed,
+  }) =>
+      WidgetStateProperty.resolveWith<Color?>((Set<WidgetState> states) {
+        if (states.contains(WidgetState.disabled)) return disabled;
+        if (states.contains(WidgetState.selected)) return selected;
+        if (states.contains(WidgetState.pressed)) {
+          return pressed ?? hovered ?? base;
+        }
+        if (states.contains(WidgetState.hovered)) return hovered ?? base;
+        return base;
+      });
+
+  /// 状态层（ripple / overlay）统一解析器：hover 4% / pressed 8% / selected 10%。
+  static WidgetStateProperty<Color?> _overlayColor(ColorScheme cs) =>
+      WidgetStateProperty.resolveWith<Color?>((Set<WidgetState> states) {
+        if (states.contains(WidgetState.disabled)) return null;
+        if (states.contains(WidgetState.selected)) {
+          return cs.primary.withValues(alpha: AppOpacity.selected);
+        }
+        if (states.contains(WidgetState.pressed)) {
+          return cs.primary.withValues(alpha: AppOpacity.pressed);
+        }
+        if (states.contains(WidgetState.hovered) ||
+            states.contains(WidgetState.focused)) {
+          return cs.primary.withValues(alpha: AppOpacity.hover);
+        }
+        return null;
+      });
+
+  /// Chip：选中态 = secondaryContainer，描边 = divider，圆角 = small。
+  static ChipThemeData chipTheme(ColorScheme cs, AppThemeTokens t) {
+    final base = cs.surfaceContainerLow;
+    final selected = cs.secondaryContainer;
+    final disabled =
+        cs.onSurface.withValues(alpha: AppOpacity.disabledContainer);
+    return ChipThemeData(
+      // color 是 3.47 起的状态色真源；刻意不再同时写
+      // backgroundColor / selectedColor / disabledColor，避免两套规则打架。
+      color: _stateColor(
+        base: base,
+        selected: selected,
+        disabled: disabled,
+      ),
+      deleteIconColor: cs.onSurfaceVariant,
+      checkmarkColor: cs.onSecondaryContainer,
+      showCheckmark: true,
+      side: BorderSide(
+        color: t.divider.withValues(alpha: AppOpacity.outline),
+        width: AppBorder.thin,
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.small),
+      ),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.xs,
+        vertical: AppSpacing.xxs,
+      ),
+      labelPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxs),
+      labelStyle: textTheme.labelLarge?.copyWith(color: cs.onSurface),
+      secondaryLabelStyle:
+          textTheme.labelMedium?.copyWith(color: cs.onSurfaceVariant),
+      iconTheme: IconThemeData(
+        size: AppIconSize.small,
+        color: cs.onSurfaceVariant,
+      ),
+      elevation: 0,
+      pressElevation: 0,
+      surfaceTintColor: Colors.transparent,
+      shadowColor: cs.shadow,
+      avatarBoxConstraints: const BoxConstraints.tightFor(
+        width: AppComponentSize.chipAvatar,
+        height: AppComponentSize.chipAvatar,
+      ),
+      deleteIconBoxConstraints: const BoxConstraints.tightFor(
+        width: AppComponentSize.chipDeleteIcon,
+        height: AppComponentSize.chipDeleteIcon,
+      ),
+    );
+  }
+
+  /// TabBar：3dp 主色下划线（带圆角）、分隔线 1dp、标签左右 16dp。
+  static TabBarThemeData tabBarTheme(ColorScheme cs, AppThemeTokens t) =>
+      TabBarThemeData(
+        indicator: UnderlineTabIndicator(
+          borderSide: BorderSide(
+            color: cs.primary,
+            width: AppComponentSize.tabIndicatorHeight,
+          ),
+          borderRadius:
+              BorderRadius.circular(AppComponentSize.tabIndicatorHeight),
+        ),
+        indicatorColor: cs.primary,
+        indicatorSize: TabBarIndicatorSize.label,
+        dividerColor: t.divider,
+        dividerHeight: AppBorder.thin,
+        labelColor: cs.primary,
+        unselectedLabelColor: cs.onSurfaceVariant,
+        labelStyle: textTheme.labelLarge?.copyWith(
+          fontWeight: FontWeight.w600,
+        ),
+        unselectedLabelStyle: textTheme.labelLarge?.copyWith(
+          fontWeight: FontWeight.w500,
+        ),
+        labelPadding:
+            const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+        overlayColor: _overlayColor(cs),
+        splashFactory: InkRipple.splashFactory,
+        splashBorderRadius: BorderRadius.circular(AppRadius.small),
+      );
+
+  /// FAB：主容器色 + card 档圆角，靠 tonal 分层而非硬阴影。
+  static FloatingActionButtonThemeData floatingActionButtonTheme(
+          ColorScheme cs) =>
+      FloatingActionButtonThemeData(
+        backgroundColor: cs.primaryContainer,
+        foregroundColor: cs.onPrimaryContainer,
+        focusColor:
+            cs.onPrimaryContainer.withValues(alpha: AppOpacity.hover),
+        hoverColor:
+            cs.onPrimaryContainer.withValues(alpha: AppOpacity.hover),
+        splashColor:
+            cs.onPrimaryContainer.withValues(alpha: AppOpacity.pressed),
+        elevation: 1,
+        focusElevation: 1,
+        hoverElevation: 2,
+        disabledElevation: 0,
+        highlightElevation: 2,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.card),
+        ),
+        iconSize: AppIconSize.large,
+        extendedPadding:
+            const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+        extendedIconLabelSpacing: AppSpacing.xs,
+        extendedTextStyle: textTheme.labelLarge,
+        sizeConstraints: const BoxConstraints.tightFor(
+          width: AppComponentSize.fabSize,
+          height: AppComponentSize.fabSize,
+        ),
+        smallSizeConstraints: const BoxConstraints.tightFor(
+          width: AppComponentSize.fabSmallSize,
+          height: AppComponentSize.fabSmallSize,
+        ),
+        extendedSizeConstraints: const BoxConstraints.tightFor(
+          height: AppComponentSize.fabExtendedHeight,
+        ),
+        enableFeedback: true,
+      );
+
+  /// Drawer：start / end 两侧方向相反的圆角，宽度统一 304dp。
+  static DrawerThemeData drawerTheme(ColorScheme cs, AppThemeTokens t) =>
+      DrawerThemeData(
+        backgroundColor: t.sheet,
+        scrimColor: cs.scrim.withValues(alpha: AppOpacity.scrim),
+        surfaceTintColor: Colors.transparent,
+        shadowColor: cs.shadow,
+        elevation: 0,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.horizontal(
+            right: Radius.circular(AppRadius.card),
+          ),
+        ),
+        endShape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.horizontal(
+            left: Radius.circular(AppRadius.card),
+          ),
+        ),
+        width: AppComponentSize.drawerWidth,
+        clipBehavior: Clip.antiAlias,
+      );
+
+  /// DatePicker：dialog 档圆角，日期格 small 档圆角，
+  /// 选中 / 今天 / 禁用 / 区间四套状态色全部走 _stateColor 与 _overlayColor。
+  static DatePickerThemeData datePickerTheme(
+      ColorScheme cs, AppThemeTokens t) {
+    final dialogShape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(AppRadius.dialog),
+    );
+    final cellShape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(AppRadius.small),
+    );
+    final disabled =
+        cs.onSurface.withValues(alpha: AppOpacity.disabled);
+    final dayForeground =
+        WidgetStateProperty.resolveWith<Color?>((Set<WidgetState> states) {
+      if (states.contains(WidgetState.disabled)) return disabled;
+      if (states.contains(WidgetState.selected)) return cs.onPrimary;
+      return cs.onSurface;
+    });
+    final dayBackground =
+        WidgetStateProperty.resolveWith<Color?>((Set<WidgetState> states) {
+      if (states.contains(WidgetState.selected)) return cs.primary;
+      if (states.contains(WidgetState.hovered) ||
+          states.contains(WidgetState.focused)) {
+        return cs.primary.withValues(alpha: AppOpacity.hover);
+      }
+      return null;
+    });
+    final yearForeground =
+        WidgetStateProperty.resolveWith<Color?>((Set<WidgetState> states) {
+      if (states.contains(WidgetState.disabled)) return disabled;
+      if (states.contains(WidgetState.selected)) return cs.onPrimary;
+      return cs.onSurface;
+    });
+    final yearBackground =
+        WidgetStateProperty.resolveWith<Color?>((Set<WidgetState> states) =>
+            states.contains(WidgetState.selected) ? cs.primary : null);
+    final buttonStyle = TextButton.styleFrom(
+      foregroundColor: cs.primary,
+      disabledForegroundColor: disabled,
+      textStyle: textTheme.labelLarge,
+      minimumSize: const Size(kMinTapTarget, kMinTapTarget),
+    );
+
+    return DatePickerThemeData(
+      backgroundColor: t.sheet,
+      surfaceTintColor: Colors.transparent,
+      shadowColor: cs.shadow,
+      elevation: 3,
+      shape: dialogShape,
+      headerBackgroundColor: cs.surfaceContainerHigh,
+      headerForegroundColor: cs.onSurfaceVariant,
+      headerHeadlineStyle:
+          textTheme.headlineSmall?.copyWith(color: cs.onSurface),
+      headerHelpStyle:
+          textTheme.labelMedium?.copyWith(color: cs.onSurfaceVariant),
+      weekdayStyle:
+          textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+      dayStyle: textTheme.bodyMedium?.copyWith(color: cs.onSurface),
+      dayForegroundColor: dayForeground,
+      dayBackgroundColor: dayBackground,
+      dayOverlayColor: _overlayColor(cs),
+      dayShape: WidgetStateProperty.all<OutlinedBorder?>(cellShape),
+      todayForegroundColor:
+          WidgetStateProperty.resolveWith<Color?>((Set<WidgetState> states) =>
+              states.contains(WidgetState.selected)
+                  ? cs.onPrimary
+                  : cs.primary),
+      todayBackgroundColor:
+          WidgetStateProperty.resolveWith<Color?>((Set<WidgetState> states) =>
+              states.contains(WidgetState.selected) ? cs.primary : null),
+      todayBorder:
+          BorderSide(color: cs.primary, width: AppBorder.thin),
+      yearStyle: textTheme.bodyMedium?.copyWith(color: cs.onSurface),
+      yearForegroundColor: yearForeground,
+      yearBackgroundColor: yearBackground,
+      yearOverlayColor: _overlayColor(cs),
+      yearShape: WidgetStateProperty.all<OutlinedBorder?>(cellShape),
+      rangePickerBackgroundColor: t.sheet,
+      rangePickerShape: dialogShape,
+      rangePickerHeaderBackgroundColor: cs.surfaceContainerHigh,
+      rangePickerHeaderForegroundColor: cs.onSurfaceVariant,
+      rangeSelectionBackgroundColor: cs.primaryContainer,
+      rangeSelectionOverlayColor: _overlayColor(cs),
+      dividerColor: t.divider,
+      cancelButtonStyle: buttonStyle,
+      confirmButtonStyle: buttonStyle,
+      toggleButtonTextStyle:
+          textTheme.labelLarge?.copyWith(color: cs.onSurfaceVariant),
+      subHeaderForegroundColor: cs.onSurfaceVariant,
+    );
+  }
+
+  /// PopupMenu：item 档圆角、8dp 垂直内边距，悬停/聚焦文字转主色。
+  static PopupMenuThemeData popupMenuTheme(
+          ColorScheme cs, AppThemeTokens t) =>
+      PopupMenuThemeData(
+        color: t.sheet,
+        surfaceTintColor: Colors.transparent,
+        shadowColor: cs.shadow,
+        elevation: 3,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.item),
+        ),
+        menuPadding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+        textStyle: textTheme.bodyLarge?.copyWith(color: cs.onSurface),
+        labelTextStyle:
+            WidgetStateProperty.resolveWith<TextStyle?>((Set<WidgetState> states) {
+          final base = textTheme.bodyLarge ?? const TextStyle();
+          if (states.contains(WidgetState.disabled)) {
+            return base.copyWith(
+                color: cs.onSurface.withValues(alpha: AppOpacity.disabled));
+          }
+          if (states.contains(WidgetState.hovered) ||
+              states.contains(WidgetState.focused) ||
+              states.contains(WidgetState.pressed)) {
+            return base.copyWith(color: cs.primary);
+          }
+          return base.copyWith(color: cs.onSurface);
+        }),
+        iconColor: cs.onSurfaceVariant,
+        iconSize: AppIconSize.large,
+        enableFeedback: true,
+      );
+
+  /// SegmentedButton：选中态 = secondaryContainer，描边 = divider，
+  /// 圆角 = small，最小高度 40dp 且保留 48dp 热区。
+  static SegmentedButtonThemeData segmentedButtonTheme(
+          ColorScheme cs, AppThemeTokens t) =>
+      SegmentedButtonThemeData(
+        selectedIcon: const Icon(AppIcons.check, size: AppIconSize.medium),
+        style: ButtonStyle(
+          backgroundColor: _stateColor(
+            base: cs.surfaceContainerLow,
+            selected: cs.secondaryContainer,
+            disabled:
+                cs.onSurface.withValues(alpha: AppOpacity.disabledContainer),
+          ),
+          foregroundColor: _stateColor(
+            base: cs.onSurfaceVariant,
+            selected: cs.onSecondaryContainer,
+            disabled:
+                cs.onSurface.withValues(alpha: AppOpacity.disabled),
+          ),
+          iconColor: _stateColor(
+            base: cs.onSurfaceVariant,
+            selected: cs.onSecondaryContainer,
+            disabled:
+                cs.onSurface.withValues(alpha: AppOpacity.disabled),
+          ),
+          overlayColor: _overlayColor(cs),
+          side: WidgetStateProperty.resolveWith<BorderSide?>(
+            (Set<WidgetState> states) => BorderSide(
+              color: states.contains(WidgetState.selected)
+                  ? Colors.transparent
+                  : t.divider,
+              width: AppBorder.thin,
+            ),
+          ),
+          shape: WidgetStateProperty.all<OutlinedBorder?>(
+            RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppRadius.small),
+            ),
+          ),
+          padding: WidgetStateProperty.all<EdgeInsetsGeometry?>(
+            const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+          ),
+          minimumSize: WidgetStateProperty.all<Size?>(
+            const Size(kMinTapTarget, AppComponentSize.segmentedButtonHeight),
+          ),
+          textStyle: WidgetStateProperty.all<TextStyle?>(
+            textTheme.labelLarge,
+          ),
+          elevation: WidgetStateProperty.all<double?>(0),
+        ),
+      );
+
+  /// Badge：与 SnackBar / 错误态同色系，尺寸走 8pt 网格。
+  static BadgeThemeData badgeTheme(ColorScheme cs) => BadgeThemeData(
+        backgroundColor: cs.error,
+        textColor: cs.onError,
+        smallSize: AppComponentSize.badgeSmallSize,
+        largeSize: AppComponentSize.badgeLargeSize,
+        textStyle: textTheme.labelSmall?.copyWith(color: cs.onError),
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxs),
+      );
+
+  /// ProgressIndicator：轨道用 surfaceContainerHighest，圆角 = small。
+  static ProgressIndicatorThemeData progressIndicatorTheme(ColorScheme cs) =>
+      ProgressIndicatorThemeData(
+        color: cs.primary,
+        linearTrackColor: cs.surfaceContainerHighest,
+        circularTrackColor: cs.surfaceContainerHighest,
+        refreshBackgroundColor: cs.surface,
+        linearMinHeight: AppComponentSize.linearProgressHeight,
+        borderRadius: BorderRadius.circular(AppRadius.small),
+        stopIndicatorColor: cs.primary,
+      );
 
   static PageTransitionsTheme get pageTransitionsTheme => PageTransitionsTheme(
     builders: <TargetPlatform, PageTransitionsBuilder>{

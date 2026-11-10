@@ -3,6 +3,10 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:yuan/service/image/image_ref.dart';
 import 'package:yuan/service/image/image_storage.dart';
+import '../../../styles/theme_tokens.dart';
+
+// ── 组件私有样式（只服务本文件）────────────────────────────────
+const int _kCacheScale = 2;
 
 /// 图片展示形态
 enum ImageShape { rect, circle }
@@ -42,7 +46,7 @@ class AppImage extends StatelessWidget {
       Container(
         width: size,
         height: size,
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        color: context.tokens.field,
       );
 
   @override
@@ -71,7 +75,7 @@ class AppImage extends StatelessWidget {
               height: size,
               fit: fit,
               // 38px 头像只解码 76px，避免整张大图进内存
-              cacheWidth: (size * 2).toInt(),
+              cacheWidth: (size * _kCacheScale).toInt(),
               gaplessPlayback: true,
               errorBuilder: (_, __, ___) => _fallback(context),
             );

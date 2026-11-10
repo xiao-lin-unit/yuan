@@ -1,15 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+
+import '../commons/scaffold/app_page_scaffold.dart';
+import '../../styles/theme_tokens.dart';
 import 'widgets/user/profile_user_section.dart';
 import 'widgets/function/profile_function_section.dart';
 import 'widgets/manage/profile_manage_section.dart';
 import 'widgets/about/profile_about_section.dart';
 
-// 「我的」页面：组装用户 / 功能 / 管理 / 关于四个分区
+// ── 页面私有内容 ───────────────────────────────────────────────
+const double _kSectionGap = AppLayout.sectionGap;
+
+/// 「我的」页面：组装用户 / 功能 / 管理 / 关于四个分区。
+/// 页面留白、滚动、宽屏限宽统一交给 AppPageScaffold，
+/// 分区间距统一用 AppLayout.sectionGap（不再出现 12/4/4/24）。
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
-  /// 功能与管理共用的点击处理：按 key 跳转，路由未注册时不会崩
   void _onItemTap(BuildContext context, String? key) {
     if (key == null) return;
     final route = '/$key';
@@ -22,42 +29,29 @@ class ProfileScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      // backgroundColor: AppStyles.bg,
-      // appBar: AppBar(
-      //   elevation: 0,
-      // ),
-      body: SafeArea(
-        // 滚动视图
-        child: SingleChildScrollView(
-          padding: EdgeInsets.only(top: 18.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // ① 用户
-              const ProfileUserSection(),
-              // 间隔
-              const SizedBox(height: 12),
-              // ② 功能
-              ProfileFunctionSection(
-                // onItemTap: (item) => _onItemTap(context, item.key),
-              ),
-              // 间隔
-              const SizedBox(height: 4),
-              // ③ 管理
-              ProfileManageSection(
-                onItemTap: (item) => _onItemTap(context, item.key),
-              ),
-              // 间隔
-              const SizedBox(height: 4),
-              // ④ 关于
-              ProfileAboutSection(
-                onAboutTap: () => _onItemTap(context, 'about'),
-              ),
-              const SizedBox(height: 24),
-            ],
+    return AppPageScaffold(
+      showAppBar: false,
+      padding: const EdgeInsets.fromLTRB(
+        0,
+        AppLayout.pageTop,
+        0,
+        AppLayout.pageBottom,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const ProfileUserSection(),
+          const SizedBox(height: _kSectionGap),
+          const ProfileFunctionSection(),
+          const SizedBox(height: _kSectionGap),
+          ProfileManageSection(
+            onItemTap: (item) => _onItemTap(context, item.key),
           ),
-        ),
+          const SizedBox(height: _kSectionGap),
+          ProfileAboutSection(
+            onAboutTap: () => _onItemTap(context, 'about'),
+          ),
+        ],
       ),
     );
   }

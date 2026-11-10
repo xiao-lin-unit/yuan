@@ -1,5 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:yuan/styles/app_decorations.dart';
 import 'package:yuan/styles/theme_tokens.dart';
+
+// ── 组件私有样式（只服务本文件）────────────────────────────────
+const double _kDragHandleWidth = 32;
+const double _kDragHandleHeight = 4;
+const double _kProgressSize = 16;
+const double _kInitialChildSize = 0.5;
+const double _kMinChildSize = 0.25;
+const double _kMaxChildSize = 0.9;
 
 class CommonBottomSheet extends StatefulWidget {
   /// 标题（可为 null）
@@ -107,9 +116,9 @@ class _CommonBottomSheetState extends State<CommonBottomSheet> {
 
     return DraggableScrollableSheet(
       expand: false,
-      initialChildSize: 0.5,
-      minChildSize: 0.25,
-      maxChildSize: 0.9,
+      initialChildSize: _kInitialChildSize,
+      minChildSize: _kMinChildSize,
+      maxChildSize: _kMaxChildSize,
       builder: (context, scrollController) {
         return NotificationListener<DraggableScrollableNotification>(
           onNotification: (notification) {
@@ -123,31 +132,18 @@ class _CommonBottomSheetState extends State<CommonBottomSheet> {
             top: false,
             child: Container(
               padding: EdgeInsets.only(bottom: bottomInset),
-              decoration: BoxDecoration(
-                // ❌ 旧版写死 Colors.white：暗色模式下弹层白得刺眼，
-                // 而输入框又跟着主题变深，出现「白纸 + 深灰块」的割裂。
-                color: t.sheet,
-                borderRadius: BorderRadius.vertical(
-                  top: Radius.circular(t.radiusSheet),
-                ),
-                boxShadow: <BoxShadow>[
-                  BoxShadow(
-                    color: t.shadow.withValues(alpha: 0.12),
-                    blurRadius: 16,
-                    offset: const Offset(0, -2),
-                  ),
-                ],
-              ),
+              // 容器装饰统一由全局层提供（明暗/主题色一换全软件同步）
+              decoration: AppDecorations.sheet(context),
               child: Column(
                 children: [
                   // M3 拖拽把手：32×4，onSurfaceVariant 低透明
                   Padding(
                     padding: const EdgeInsets.only(top: AppSpacing.sm, bottom: AppSpacing.xs),
                     child: Container(
-                      width: 32,
-                      height: 4,
+                      width: _kDragHandleWidth,
+                      height: _kDragHandleHeight,
                       decoration: BoxDecoration(
-                        color: cs.onSurfaceVariant.withValues(alpha: 0.4),
+                        color: cs.onSurfaceVariant.withValues(alpha: AppOpacity.scrim),
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
@@ -187,8 +183,8 @@ class _CommonBottomSheetState extends State<CommonBottomSheet> {
                               onPressed: _saving ? null : _onConfirmPressed,
                               child: _saving
                                   ? SizedBox(
-                                      width: 16,
-                                      height: 16,
+                                      width: _kProgressSize,
+                                      height: _kProgressSize,
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2,
                                         color: cs.primary,
@@ -206,7 +202,7 @@ class _CommonBottomSheetState extends State<CommonBottomSheet> {
                       ),
                     ),
 
-                  Divider(color: t.divider, height: 1, thickness: 1),
+                  Divider(color: t.divider, height: AppBorder.thin, thickness: AppBorder.thin),
 
                   /// ===== 内容区（可滚动） =====
                   Expanded(

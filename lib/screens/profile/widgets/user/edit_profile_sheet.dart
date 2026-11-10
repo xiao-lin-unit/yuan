@@ -3,7 +3,15 @@ import 'package:yuan/service/image/image_category.dart';
 import 'package:yuan/service/image/image_ref.dart';
 import 'package:yuan/styles/theme_tokens.dart';
 
+import '../../../commons/icons/app_icons.dart';
+
+import '../../../commons/image/app_image.dart';
 import '../../../commons/image/image_picker_widget.dart';
+
+// ── 组件私有样式（只服务本文件）────────────────────────────────
+const double _kLabelWidth = 72;
+const double _kAvatarSize = 48;
+const double _kClearIconSize = 18;
 
 class EditProfileSheet extends StatelessWidget {
   final TextEditingController nameCtrl;
@@ -87,9 +95,6 @@ class _FormRow extends StatelessWidget {
   final Widget child;
   final CrossAxisAlignment align;
 
-  static const double _labelWidth = 72;
-  static const double _minHeight = 64;
-
   const _FormRow({
     required this.label,
     required this.child,
@@ -103,14 +108,16 @@ class _FormRow extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: t.divider)),
+        border: Border(
+          bottom: BorderSide(color: t.divider, width: AppBorder.thin),
+        ),
       ),
-      constraints: const BoxConstraints(minHeight: _minHeight),
+      constraints: const BoxConstraints(minHeight: AppLayout.formRowMinHeight),
       child: Row(
         crossAxisAlignment: align,
         children: [
           SizedBox(
-            width: _labelWidth,
+            width: _kLabelWidth,
             child: Text(
               label,
               style: tt.bodyMedium?.copyWith(
@@ -135,8 +142,6 @@ class _AvatarField extends StatelessWidget {
   final ImageRef? initialRef;
   final ValueChanged<Object?> onAvatarChanged;
 
-  static const double _size = 48;
-
   const _AvatarField({required this.initialRef, required this.onAvatarChanged});
 
   @override
@@ -149,21 +154,21 @@ class _AvatarField extends StatelessWidget {
       children: [
         // 必须钉死尺寸：Stack 在无界高度下会把 Infinity 透传给子元素
         SizedBox(
-          width: _size,
-          height: _size,
+          width: _kAvatarSize,
+          height: _kAvatarSize,
           child: SingleImagePickerWidget(
             initialRef: initialRef,
             enableUpload: true,
             category: ImageCategory.avatar,
-            size: _size,
+            size: _kAvatarSize,
             shape: ImageShape.circle,
             onImageChanged: onAvatarChanged,
             placeholder: Container(
               alignment: Alignment.center,
               decoration: BoxDecoration(color: t.field, shape: BoxShape.circle),
               child: Icon(
-                Icons.person,
-                size: _size * 0.5,
+                AppIcons.user,
+                size: _kAvatarSize * 0.5,
                 color: cs.onSurfaceVariant,
               ),
             ),
@@ -264,7 +269,7 @@ class _TextFieldState extends State<_TextField> {
           IconButton(
             onPressed: () => widget.controller.clear(),
             tooltip: '清空',
-            icon: const Icon(Icons.close, size: 18),
+            icon: const Icon(AppIcons.clear, size: _kClearIconSize),
             color: cs.onSurfaceVariant,
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints.tightFor(

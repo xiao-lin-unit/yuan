@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+
 import '../../../commons/menu/menu_item.dart';
 import '../../../commons/menu/menu_list.dart';
 import '../../../commons/header/section_header.dart';
 import '../../../commons/icons/app_icons.dart';
+
+// ── 组件私有内容（只服务本分区）────────────────────────────────
+const String _kSectionTitle = '管理';
 
 /// ③ 管理分区
 class ProfileManageSection extends StatelessWidget {
@@ -11,8 +15,18 @@ class ProfileManageSection extends StatelessWidget {
   const ProfileManageSection({super.key, this.onItemTap});
 
   static const List<MenuItemData> _items = [
-    MenuItemData(emoji: '📂', title: '分类管理', subtitle: '自定义收支分类', key: 'category'),
-    MenuItemData(emoji: '🗑️', title: '回收站', subtitle: '误删可恢复', key: 'trash'),
+    MenuItemData(
+      icon: AppIcons.category,
+      title: '分类管理',
+      subtitle: '自定义收支分类',
+      key: 'category',
+    ),
+    MenuItemData(
+      icon: AppIcons.trash,
+      title: '回收站',
+      subtitle: '误删可恢复',
+      key: 'trash',
+    ),
   ];
 
   @override
@@ -20,9 +34,10 @@ class ProfileManageSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SectionHeader(title: '管理', trailing: Icon(
-          AppIcons.function,
-        )),
+        const SectionHeader(
+          title: _kSectionTitle,
+          trailing: Icon(AppIcons.manage),
+        ),
         MenuList(items: _items),
       ],
     );
