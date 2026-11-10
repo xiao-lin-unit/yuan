@@ -68,7 +68,12 @@ class MenuItem extends StatelessWidget {
                 SizedBox(
                   width: _kIconBoxWidth,
                   child: data.icon != null
-                      ? AppIconBadge(icon: data.icon!)
+                      ? AppIconBadge(
+                          icon: data.icon!,
+                          // key 是业务语义标识（knowledge / export / trash…），
+                          // 颜色由全局 AppIconTone 映射，业务层不用传 Color。
+                          toneKey: data.key,
+                        )
                       : Text(
                           data.emoji ?? '',
                           style: const TextStyle(fontSize: _kEmojiSize),

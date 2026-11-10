@@ -7,6 +7,8 @@ import '../screens/ledger/ledger_screen.dart';
 import '../screens/accounts/accounts_screen.dart';
 import '../screens/analysis/analysis_screen.dart';
 import '../screens/profile/profile_screen.dart';
+import '../styles/app_icon_tone.dart';
+import '../styles/theme_tokens.dart';
 
 class RouteNavigation {
   final String label;
@@ -41,15 +43,45 @@ class AppShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final location = GoRouterState.of(context).uri.toString();
+    final found = tabs.indexWhere((t) => location == t.path);
+    final index = found < 0 ? 0 : found;
+
+    // 底导是高频导航，按 M3 不铺多色图标：图标保持单色 +
+    // 选中/未选中区分，彩色只落在 indicator 容器上，并随当前 tab
+    // 的语义色变化（记账绿 / 资债琥珀 / 账户蓝 / 分析第三色 / 我的主色）。
+    // 色值从当前主题派生，切主题色或明暗时自动重算。
+    final iconTone = AppIconTone.of(context);
+    final pair = iconTone.resolve(
+      iconTone.forTab(index),
+      AppIconEmphasis.tonal,
+    );
+    final container = pair.container;
+    final selectedIconColor = pair.foreground;
+    final cs = Theme.of(context).colorScheme;
+
+    final navTheme = Theme.of(context).navigationBarTheme.copyWith(
+          indicatorColor: container,
+          iconTheme: WidgetStateProperty.resolveWith<IconThemeData?>((states) {
+            final isSelected = states.contains(WidgetState.selected);
+            return IconThemeData(
+              size: AppIconSize.large,
+              color: isSelected ? selectedIconColor : cs.onSurfaceVariant,
+            );
+          }),
+        );
+
     return Scaffold(
       resizeToAvoidBottomInset: false,
       body: child,
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: tabs.indexWhere((t) => location == t.path),
-        onDestinationSelected: (i) => context.go(tabs[i].path),
-        destinations: tabs
-            .map((t) => NavigationDestination(icon: t.icon, label: t.label))
-            .toList(),
+      bottomNavigationBar: Theme(
+        data: Theme.of(context).copyWith(navigationBarTheme: navTheme),
+        child: NavigationBar(
+          selectedIndex: index,
+          onDestinationSelected: (i) => context.go(tabs[i].path),
+          destinations: tabs
+              .map((t) => NavigationDestination(icon: t.icon, label: t.label))
+              .toList(),
+        ),
       ),
     );
   }

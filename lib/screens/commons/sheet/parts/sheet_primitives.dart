@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:yuan/screens/commons/icons/app_icons.dart';
 import 'package:yuan/screens/commons/sheet/sheet_models.dart';
+import 'package:yuan/styles/app_icon_tone.dart';
 import 'package:yuan/styles/sheet_tokens.dart';
 import 'package:yuan/styles/theme_tokens.dart';
 
@@ -130,17 +131,22 @@ class SheetIconBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 确认 / 概览弹层里这是整屏唯一的图标锚点，用 filled 实色 +
+    // 自动黑/白前景，与空状态徽章同一档；语义色（danger/warning/…）
+    // 仍由 sheetIntentTone 传入，换主题自动重算。
+    final pair = AppIconTone.of(context)
+        .resolve(tone, AppIconEmphasis.filled);
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: tone.withValues(alpha: AppOpacity.disabledContainer),
+        color: pair.container,
         shape: BoxShape.circle,
       ),
       child: Icon(
         icon,
         size: AppSheetSize.iconBadgeIconSize,
-        color: tone,
+        color: pair.foreground,
       ),
     );
   }

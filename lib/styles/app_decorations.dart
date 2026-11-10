@@ -81,10 +81,24 @@ abstract final class AppDecorations {
   }
 
   /// 图标徽章：语义色低透明底 + 语义色图标，统一全软件图标视觉语言
-  static BoxDecoration iconBadge(BuildContext context, Color tone) {
+  /// 图标徽章容器。
+  ///
+  /// 参数已从「语义色」改为「由 AppIconTone.resolve 解析好的容器色」：
+  /// 旧版固定 12% 淡底 + 同色图标，等于给单色图标蒙了层几乎看不见的雾，
+  /// 比纯单色还平。现在容器实色（tonal 浅 / filled 深），前景取反色，
+  /// 圆角与描边仍来自全局令牌。透明容器（standard 档）不加描边。
+  static BoxDecoration iconBadge(BuildContext context, Color container) {
+    final t = context.tokens;
+    final transparent = container == Colors.transparent;
     return BoxDecoration(
-      color: tone.withValues(alpha: AppOpacity.disabledContainer),
+      color: container,
       borderRadius: BorderRadius.circular(AppRadius.small + 2),
+      border: transparent
+          ? null
+          : Border.all(
+              color: t.divider.withValues(alpha: AppOpacity.outline),
+              width: AppBorder.thin,
+            ),
     );
   }
 
