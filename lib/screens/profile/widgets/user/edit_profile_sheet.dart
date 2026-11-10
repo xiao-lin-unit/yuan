@@ -1,282 +1,106 @@
 import 'package:flutter/material.dart';
+import 'package:yuan/screens/commons/image/app_image.dart';
+import 'package:yuan/screens/commons/image/image_picker_widget.dart';
+import 'package:yuan/screens/commons/sheet/contents/form_sheet_content.dart';
+import 'package:yuan/screens/commons/sheet/parts/sheet_inputs.dart';
+import 'package:yuan/screens/commons/sheet/sheet_form_items.dart';
 import 'package:yuan/service/image/image_category.dart';
 import 'package:yuan/service/image/image_ref.dart';
-import 'package:yuan/styles/theme_tokens.dart';
-
-import '../../../commons/icons/app_icons.dart';
-
-import '../../../commons/image/app_image.dart';
-import '../../../commons/image/image_picker_widget.dart';
 
 // ── 组件私有样式（只服务本文件）────────────────────────────────
-const double _kLabelWidth = 72;
-const double _kAvatarSize = 48;
-const double _kClearIconSize = 18;
+const int _kNameMaxLength = 12;
+const int _kSubMaxLength = 60;
+const int _kSubMaxLines = 3;
+const int _kSubMinLines = 2;
+const String _kNameHint = '怎么称呼你？';
+const String _kSubHint = '一句话介绍自己，例如：月薪族，正在攒钱买车';
+const String _kPrivacyNote = '头像仅保存在本设备，不会上传云端。';
+const String _kEmptyNameError = '昵称不能为空';
 
+/// 【我的】→ 用户部分 → 编辑资料。
+///
+/// 这一层**只声明表单内容**：每一项的 label、控件类型、初值、校验规则。
+/// 控件使用方式与样式（圆角容器、字号、清除按钮、字数统计、分隔线、
+/// 头像整圆、渐变主按钮、保存失败不关闭）全部由 [FormSheetContent] 统一负责。
+///
+/// 因此这里没有任何 TextEditingController、没有 `_FormRow` / `_TextField`
+/// 私有实现、没有 `InputDecoration`、也没有 `MediaQuery.viewInsets` 处理 ——
+/// 那些都属于公共表单组件的职责。以后加「手机号」「生日」只是多写一项。
 class EditProfileSheet extends StatelessWidget {
-  final TextEditingController nameCtrl;
-  final TextEditingController subCtrl;
+  const EditProfileSheet({
+    super.key,
+    required this.initialName,
+    required this.initialSub,
+    required this.initialRef,
+    required this.onSave,
+  });
+
+  final String initialName;
+  final String initialSub;
 
   /// 已持久化的图片引用，由统一图片组件自己解析展示
   final ImageRef? initialRef;
 
-  /// ImageCandidate = 新图；null = 删除/清空
-  final ValueChanged<Object?> onAvatarChanged;
-
-  const EditProfileSheet({
-    super.key,
-    required this.nameCtrl,
-    required this.subCtrl,
-    required this.initialRef,
-    required this.onAvatarChanged,
-  });
+  /// 提交回调：参数由公共组件按 key 收集好，业务层不再自己拼临时变量。
+  /// 抛异常 = 保存失败，弹窗保持打开并提示。
+  final Future<void> Function(SheetFormValues values) onSave;
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
-
-    // BottomSheet 高度无界，Column(mainAxisSize.min) 必须套一层 ScrollView
-    return SingleChildScrollView(
-      padding: EdgeInsets.only(
-        top: AppSpacing.xs,
-        bottom: MediaQuery.of(context).viewInsets.bottom + AppSpacing.md,
-      ),
-      child: Column(
-        children: [
-          _FormRow(
-            label: '头像',
-            child: _AvatarField(
-              initialRef: initialRef,
-              onAvatarChanged: onAvatarChanged,
-            ),
-          ),
-          _FormRow(
-            label: '名称',
-            child: _TextField(
-              controller: nameCtrl,
-              hintText: '怎么称呼你？',
-              maxLength: 12,
-              textInputAction: TextInputAction.next,
-            ),
-          ),
-          _FormRow(
-            label: '描述',
-            align: CrossAxisAlignment.start,
-            child: _TextField(
-              controller: subCtrl,
-              hintText: '一句话介绍自己，例如：月薪族，正在攒钱买车',
-              maxLength: 60,
-              maxLines: 3,
-              minLines: 2,
-              textInputAction: TextInputAction.done,
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(
-              top: AppSpacing.sm,
-              right: AppSpacing.xxs,
-            ),
-            child: Text(
-              '头像仅保存在本设备，不会上传云端。',
-              textAlign: TextAlign.right,
-              style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// 一行表单：左标签 72px + 右内容，底部分割线
-class _FormRow extends StatelessWidget {
-  final String label;
-  final Widget child;
-  final CrossAxisAlignment align;
-
-  const _FormRow({
-    required this.label,
-    required this.child,
-    this.align = CrossAxisAlignment.center,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final tt = Theme.of(context).textTheme;
-    final t = context.tokens;
-
-    return Container(
-      decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: t.divider, width: AppBorder.thin),
-        ),
-      ),
-      constraints: const BoxConstraints(minHeight: AppLayout.formRowMinHeight),
-      child: Row(
-        crossAxisAlignment: align,
-        children: [
-          SizedBox(
-            width: _kLabelWidth,
-            child: Text(
-              label,
-              style: tt.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxs),
-              child: child,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// 头像字段：只是「统一单图组件 + 一个业务分类」，没有任何头像专用逻辑。
-class _AvatarField extends StatelessWidget {
-  final ImageRef? initialRef;
-  final ValueChanged<Object?> onAvatarChanged;
-
-  const _AvatarField({required this.initialRef, required this.onAvatarChanged});
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final t = context.tokens;
-
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        // 必须钉死尺寸：Stack 在无界高度下会把 Infinity 透传给子元素
-        SizedBox(
-          width: _kAvatarSize,
-          height: _kAvatarSize,
-          child: SingleImagePickerWidget(
+    return FormSheetContent(
+      title: '编辑资料',
+      submitLabel: '保存修改',
+      onSubmit: onSave,
+      items: <SheetFormItem>[
+        // ① 头像：公共组件提供整圆容器 + 相机角标 + 尺寸，
+        //    业务层只注入「统一单图组件 + 一个业务分类」，不写任何头像专用逻辑。
+        SheetFormAvatarItem(
+          key: 'avatar',
+          label: '头像',
+          initialValue: imageUndefined,
+          builder: (context, onChanged, size) => SingleImagePickerWidget(
             initialRef: initialRef,
             enableUpload: true,
             category: ImageCategory.avatar,
-            size: _kAvatarSize,
+            size: size,
             shape: ImageShape.circle,
-            onImageChanged: onAvatarChanged,
-            placeholder: Container(
-              alignment: Alignment.center,
-              decoration: BoxDecoration(color: t.field, shape: BoxShape.circle),
-              child: Icon(
-                AppIcons.user,
-                size: _kAvatarSize * 0.5,
-                color: cs.onSurfaceVariant,
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// 输入框：不再自己写 `InputBorder.none` + `contentPadding: zero`。
-///
-/// 旧版局部覆盖把主题的 filled 背景留着、边框去掉，结果是一块没有边界、
-/// 文字贴边的深色矩形；聚焦时也没有任何视觉反馈。
-/// 现在只传业务字段（hint / counter），容器、填充色、指示线、
-/// 内外边距、错误态全部由 ThemeSetting.inputDecorationTheme 统一提供。
-class _TextField extends StatefulWidget {
-  final TextEditingController controller;
-  final String? hintText;
-  final int maxLength;
-  final int maxLines;
-  final int minLines;
-  final TextInputAction textInputAction;
-
-  const _TextField({
-    required this.controller,
-    required this.hintText,
-    required this.maxLength,
-    required this.textInputAction,
-    this.maxLines = 1,
-    this.minLines = 1,
-  });
-
-  @override
-  State<_TextField> createState() => _TextFieldState();
-}
-
-class _TextFieldState extends State<_TextField> {
-  late int _length;
-
-  @override
-  void initState() {
-    super.initState();
-    _length = widget.controller.text.length;
-    widget.controller.addListener(_onChanged);
-  }
-
-  void _onChanged() => setState(() => _length = widget.controller.text.length);
-
-  @override
-  void dispose() {
-    widget.controller.removeListener(_onChanged);
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
-    final multiLine = widget.maxLines > 1;
-
-    return Row(
-      crossAxisAlignment: multiLine
-          ? CrossAxisAlignment.start
-          : CrossAxisAlignment.center,
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              TextField(
-                controller: widget.controller,
-                maxLength: widget.maxLength,
-                maxLines: widget.maxLines,
-                minLines: widget.minLines,
-                textInputAction: widget.textInputAction,
-                style: tt.bodyLarge?.copyWith(color: cs.onSurface),
-                decoration: InputDecoration(
-                  hintText: widget.hintText,
-                  counterText: '',
-                  alignLabelWithHint: multiLine,
-                  // 刻意不覆盖 border / filled / fillColor / contentPadding
-                ),
-              ),
-              if (multiLine) ...[
-                const SizedBox(height: AppSpacing.xxs),
-                Text(
-                  '$_length/${widget.maxLength}',
-                  style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                ),
-              ],
-            ],
+            onImageChanged: onChanged,
+            placeholder: SheetFormAvatarPlaceholder(size: size),
           ),
         ),
 
-        // 清除按钮：48dp 热区 + 语义图标 + tooltip
-        if (_length > 0)
-          IconButton(
-            onPressed: () => widget.controller.clear(),
-            tooltip: '清空',
-            icon: const Icon(AppIcons.clear, size: _kClearIconSize),
-            color: cs.onSurfaceVariant,
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints.tightFor(
-              width: kMinTapTarget,
-              height: kMinTapTarget,
-            ),
-          ),
+        // ② 名称：单行文本 + 清除按钮 + 非空校验
+        SheetFormTextItem(
+          key: 'name',
+          label: '名称',
+          initialValue: initialName,
+          hint: _kNameHint,
+          maxLength: _kNameMaxLength,
+          showClearButton: true,
+          textInputAction: TextInputAction.next,
+          validator: (value) =>
+              value.trim().isEmpty ? _kEmptyNameError : null,
+        ),
+
+        // ③ 描述：多行文本 + 字数统计
+        SheetFormTextItem(
+          key: 'sub',
+          label: '描述',
+          initialValue: initialSub,
+          hint: _kSubHint,
+          maxLength: _kSubMaxLength,
+          maxLines: _kSubMaxLines,
+          minLines: _kSubMinLines,
+          showClearButton: true,
+          showCounter: true,
+          textInputAction: TextInputAction.done,
+        ),
+
+        // ④ 说明小字
+        const SheetFormNoteItem(
+          key: 'privacyNote',
+          text: _kPrivacyNote,
+        ),
       ],
     );
   }

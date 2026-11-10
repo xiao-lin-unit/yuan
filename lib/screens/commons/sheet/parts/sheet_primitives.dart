@@ -197,10 +197,14 @@ class SheetCaption extends StatelessWidget {
     super.key,
     required this.text,
     this.centered = false,
+    this.align = TextAlign.start,
   });
 
   final String text;
   final bool centered;
+
+  /// 显式对齐；[centered] 为 true 时优先居中
+  final TextAlign align;
 
   @override
   Widget build(BuildContext context) {
@@ -208,7 +212,7 @@ class SheetCaption extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: _kCaptionGap),
       child: Text(
         text,
-        textAlign: centered ? TextAlign.center : TextAlign.start,
+        textAlign: centered ? TextAlign.center : align,
         style: SheetText.of(context).caption,
       ),
     );

@@ -52,6 +52,9 @@ abstract final class AppSheetSize {
   static const double avatarSize = 96;
   static const double avatarCameraBadge = 32;
 
+  /// 表单行：左侧 label 固定宽度（全软件表单对齐一致）
+  static const double formLabelWidth = 72;
+
   static const double optionRowHeight = 56;
   static const double optionRadioSize = 22;
 

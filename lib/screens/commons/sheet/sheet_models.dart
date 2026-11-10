@@ -75,37 +75,11 @@ class SheetTag<T> {
   final String label;
 }
 
-/// 表单行：左侧 label + 右侧可编辑值，支持单行 / 多行。
-@immutable
-class SheetFieldSpec {
-  const SheetFieldSpec({
-    required this.label,
-    required this.value,
-    this.maxLines = 1,
-    this.onChanged,
-  });
-
-  final String label;
-  final String value;
-  final int maxLines;
-  final ValueChanged<String>? onChanged;
-}
-
-/// 开关行。
-@immutable
-class SheetSwitchSpec {
-  const SheetSwitchSpec({
-    required this.label,
-    required this.value,
-    required this.onChanged,
-  });
-
-  final String label;
-  final bool value;
-  final ValueChanged<bool> onChanged;
-}
-
 /// 底栏文字动作（播放列表 / 定时关闭之类）。
+///
+/// 注：表单项的描述已统一迁到 `sheet_form_items.dart` 的 [SheetFormItem]
+/// sealed 层级（label + 控件类型 + 配置），公共表单组件负责渲染与值收集。
+/// 这里不再保留「表单行 / 开关行」两套独立 spec，避免同一职责两套契约。
 @immutable
 class SheetFooterAction {
   const SheetFooterAction({

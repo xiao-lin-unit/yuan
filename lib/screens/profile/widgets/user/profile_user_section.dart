@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:yuan/screens/commons/sheet/app_sheet_shell.dart';
+import 'package:yuan/screens/commons/sheet/sheet_form_items.dart';
 import 'package:yuan/screens/profile/widgets/user/user_avatar.dart';
 import 'package:yuan/service/image/image_ref.dart';
 import 'package:yuan/styles/app_decorations.dart';
@@ -11,7 +13,6 @@ import 'package:yuan/styles/theme_tokens.dart';
 import '../../../../database/user/user_info.dart';
 import '../../../../service/user_controller.dart';
 import '../../../commons/icons/app_icons.dart';
-import '../../../commons/sheet/bottom_sheet.dart';
 import 'edit_profile_sheet.dart';
 
 // ── 组件私有样式（只服务本文件）────────────────────────────────
@@ -29,52 +30,36 @@ class ProfileUserSection extends StatelessWidget {
       initialName: user.username,
       initialSub: user.userSub,
       initialRef: user.avatarRef,
-      onSave: (name, sub, avatar) async {
+      onSave: (values) async {
         await context.read<UserController>().updateProfile(
-          username: name,
-          userSub: sub,
-          avatar: avatar,
-        );
+              username: values.text('name').trim(),
+              userSub: values.text('sub').trim(),
+              avatar: values.raw('avatar'),
+            );
       },
     );
   }
 
   Future<void> showEditProfileSheet(
-      BuildContext context, {
-        required String initialName,
-        required String initialSub,
-        required ImageRef? initialRef,
-        required Future<void> Function(String name, String sub, Object? avatar) onSave,
-      }) async {
-    final nameCtrl = TextEditingController(text: initialName);
-    final subCtrl = TextEditingController(text: initialSub);
-
-    Object? tempAvatar = imageUndefined;
-
-    await CommonBottomSheet.show(
+    BuildContext context, {
+    required String initialName,
+    required String initialSub,
+    required ImageRef? initialRef,
+    required Future<void> Function(SheetFormValues values) onSave,
+  }) async {
+    // 旧实现：CommonBottomSheet + 外部 TextEditingController +
+    // tempAvatar 临时变量 + 手写 onConfirm 校验。
+    // 现在：外壳负责玻璃/把手/滚动/键盘避让，内容组件负责表单全部职责，
+    // 这里只剩「把初始值传进去、把结果接出来」。
+    await AppSheetShell.show<SheetFormValues>(
       context,
-      title: '编辑资料',
-      showConfirmButton: true,
-      onConfirm: () async {
-        if (!context.mounted) return;
-        final name = nameCtrl.text.trim();
-        final sub = subCtrl.text.trim();
-
-        if (name.isEmpty) {
-          throw StateError('昵称不能为空');
-        }
-        await onSave(name, sub, tempAvatar);
-      },
       child: EditProfileSheet(
-        nameCtrl: nameCtrl,
-        subCtrl: subCtrl,
+        initialName: initialName,
+        initialSub: initialSub,
         initialRef: initialRef,
-        onAvatarChanged: (v) => tempAvatar = v,
+        onSave: onSave,
       ),
     );
-
-    nameCtrl.dispose();
-    subCtrl.dispose();
   }
 
   @override

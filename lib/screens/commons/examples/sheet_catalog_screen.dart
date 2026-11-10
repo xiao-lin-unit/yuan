@@ -8,6 +8,8 @@ import 'package:yuan/screens/commons/sheet/contents/form_sheet_content.dart';
 import 'package:yuan/screens/commons/sheet/contents/operation_sheet_content.dart';
 import 'package:yuan/screens/commons/sheet/contents/overview_sheet_content.dart';
 import 'package:yuan/screens/commons/sheet/contents/select_sheet_content.dart';
+import 'package:yuan/screens/commons/sheet/parts/sheet_inputs.dart';
+import 'package:yuan/screens/commons/sheet/sheet_form_items.dart';
 import 'package:yuan/screens/commons/sheet/sheet_models.dart';
 import 'package:yuan/styles/app_decorations.dart';
 import 'package:yuan/styles/app_typography.dart';
@@ -111,32 +113,66 @@ class SheetCatalogScreen extends StatelessWidget {
           _CatalogEntry(
             index: '03',
             title: '表单编辑',
-            subtitle: '头像 · 表单行 · 标签 · 开关 · 保存',
+            subtitle: '声明式 items：头像 · 文本 · 标签 · 开关 · 说明',
             icon: AppIcons.edit,
             onTap: () => _show(
               context,
-              FormSheetContent<String>(
+              FormSheetContent(
                 title: '编辑资料',
-                fields: const <SheetFieldSpec>[
-                  SheetFieldSpec(label: '昵称', value: '林小满'),
-                  SheetFieldSpec(
+                submitLabel: '保存修改',
+                onSubmit: (values) async {
+                  // 使用方只按 key 取值，不再持有 controller / 临时变量
+                  debugPrint('表单值：${values.toMap()}');
+                },
+                items: <SheetFormItem>[
+                  SheetFormAvatarItem(
+                    key: 'avatar',
+                    // 未改动哨兵；真实业务里传 imageUndefined
+                    initialValue: const Object(),
+                    builder: (context, onChanged, size) =>
+                        SheetFormAvatarPlaceholder(size: size),
+                  ),
+                  const SheetFormTextItem(
+                    key: 'name',
+                    label: '昵称',
+                    initialValue: '林小满',
+                    hint: '怎么称呼你？',
+                    maxLength: 12,
+                    showClearButton: true,
+                    validator: _validateName,
+                  ),
+                  const SheetFormTextItem(
+                    key: 'bio',
                     label: '个人简介',
-                    value: '热爱生活，记录日常。\n分享镜头里的光。',
+                    initialValue: '热爱生活，记录日常。\n分享镜头里的光。',
+                    hint: '写点什么介绍自己',
+                    maxLength: 60,
                     maxLines: 3,
+                    minLines: 2,
+                    showClearButton: true,
+                    showCounter: true,
+                  ),
+                  const SheetFormTagsItem(
+                    key: 'tags',
+                    label: '标签',
+                    options: <SheetTag<Object>>[
+                      SheetTag<Object>(value: 'photo', label: '摄影'),
+                      SheetTag<Object>(value: 'hike', label: '徒步'),
+                      SheetTag<Object>(value: 'coffee', label: '咖啡'),
+                    ],
+                    initialSelected: <Object>{'photo'},
+                  ),
+                  const SheetFormToggleItem(
+                    key: 'public',
+                    label: '设为公开',
+                    initialValue: true,
+                    dividerAbove: true,
+                  ),
+                  const SheetFormNoteItem(
+                    key: 'note',
+                    text: '资料仅保存在本设备，不会上传云端。',
                   ),
                 ],
-                tags: const <SheetTag<String>>[
-                  SheetTag<String>(value: 'photo', label: '摄影'),
-                  SheetTag<String>(value: 'hike', label: '徒步'),
-                  SheetTag<String>(value: 'coffee', label: '咖啡'),
-                ],
-                initialSelectedTags: const <String>{'photo'},
-                switchRow: SheetSwitchSpec(
-                  label: '设为公开',
-                  value: true,
-                  onChanged: _noop,
-                ),
-                submitLabel: '保存修改',
               ),
             ),
           ),
@@ -223,7 +259,9 @@ class SheetCatalogScreen extends StatelessWidget {
   }
 }
 
-void _noop(bool _) {}
+/// 声明式校验：使用方只给规则，错误文案的样式由公共组件统一渲染。
+String? _validateName(String value) =>
+    value.trim().isEmpty ? '昵称不能为空' : null;
 
 class _CatalogEntry extends StatelessWidget {
   const _CatalogEntry({
