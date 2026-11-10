@@ -7,7 +7,12 @@ import 'package:yuan/styles/theme_tokens.dart';
 ///
 /// 统一了：28dp 顶部大圆角、近白/深灰磨砂玻璃背景、极细高光描边、
 /// 向上柔光阴影、顶部居中拖拽把手、底部 home indicator、24dp 内容留白、
-/// 90% 屏高上限与键盘避让。
+/// 90% 屏高上限。
+///
+/// 键盘避让**只在 [show] 的 builder 里做一次**（AnimatedPadding + Align），
+/// 外壳内部不再读 viewInsets、不再加自己的 bottom padding：
+/// 双重避让会让 sheet 底部与键盘之间露出一条灰色间隙，并把内容整体
+/// 推到设备顶端。外壳只用 LayoutBuilder 拿到的「实际可用高度」限高。
 ///
 /// 与已有的 `CommonBottomSheet` **并存，不修改它**：那个组件是
 /// `DraggableScrollableSheet` + 标题栏 + 确认按钮，业务里
@@ -63,16 +68,38 @@ class AppSheetShell extends StatelessWidget {
       isScrollControlled: true,
       isDismissible: barrierDismissible,
       enableDrag: barrierDismissible,
-      builder: (_) => AppSheetShell(
-        title: title,
-        subtitle: subtitle,
-        leading: leading,
-        trailing: trailing,
-        centeredHeader: centeredHeader,
-        showGrabber: showGrabber,
-        showHomeIndicator: showHomeIndicator,
-        scrollable: scrollable,
-        child: child,
+      // 键盘避让的唯一入口。
+      //
+      // ① AnimatedPadding 用 builder 自己的 context 读 viewInsets，
+      //    键盘弹出/收起时 MediaQuery 变化会触发重建，padding 带动画。
+      //    它把「键盘高度」这一层留白放在 sheet 之外，sheet 底部正好
+      //    贴在键盘上沿，中间不会出现原先那条透明灰色间隙。
+      // ② Align 是关键：showModalBottomSheet 会把 sheet 底部对齐屏幕
+      //    底部、并可能给出 tight 高度约束；Align 把它转成 loose，
+      //    外壳里的 ConstrainedBox 才真正能限高。少了这一层，
+      //    maxHeight 被 BoxConstraints.enforce 吃掉，sheet 会铺满
+      //    「屏幕 - 键盘」的全部高度，顶部圆角被推到状态栏 —— 这正是
+      //    上一轮改了 availableHeight 却仍然贴顶的原因。
+      builder: (BuildContext sheetContext) => AnimatedPadding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.viewInsetsOf(sheetContext).bottom,
+        ),
+        duration: AppMotion.medium,
+        curve: Curves.easeOut,
+        child: Align(
+          alignment: Alignment.bottomCenter,
+          child: AppSheetShell(
+            title: title,
+            subtitle: subtitle,
+            leading: leading,
+            trailing: trailing,
+            centeredHeader: centeredHeader,
+            showGrabber: showGrabber,
+            showHomeIndicator: showHomeIndicator,
+            scrollable: scrollable,
+            child: child,
+          ),
+        ),
       ),
     );
   }
@@ -80,121 +107,115 @@ class AppSheetShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = SheetPalette.of(context);
-    final MediaQueryData mq = MediaQuery.of(context);
-    final double keyboardInset = mq.viewInsets.bottom;
     final bool hasHeader = title != null || leading != null || trailing != null;
 
-    // 键盘弹出时，可视区只剩 size.height - keyboardInset。
-    //
-    // 旧版把 maxHeight 按「整屏 * 0.9」算，又用 Padding(bottom: 键盘高)
-    // 把 sheet 抬到键盘上方，于是总占用 = 0.9 屏 + 键盘高，必然超出屏幕：
-    // 顶部被裁到状态栏、28dp 圆角消失，看起来就是「整个 sheet 被顶到顶端」。
-    //
-    // Flutter 3.47 的 showModalBottomSheet 不会自动做 viewInsets 避让
-    // （ModalBottomSheetRoute 里没有 AnimatedPadding），所以底部 padding
-    // 必须保留、用于把 sheet 抬到键盘上方；只要同步把 maxHeight 改成
-    // 「可用高度 * factor」，内容交给已有的 SingleChildScrollView 滚动即可。
-    final double availableHeight =
-        (mq.size.height - keyboardInset).clamp(0.0, double.infinity);
-    final double maxHeight = availableHeight * maxHeightFactor;
-
+    // 键盘高度已由 [show] 的 AnimatedPadding 扣掉，这里拿到的
+    // constraints.maxHeight 就是「键盘上方的真实可用高度」。
+    // 不再自己读 viewInsets、不再加 bottom Padding —— 外壳内部再做一次
+    // 避让是上一轮留下的问题：等于把同一份键盘高度算了两遍。
     return SafeArea(
       top: false,
-      child: Padding(
-        padding: EdgeInsets.only(bottom: keyboardInset),
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxHeight: maxHeight),
-          child: ClipRRect(
-            borderRadius: const BorderRadius.vertical(
-              top: Radius.circular(AppSheetRadius.modal),
-            ),
-            child: BackdropFilter(
-              filter: p.glassFilter,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: p.glassColor,
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(AppSheetRadius.modal),
-                  ),
-                  border: Border.all(
-                    color: p.glassBorder,
-                    width: AppBorder.thin,
-                  ),
-                  boxShadow: <BoxShadow>[
-                    BoxShadow(
-                      color: p.tokens.shadow.withValues(
-                        alpha: AppElevation.sheetAlpha,
-                      ),
-                      blurRadius: AppElevation.sheetBlur,
-                      offset: AppElevation.sheetOffset,
+      bottom: false,
+      child: LayoutBuilder(
+        builder: (BuildContext context, BoxConstraints constraints) {
+          final double available = constraints.maxHeight.isFinite
+              ? constraints.maxHeight
+              : MediaQuery.sizeOf(context).height;
+          final double maxHeight = available * maxHeightFactor;
+          return ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: maxHeight),
+            child: ClipRRect(
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(AppSheetRadius.modal),
+              ),
+              child: BackdropFilter(
+                filter: p.glassFilter,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: p.glassColor,
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(AppSheetRadius.modal),
                     ),
-                  ],
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: <Widget>[
-                    if (showGrabber)
-                      const Padding(
-                        padding: EdgeInsets.only(
-                          top: AppSheetSize.topPadding,
-                          bottom: AppSpacing.xs,
-                        ),
-                        child: SheetGrabber(),
-                      ),
-                    if (hasHeader)
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(
-                          AppSheetSize.horizontalPadding,
-                          AppSpacing.xs,
-                          AppSheetSize.horizontalPadding,
-                          AppSpacing.md,
-                        ),
-                        child: SheetHeader(
-                          title: title ?? '',
-                          subtitle: subtitle,
-                          leading: leading,
-                          trailing: trailing,
-                          centered: centeredHeader,
-                        ),
-                      ),
-                    Flexible(
-                      child: scrollable
-                          ? SingleChildScrollView(
-                              padding: contentPadding ??
-                                  const EdgeInsets.fromLTRB(
-                                    AppSheetSize.horizontalPadding,
-                                    0,
-                                    AppSheetSize.horizontalPadding,
-                                    AppSheetSize.bottomPadding,
-                                  ),
-                              child: child,
-                            )
-                          : Padding(
-                              padding: contentPadding ??
-                                  const EdgeInsets.fromLTRB(
-                                    AppSheetSize.horizontalPadding,
-                                    0,
-                                    AppSheetSize.horizontalPadding,
-                                    AppSheetSize.bottomPadding,
-                                  ),
-                              child: child,
-                            ),
+                    border: Border.all(
+                      color: p.glassBorder,
+                      width: AppBorder.thin,
                     ),
-                    if (showHomeIndicator)
-                      const Padding(
-                        padding: EdgeInsets.only(
-                          top: AppSpacing.xs,
-                          bottom: AppSpacing.sm,
+                    boxShadow: <BoxShadow>[
+                      BoxShadow(
+                        color: p.tokens.shadow.withValues(
+                          alpha: AppElevation.sheetAlpha,
                         ),
-                        child: SheetHomeIndicator(),
+                        blurRadius: AppElevation.sheetBlur,
+                        offset: AppElevation.sheetOffset,
                       ),
-                  ],
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: <Widget>[
+                      if (showGrabber)
+                        const Padding(
+                          padding: EdgeInsets.only(
+                            top: AppSheetSize.topPadding,
+                            bottom: AppSpacing.xs,
+                          ),
+                          child: SheetGrabber(),
+                        ),
+                      if (hasHeader)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(
+                            AppSheetSize.horizontalPadding,
+                            AppSpacing.xs,
+                            AppSheetSize.horizontalPadding,
+                            AppSpacing.md,
+                          ),
+                          child: SheetHeader(
+                            title: title ?? '',
+                            subtitle: subtitle,
+                            leading: leading,
+                            trailing: trailing,
+                            centered: centeredHeader,
+                          ),
+                        ),
+                      Flexible(
+                        child: scrollable
+                            ? SingleChildScrollView(
+                                padding: contentPadding ??
+                                    const EdgeInsets.fromLTRB(
+                                      AppSheetSize.horizontalPadding,
+                                      0,
+                                      AppSheetSize.horizontalPadding,
+                                      AppSheetSize.bottomPadding,
+                                    ),
+                                child: child,
+                              )
+                            : Padding(
+                                padding: contentPadding ??
+                                    const EdgeInsets.fromLTRB(
+                                      AppSheetSize.horizontalPadding,
+                                      0,
+                                      AppSheetSize.horizontalPadding,
+                                      AppSheetSize.bottomPadding,
+                                    ),
+                                child: child,
+                              ),
+                      ),
+                      if (showHomeIndicator)
+                        const Padding(
+                          padding: EdgeInsets.only(
+                            top: AppSpacing.xs,
+                            bottom: AppSpacing.sm,
+                          ),
+                          child: SheetHomeIndicator(),
+                        ),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }
