@@ -95,7 +95,7 @@ class SheetHeader extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: <Widget>[
-        if (leading != null) leading!,
+        ?leading,
         Expanded(
           child: Column(
             crossAxisAlignment:
@@ -103,7 +103,7 @@ class SheetHeader extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
               titleWidget,
-              if (subtitleWidget != null) subtitleWidget,
+              ?subtitleWidget,
             ],
           ),
         ),

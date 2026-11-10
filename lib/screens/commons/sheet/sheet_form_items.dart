@@ -150,11 +150,11 @@ final class SheetFormTagsItem extends SheetFormItem {
 /// 开关行。
 final class SheetFormToggleItem extends SheetFormItem {
   const SheetFormToggleItem({
-    required String key,
-    required String? label,
+    required super.key,
+    required super.label,
     this.initialValue = false,
-    bool dividerAbove = true,
-  }) : super(key: key, label: label, dividerAbove: dividerAbove);
+    super.dividerAbove = true,
+  });
 
   final bool initialValue;
 }
@@ -177,12 +177,12 @@ final class SheetFormCustomItem extends SheetFormItem {
 /// 底部说明小字（「头像仅保存在本设备，不会上传云端。」）。
 final class SheetFormNoteItem extends SheetFormItem {
   const SheetFormNoteItem({
-    required String key,
+    required super.key,
     required this.text,
     this.centered = false,
     this.align = TextAlign.end,
-    bool dividerAbove = false,
-  }) : super(key: key, label: null, dividerAbove: dividerAbove);
+    super.dividerAbove,
+  }) : super(label: null);
 
   final String text;
   final bool centered;

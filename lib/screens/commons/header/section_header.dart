@@ -78,7 +78,7 @@ class SectionHeader extends StatelessWidget {
           Text(title, style: context.appText.sectionHeader),
           if (trailingWidget != null) ...[
             const SizedBox(width: _kTrailingGap),
-            trailingWidget!,
+            trailingWidget,
           ],
         ],
       ),

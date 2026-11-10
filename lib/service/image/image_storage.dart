@@ -148,7 +148,9 @@ class ImageStorage {
         b[0] == 0x52 &&
         b[1] == 0x49 &&
         b[2] == 0x46 &&
-        b[3] == 0x46) return '.webp';
+        b[3] == 0x46) {
+      return '.webp';
+    }
     if (b.length >= 12 &&
         b[4] == 0x66 &&
         b[5] == 0x74 &&
