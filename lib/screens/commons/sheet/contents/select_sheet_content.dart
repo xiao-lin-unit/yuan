@@ -24,7 +24,8 @@ class SelectSheetContent<T> extends StatefulWidget {
     super.key,
     required this.title,
     required this.options,
-    required this.actionLabel,
+    this.actionLabel = '应用',
+    this.action = true,
     this.subtitle,
     this.initialValue,
     this.onChanged,
@@ -36,6 +37,7 @@ class SelectSheetContent<T> extends StatefulWidget {
   final String? subtitle;
   final List<SheetOption<T>> options;
   final String actionLabel;
+  final bool action;
   final T? initialValue;
   final ValueChanged<T?>? onChanged;
 
@@ -110,12 +112,14 @@ class _SelectSheetContentState<T> extends State<SelectSheetContent<T>> {
           value: _value,
           onChanged: _select,
         ),
-        const SizedBox(height: AppSheetSize.sectionGap),
-        SheetGradientButton(
-          label: widget.actionLabel,
-          onPressed: _value == null ? null : () => unawaited(_apply()),
-          loading: _saving,
-        ),
+        if (widget.action) ...[
+          const SizedBox(height: AppSheetSize.sectionGap),
+          SheetGradientButton(
+            label: widget.actionLabel,
+            onPressed: _value == null ? null : () => unawaited(_apply()),
+            loading: _saving,
+          ),
+        ]
       ],
     );
   }

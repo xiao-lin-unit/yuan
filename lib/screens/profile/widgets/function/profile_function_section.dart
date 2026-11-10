@@ -44,6 +44,7 @@ class ProfileFunctionSection extends StatelessWidget {
         title: _kThemeSheetTitle,
         subtitle: _kThemeSheetSubtitle,
         actionLabel: _kThemeApplyLabel,
+        action: false,
         // 当前颜色默认高亮，用户不改直接「应用」不会产生无意义写盘
         initialValue: controller.seedKey,
         options: <SheetOption<String>>[
@@ -56,7 +57,8 @@ class ProfileFunctionSection extends StatelessWidget {
               swatch: ColorSetting.themeColor(key),
             ),
         ],
-        onApplyAsync: (String key) => controller.setSeedKey(key),
+        // onApplyAsync: (String key) => controller.setSeedKey(key),
+        onChanged: (String? key) => controller.setSeedKey(key!),
       ),
     );
   }
