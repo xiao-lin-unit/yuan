@@ -76,6 +76,18 @@ abstract final class AppSheetSize {
 
   static const double maxSheetHeightFactor = 0.9;
   static const double glassBlurSigma = 18;
+
+  /// 键盘弹出时输入框的「聚焦自动滚动」兜底（dp）。
+  ///
+  /// 中文输入法常带工具栏/候选栏，`viewInsets.bottom` 可能滞后或比键盘
+  /// 视觉高度略小；TextField.scrollPadding 取
+  /// `max(viewInsets.bottom, 本值)`，保证聚焦的输入框能滚到键盘上方。
+  /// 320 覆盖常见九宫格/全键盘（含工具栏）的高度下沿。
+  static const double keyboardScrollPadding = 320;
+
+  /// 滚动内容底部的固定安全距：键盘弹出时给最后一项（保存按钮、说明文字）
+  /// 留一点呼吸空间，避免正好贴着键盘上沿。
+  static const double keyboardScrollSafety = 24;
 }
 
 /// Sheet 专用透明度 / 光晕。

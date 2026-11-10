@@ -62,7 +62,20 @@ class AppShell extends StatelessWidget {
         );
 
     return Scaffold(
-      resizeToAvoidBottomInset: false,
+      // 键盘避让的根开关，必须为 true。
+      //
+      // go_router 的 ShellRoute 会在 Scaffold.body 内建一个嵌套 Navigator，
+      // showModalBottomSheet 的 route 就挂在这个 Navigator 的 Overlay 上。
+      // 设 false 时 Scaffold 会给 body 子树套
+      // `MediaQuery.removeViewInsets(removeBottom: true)`：
+      //   ① route 里 MediaQuery.viewInsets.bottom 恒为 0，Sheet 内部所有
+      //      键盘补偿都读到 0（前几轮怎么改都无效的根因）；
+      //   ② Overlay 不随键盘缩小，铺满整屏，键盘直接盖住 Sheet 下半部分。
+      //
+      // 设 true 后：body（含 Overlay）自动缩到键盘上方，Sheet 的可用高度
+      // 与 viewport 底部天然就是键盘上沿；viewInsets 也保留真实值。
+      // 全局一处生效，所有 Sheet / 页面统一，不需要在弹层里猜键盘高度。
+      resizeToAvoidBottomInset: true,
       body: child,
       bottomNavigationBar: Theme(
         data: Theme.of(context).copyWith(navigationBarTheme: navTheme),

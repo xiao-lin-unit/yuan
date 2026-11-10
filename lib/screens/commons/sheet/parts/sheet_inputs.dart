@@ -17,6 +17,21 @@ const double _kSwitchRowMinHeight = AppLayout.listItemMinHeight;
 const double _kClearIconSize = AppIconSize.small;
 const double _kCounterGap = AppSpacing.xxs;
 
+/// 聚焦输入框时，Flutter 会用 `scrollPadding` 把输入框滚进可见区。
+/// 默认只有 20dp，键盘弹出时远不够 —— 输入框会被滚到 viewport 底部
+/// （键盘后面）却仍被判定为「可见」。
+///
+/// 取 `max(实际键盘高, 兜底值)`：兜底值覆盖中文输入法工具栏/候选栏
+/// 导致的 viewInsets 滞后或偏小；无键盘时回到一个接近默认的小值，
+/// 不改变平时的滚动手感。
+double _keyboardScrollPadding(BuildContext context) {
+  final double raw = MediaQuery.viewInsetsOf(context).bottom;
+  if (raw <= 0) return AppSpacing.md;
+  return raw > AppSheetSize.keyboardScrollPadding
+      ? raw
+      : AppSheetSize.keyboardScrollPadding;
+}
+
 /// 两种文本行共用的容器外壳。
 ///
 /// 统一了「原来 label 没固定宽、标签组却有 72dp 列」的错位：
@@ -175,6 +190,10 @@ class SheetSingleLineFormField extends StatelessWidget {
           textInputAction: textInputAction,
           validator: validator,
           onChanged: onChanged,
+          // 聚焦时把本行滚到键盘上方，而不是滚到 viewport 底部（键盘后）。
+          scrollPadding: EdgeInsets.only(
+            bottom: _keyboardScrollPadding(context),
+          ),
           style: text.fieldValueSingleLine,
           decoration: InputDecoration(
             isCollapsed: true,
@@ -284,6 +303,11 @@ class SheetMultiLineFormField extends StatelessWidget {
           textInputAction: textInputAction,
           validator: validator,
           onChanged: onChanged,
+          // 与单行共用一份兜底逻辑：聚焦「描述」这类靠下的输入框时，
+          // 自动滚到键盘上方，且滚动 extent 足够带上它下面的字数统计。
+          scrollPadding: EdgeInsets.only(
+            bottom: _keyboardScrollPadding(context),
+          ),
           style: text.fieldValue,
           decoration: InputDecoration(
             border: InputBorder.none,

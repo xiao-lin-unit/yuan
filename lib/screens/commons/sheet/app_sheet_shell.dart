@@ -9,20 +9,24 @@ import 'package:yuan/styles/theme_tokens.dart';
 /// 向上柔光阴影、顶部居中拖拽把手、底部 home indicator、24dp 内容留白、
 /// 90% 屏高上限。
 ///
-/// 键盘策略：**完全不抬 Sheet**。
+/// 键盘策略：**外壳不抬 Sheet、不猜键盘高度**。
 ///
-/// 前几轮一直在「用 bottom padding 把 sheet 抬到键盘上方」里打转，
-/// 但「抬」这个动作本身就是把 sheet 往设备顶端推：只要 sheet 底部
-/// 被移离 view 底部、而高度又按较大的可用高度算，顶部必然溢出，
-/// 圆角被裁到状态栏，且底部露出 barrier 灰带。
+/// 避让由 `router_shell.dart` 的 `Scaffold(resizeToAvoidBottomInset: true)`
+/// 统一完成：body（含 go_router 嵌套 Navigator 的 Overlay）会缩到键盘
+/// 上方，Sheet 的 LayoutBuilder 拿到的可用高度天然就是「键盘上方高度」，
+/// viewport 底部即键盘上沿 —— 最下方内容滑到底自然可见。
 ///
-/// 现在 Sheet 底部永远对齐 view 底部（`Align.bottomCenter`），
-/// 位置与键盘完全无关；键盘的可见性只通过**滚动内容内部**追加一段
-/// `viewInsets.bottom` 的 padding 来解决 —— 那是可滚动区域，不会
-/// 改变 Sheet 自身的位置或高度。
+/// 前几轮在弹层内部反复加 `bottom padding = viewInsets.bottom` 都无效，
+/// 根因是那个开关设成了 false：Scaffold 用
+/// `MediaQuery.removeViewInsets` 把 body 子树的 viewInsets 清零，
+/// 弹层读到的键盘高度恒为 0，且 Overlay 不缩小、键盘直接盖住下半屏。
 ///
-/// 外壳只用 LayoutBuilder 拿到的「实际可用高度」限高，因此顶部
-/// 恒为 `0.1 × 可用高度 > 0`，数学上不可能贴到设备顶端。
+/// 外壳只保留两件事：`Align` 把 tight 约束转 loose（让限高生效）、
+/// 滚动内容底部一个固定小安全距；聚焦输入框的自动滚动由
+/// `TextField.scrollPadding` 在 `sheet_inputs.dart` 里负责。
+///
+/// 顶部恒为 `0.1 × 可用高度 > 0`，不会贴到设备顶端；无键盘时
+/// 可用高度 = 全屏，六个 Sheet 外观与原来完全一致。
 ///
 /// 与已有的 `CommonBottomSheet` **并存，不修改它**：那个组件是
 /// `DraggableScrollableSheet` + 标题栏 + 确认按钮，业务里
@@ -123,11 +127,16 @@ class AppSheetShell extends StatelessWidget {
               : MediaQuery.sizeOf(context).height;
           final double maxHeight = available * maxHeightFactor;
 
-          // 键盘补偿放在「滚动内容」里，而不是 Sheet 外层：
-          // 它让内容能滚出键盘遮挡区，但不会把 Sheet 自身往上推。
-          // 若 adjustResize 已经缩小了 view，这段 padding 只是多出
-          // 一块可滚动留白，完全无害。
-          final double keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+          // 键盘避让由外层 Scaffold 的 resizeToAvoidBottomInset:true 完成：
+          // route 的 Overlay 已缩到键盘上方，viewport 底部即键盘上沿，
+          // 滚动内容「滑到底」时最后一项本来就可见 —— 不需要再按
+          // viewInsets 的高度补一段 padding（那会让底部空出整块键盘高度）。
+          //
+          // 这里只加一个固定小安全距，兼容输入法工具栏比 viewInsets
+          // 略高的情况；聚焦输入框的自动滚动由 TextField.scrollPadding
+          // 负责（见 sheet_inputs.dart）。
+          final bool keyboardVisible =
+              MediaQuery.viewInsetsOf(context).bottom > 0;
           final EdgeInsetsGeometry basePadding = contentPadding ??
               const EdgeInsets.fromLTRB(
                 AppSheetSize.horizontalPadding,
@@ -135,8 +144,12 @@ class AppSheetShell extends StatelessWidget {
                 AppSheetSize.horizontalPadding,
                 AppSheetSize.bottomPadding,
               );
-          final EdgeInsetsGeometry effectivePadding = keyboardInset > 0
-              ? basePadding.add(EdgeInsets.only(bottom: keyboardInset))
+          final EdgeInsetsGeometry effectivePadding = keyboardVisible
+              ? basePadding.add(
+                  const EdgeInsets.only(
+                    bottom: AppSheetSize.keyboardScrollSafety,
+                  ),
+                )
               : basePadding;
 
           return ConstrainedBox(
