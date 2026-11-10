@@ -31,7 +31,7 @@ abstract final class AppTypography {
     bodySmall: TextStyle(fontSize: 12, fontWeight: FontWeight.w400, height: 1.33),
     labelLarge: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, height: 1.43),
     labelMedium: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, height: 1.33),
-    labelSmall: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, height: 1.27),
+    labelSmall: labelSmall,
   );
 
   // ── 语义角色（无颜色）─────────────────────────────────────────
@@ -84,6 +84,11 @@ abstract final class AppTypography {
     fontSize: 14,
     fontWeight: FontWeight.w400,
     height: 1.5,
+  );
+  static const TextStyle labelSmall = TextStyle(
+      fontSize: 11,
+      fontWeight: FontWeight.w600,
+      height: 1.27
   );
 }
 
