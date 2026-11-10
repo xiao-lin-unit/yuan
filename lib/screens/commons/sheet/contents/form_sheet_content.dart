@@ -121,7 +121,15 @@ class _FormSheetContentState extends State<FormSheetContent> {
   void _resetFromItems() {
     for (final item in widget.items) {
       switch (item) {
-        case SheetFormTextItem(:final String key, :final String initialValue):
+        case SheetFormSingleLineTextItem(
+            :final String key,
+            :final String initialValue
+          ):
+          _controllers[key] = TextEditingController(text: initialValue);
+        case SheetFormMultiLineTextItem(
+            :final String key,
+            :final String initialValue
+          ):
           _controllers[key] = TextEditingController(text: initialValue);
         case SheetFormAvatarItem(:final String key, :final Object? initialValue):
           _values[key] = initialValue;
@@ -150,7 +158,15 @@ class _FormSheetContentState extends State<FormSheetContent> {
     final map = <String, Object?>{};
     for (final item in widget.items) {
       switch (item) {
-        case SheetFormTextItem(:final String key, :final String initialValue):
+        case SheetFormSingleLineTextItem(
+            :final String key,
+            :final String initialValue
+          ):
+          map[key] = _controllers[key]?.text ?? initialValue;
+        case SheetFormMultiLineTextItem(
+            :final String key,
+            :final String initialValue
+          ):
           map[key] = _controllers[key]?.text ?? initialValue;
         case SheetFormAvatarItem(:final String key):
           map[key] = _values[key];
@@ -205,7 +221,20 @@ class _FormSheetContentState extends State<FormSheetContent> {
   // ── 渲染分发 ──────────────────────────────────────────────────
   Widget _buildItem(SheetFormItem item) {
     return switch (item) {
-      SheetFormTextItem() => SheetFormField(
+      SheetFormSingleLineTextItem() => SheetSingleLineFormField(
+          label: item.label ?? '',
+          controller: _controllers[item.key]!,
+          hintText: item.hint,
+          maxLength: item.maxLength,
+          showClearButton: item.showClearButton,
+          keyboardType: item.keyboardType,
+          textInputAction: item.textInputAction,
+          validator: item.validator == null
+              ? null
+              : (v) => item.validator!(v ?? ''),
+          onChanged: item.onChanged,
+        ),
+      SheetFormMultiLineTextItem() => SheetMultiLineFormField(
           label: item.label ?? '',
           controller: _controllers[item.key]!,
           hintText: item.hint,

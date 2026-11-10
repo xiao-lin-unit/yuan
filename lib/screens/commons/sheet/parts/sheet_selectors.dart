@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:yuan/screens/commons/icons/app_icons.dart';
 import 'package:yuan/screens/commons/sheet/sheet_models.dart';
+import 'package:yuan/styles/color_math.dart';
 import 'package:yuan/styles/sheet_tokens.dart';
 import 'package:yuan/styles/theme_tokens.dart';
 
@@ -188,11 +189,7 @@ class _OptionRow<T> extends StatelessWidget {
             ),
             child: Row(
               children: <Widget>[
-                Icon(
-                  option.icon,
-                  size: AppIconSize.medium,
-                  color: selected ? p.cs.primary : p.mutedText,
-                ),
+                _OptionLeading(option: option, selected: selected, p: p),
                 const SizedBox(width: _kOptionIconGap),
                 Expanded(
                   child: Text(
@@ -214,6 +211,51 @@ class _OptionRow<T> extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// 选项行的 leading：有代表色就画色点，否则画语义图标。
+///
+/// 色点尺寸 / 描边 / 选中环全部来自全局令牌与 [SheetPalette]，
+/// 使用方只提供「这个选项代表什么颜色」这一份数据。
+class _OptionLeading<T> extends StatelessWidget {
+  const _OptionLeading({
+    required this.option,
+    required this.selected,
+    required this.p,
+  });
+
+  final SheetOption<T> option;
+  final bool selected;
+  final SheetPalette p;
+
+  @override
+  Widget build(BuildContext context) {
+    final Color? swatch = option.swatch;
+    if (swatch != null) {
+      return Container(
+        width: AppSheetSize.optionSwatchSize,
+        height: AppSheetSize.optionSwatchSize,
+        decoration: BoxDecoration(
+          color: swatch,
+          shape: BoxShape.circle,
+          border: Border.all(
+            // 按 WCAG 相对亮度自动选黑/白：8 个种子色深浅不一，
+            // 固定白环在浅色上会糊掉，固定黑环在深色上又看不清。
+            color: selected
+                ? ColorMath.onColorFor(swatch)
+                : p.dividerColor.withValues(alpha: AppOpacity.outline),
+            width: selected ? AppBorder.focused : AppBorder.thin,
+          ),
+          boxShadow: selected ? p.primaryGlow : null,
+        ),
+      );
+    }
+    return Icon(
+      option.icon!,
+      size: AppIconSize.medium,
+      color: selected ? p.cs.primary : p.mutedText,
     );
   }
 }

@@ -174,7 +174,21 @@ class ThemeController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 主题菜单：在预设色板里循环，而不是写死一个 'pink'
+  /// 按预设 key 切换主题色，供「主题颜色」选择弹层使用。
+  ///
+  /// key → Color 的映射收在主题层，业务层只传用户选中的标识；
+  /// 选中当前色时直接返回，避免无意义的 SharedPreferences 写入与
+  /// 整棵树重建。setSeed 本身仍是「先写盘成功再改内存」的 await 链路。
+  Future<void> setSeedKey(String key) async {
+    final next = ColorSetting.themeColor(key);
+    if (_seedKey == key && _seed.toARGB32() == next.toARGB32()) return;
+    await setSeed(next, key: key);
+  }
+
+  /// 在预设色板里循环。
+  ///
+  /// 【我的】→ 主题 已改为打开 SelectSheetContent 单选确认，
+  /// 这里保留作为兼容 API / 快捷调用，不再是菜单入口。
   Future<void> cycleSeed() async {
     final next = ColorSetting.nextKey(_seedKey);
     await setSeed(ColorSetting.themeColor(next), key: next);

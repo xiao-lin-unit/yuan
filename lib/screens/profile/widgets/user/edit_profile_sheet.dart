@@ -70,8 +70,8 @@ class EditProfileSheet extends StatelessWidget {
           ),
         ),
 
-        // ② 名称：单行文本 + 清除按钮 + 非空校验
-        SheetFormTextItem(
+        // ② 名称：单行文本（紧凑行、垂直居中）+ 清除按钮 + 非空校验
+        SheetFormSingleLineTextItem(
           key: 'name',
           label: '名称',
           initialValue: initialName,
@@ -83,8 +83,8 @@ class EditProfileSheet extends StatelessWidget {
               value.trim().isEmpty ? _kEmptyNameError : null,
         ),
 
-        // ③ 描述：多行文本 + 字数统计
-        SheetFormTextItem(
+        // ③ 描述：多行文本（顶部对齐、字数统计）
+        SheetFormMultiLineTextItem(
           key: 'sub',
           label: '描述',
           initialValue: initialSub,

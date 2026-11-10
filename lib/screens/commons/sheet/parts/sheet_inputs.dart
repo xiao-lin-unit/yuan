@@ -5,35 +5,175 @@ import 'package:yuan/styles/sheet_tokens.dart';
 import 'package:yuan/styles/theme_tokens.dart';
 
 // ── 组件私有样式（只服务本文件，全部引用全局令牌）──────────────
-const double _kFieldMinHeight = AppLayout.fieldMinHeight;
-const double _kFieldPaddingV = AppSpacing.sm;
+/// 单行高度 = 全局最小点击区 48dp，不再跟着多行 / 独立输入框的 56dp。
+/// 这是「单行看起来过高」的根因：两种控件共用一个 minHeight。
+const double _kSingleLineFieldHeight = kMinTapTarget;
+const double _kMultiLineFieldMinHeight = AppLayout.fieldMinHeight;
+const double _kMultiLineFieldPaddingV = AppSpacing.sm;
 const double _kFieldPaddingH = AppSpacing.md;
 const double _kLabelGap = AppSpacing.md;
+const double _kLabelTopInset = AppSpacing.xxs;
 const double _kSwitchRowMinHeight = AppLayout.listItemMinHeight;
 const double _kClearIconSize = AppIconSize.small;
 const double _kCounterGap = AppSpacing.xxs;
 
-/// 表单文本输入行。
+/// 两种文本行共用的容器外壳。
 ///
-/// 这是**通用零件**：只描述「一个 label + 一个输入框」长什么样、怎么用，
-/// 不知道表单里其它项是什么。样式全部来自全局令牌与 ColorScheme：
-/// 容器用 `AppDecorations.field`，文字用 `SheetText`，错误色用 `cs.error`。
+/// 统一了「原来 label 没固定宽、标签组却有 72dp 列」的错位：
+/// 现在单行 / 多行 / 标签组 / 自定义项全部用 `AppSheetSize.formLabelWidth`
+/// 对齐，样式只有这一份（容器装饰、圆角、内边距、label 排版）。
 ///
-/// 刻意用 `InputDecoration(border: InputBorder.none, filled: false)` 覆盖
-/// 全局 `InputDecorationTheme`（filled + 下划线指示线），否则输入框会自带
-/// 一层填充色和底边，和原型里「整行一个圆角框」的观感对不上。
-/// 错误文案与字数统计仍由本零件按同一套排版渲染，不散到业务层。
-class SheetFormField extends StatelessWidget {
-  const SheetFormField({
+/// [singleLine] 是两者唯一的布局差异开关：
+/// - 单行：48dp 下限、垂直内边距 0、Row 垂直居中。Container 的 minHeight
+///   会以约束形式传给 child，Row 被撑到 48dp 后由 crossAxisAlignment.center
+///   把 label 与 input 一起居中 —— 不需要额外 Align，也不会影响宽度约束；
+/// - 多行：56dp 下限、12dp 垂直内边距、Row 顶部对齐、label 顶部微调。
+class _FormFieldShell extends StatelessWidget {
+  const _FormFieldShell({
+    required this.label,
+    required this.child,
+    required this.singleLine,
+  });
+
+  final String label;
+  final Widget child;
+  final bool singleLine;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: BoxConstraints(
+        minHeight: singleLine
+            ? _kSingleLineFieldHeight
+            : _kMultiLineFieldMinHeight,
+      ),
+      decoration: AppDecorations.field(context),
+      padding: EdgeInsets.symmetric(
+        horizontal: _kFieldPaddingH,
+        vertical: singleLine ? 0 : _kMultiLineFieldPaddingV,
+      ),
+      child: Row(
+        crossAxisAlignment: singleLine
+            ? CrossAxisAlignment.center
+            : CrossAxisAlignment.start,
+        children: <Widget>[
+          SizedBox(
+            width: AppSheetSize.formLabelWidth,
+            child: Padding(
+              padding: EdgeInsets.only(top: singleLine ? 0 : _kLabelTopInset),
+              child: Text(label, style: SheetText.of(context).fieldLabel),
+            ),
+          ),
+          const SizedBox(width: _kLabelGap),
+          Expanded(child: child),
+        ],
+      ),
+    );
+  }
+}
+
+/// 单行文本输入行。
+///
+/// label 与 input 在同一水平线上垂直居中；48dp 行高、零垂直内边距，
+/// 上下留白完全由行高与文字高度的差值自然形成（约 12dp），
+/// 不再叠加 12dp padding + 56dp minHeight 造成「虚胖」。
+/// 不渲染字数统计；清除按钮只占行内右侧，不改变行高。
+class SheetSingleLineFormField extends StatelessWidget {
+  const SheetSingleLineFormField({
     super.key,
     required this.label,
     required this.controller,
     this.hintText,
     this.maxLength,
-    this.maxLines = 1,
-    this.minLines,
     this.showClearButton = false,
-    this.showCounter = false,
+    this.keyboardType,
+    this.textInputAction,
+    this.validator,
+    this.onChanged,
+  });
+
+  final String label;
+  final TextEditingController controller;
+  final String? hintText;
+  final int? maxLength;
+  final bool showClearButton;
+  final TextInputType? keyboardType;
+  final TextInputAction? textInputAction;
+  final String? Function(String? value)? validator;
+  final ValueChanged<String>? onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = SheetText.of(context);
+    final p = SheetPalette.of(context);
+    final cs = Theme.of(context).colorScheme;
+
+    return _FormFieldShell(
+      label: label,
+      singleLine: true,
+      // child 参数不会随文本变化重建，保证 FormFieldState / validator
+      // 注册稳定；只有「清除按钮」这一个随输入变化的部分在 builder 里。
+      child: ValueListenableBuilder<TextEditingValue>(
+        valueListenable: controller,
+        child: TextFormField(
+          controller: controller,
+          maxLength: maxLength,
+          maxLines: 1,
+          minLines: 1,
+          keyboardType: keyboardType,
+          textInputAction: textInputAction,
+          validator: validator,
+          onChanged: onChanged,
+          style: text.fieldValue,
+          decoration: InputDecoration(
+            border: InputBorder.none,
+            enabledBorder: InputBorder.none,
+            focusedBorder: InputBorder.none,
+            errorBorder: InputBorder.none,
+            focusedErrorBorder: InputBorder.none,
+            filled: false,
+            isDense: true,
+            contentPadding: EdgeInsets.zero,
+            hintText: hintText,
+            counterText: '',
+            errorMaxLines: 1,
+            hintStyle: text.fieldValue.copyWith(
+              color: p.mutedText.withValues(alpha: AppOpacity.hint),
+            ),
+            errorStyle: text.caption.copyWith(color: cs.error),
+          ),
+        ),
+        builder: (context, value, field) {
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: <Widget>[
+              Expanded(child: field!),
+              if (showClearButton && value.text.isNotEmpty)
+                _ClearButton(controller: controller, color: p.mutedText),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// 多行文本输入行。
+///
+/// label 顶部对齐首行文字，输入框按 minLines / maxLines 自然增高，
+/// 字数统计在下方；这几项都会撑高容器，所以保留 56dp 下限 + 12dp
+/// 垂直内边距，与单行的紧凑节奏明确区分。
+class SheetMultiLineFormField extends StatelessWidget {
+  const SheetMultiLineFormField({
+    super.key,
+    required this.label,
+    required this.controller,
+    this.hintText,
+    this.maxLength,
+    this.maxLines = 3,
+    this.minLines = 2,
+    this.showClearButton = false,
+    this.showCounter = true,
     this.keyboardType,
     this.textInputAction,
     this.validator,
@@ -45,7 +185,7 @@ class SheetFormField extends StatelessWidget {
   final String? hintText;
   final int? maxLength;
   final int maxLines;
-  final int? minLines;
+  final int minLines;
   final bool showClearButton;
   final bool showCounter;
   final TextInputType? keyboardType;
@@ -58,99 +198,87 @@ class SheetFormField extends StatelessWidget {
     final text = SheetText.of(context);
     final p = SheetPalette.of(context);
     final cs = Theme.of(context).colorScheme;
-    final multiLine = maxLines > 1;
 
-    return Container(
-      constraints: const BoxConstraints(minHeight: _kFieldMinHeight),
-      decoration: AppDecorations.field(context),
-      padding: const EdgeInsets.symmetric(
-        horizontal: _kFieldPaddingH,
-        vertical: _kFieldPaddingV,
-      ),
-      child: Row(
-        crossAxisAlignment:
-            multiLine ? CrossAxisAlignment.start : CrossAxisAlignment.center,
-        children: <Widget>[
-          Padding(
-            padding: EdgeInsets.only(top: multiLine ? AppSpacing.xxs : 0),
-            child: Text(label, style: text.fieldLabel),
-          ),
-          const SizedBox(width: _kLabelGap),
-          Expanded(
-            // child 参数不会随文本变化重建，保证 FormFieldState / validator
-            // 注册稳定；只有「清除按钮 + 字数」这两个随输入变化的部分在 builder 里。
-            child: ValueListenableBuilder<TextEditingValue>(
-              valueListenable: controller,
-              child: TextFormField(
-                controller: controller,
-                maxLength: maxLength,
-                maxLines: maxLines,
-                minLines: minLines,
-                keyboardType: keyboardType,
-                textInputAction: textInputAction,
-                validator: validator,
-                onChanged: onChanged,
-                style: text.fieldValue,
-                decoration: InputDecoration(
-                  border: InputBorder.none,
-                  enabledBorder: InputBorder.none,
-                  focusedBorder: InputBorder.none,
-                  errorBorder: InputBorder.none,
-                  focusedErrorBorder: InputBorder.none,
-                  filled: false,
-                  isDense: true,
-                  contentPadding: EdgeInsets.zero,
-                  hintText: hintText,
-                  counterText: '',
-                  errorMaxLines: 2,
-                  hintStyle: text.fieldValue.copyWith(
-                    color: p.mutedText.withValues(alpha: AppOpacity.hint),
-                  ),
-                  errorStyle: text.caption.copyWith(color: cs.error),
-                ),
-              ),
-              builder: (context, value, field) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: <Widget>[
-                    Row(
-                      crossAxisAlignment: multiLine
-                          ? CrossAxisAlignment.start
-                          : CrossAxisAlignment.center,
-                      children: <Widget>[
-                        Expanded(child: field!),
-                        if (showClearButton && value.text.isNotEmpty)
-                          IconButton(
-                            onPressed: controller.clear,
-                            tooltip: '清空',
-                            icon: const Icon(
-                              AppIcons.clear,
-                              size: _kClearIconSize,
-                            ),
-                            color: p.mutedText,
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints.tightFor(
-                              width: kMinTapTarget,
-                              height: kMinTapTarget,
-                            ),
-                          ),
-                      ],
-                    ),
-                    if (showCounter && maxLength != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: _kCounterGap),
-                        child: Text(
-                          '${value.text.length}/$maxLength',
-                          style: text.caption,
-                        ),
-                      ),
-                  ],
-                );
-              },
+    return _FormFieldShell(
+      label: label,
+      singleLine: false,
+      child: ValueListenableBuilder<TextEditingValue>(
+        valueListenable: controller,
+        child: TextFormField(
+          controller: controller,
+          maxLength: maxLength,
+          maxLines: maxLines,
+          minLines: minLines,
+          keyboardType: keyboardType,
+          textInputAction: textInputAction,
+          validator: validator,
+          onChanged: onChanged,
+          style: text.fieldValue,
+          decoration: InputDecoration(
+            border: InputBorder.none,
+            enabledBorder: InputBorder.none,
+            focusedBorder: InputBorder.none,
+            errorBorder: InputBorder.none,
+            focusedErrorBorder: InputBorder.none,
+            filled: false,
+            isDense: true,
+            contentPadding: EdgeInsets.zero,
+            hintText: hintText,
+            counterText: '',
+            errorMaxLines: 2,
+            hintStyle: text.fieldValue.copyWith(
+              color: p.mutedText.withValues(alpha: AppOpacity.hint),
             ),
+            errorStyle: text.caption.copyWith(color: cs.error),
           ),
-        ],
+        ),
+        builder: (context, value, field) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Expanded(child: field!),
+                  if (showClearButton && value.text.isNotEmpty)
+                    _ClearButton(controller: controller, color: p.mutedText),
+                ],
+              ),
+              if (showCounter && maxLength != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: _kCounterGap),
+                  child: Text(
+                    '${value.text.length}/$maxLength',
+                    style: text.caption,
+                  ),
+                ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// 清除按钮：两种文本行共用，48dp 无障碍热区 + 语义图标 + tooltip。
+class _ClearButton extends StatelessWidget {
+  const _ClearButton({required this.controller, required this.color});
+
+  final TextEditingController controller;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      onPressed: controller.clear,
+      tooltip: '清空',
+      icon: const Icon(AppIcons.clear, size: _kClearIconSize),
+      color: color,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints.tightFor(
+        width: kMinTapTarget,
+        height: kMinTapTarget,
       ),
     );
   }

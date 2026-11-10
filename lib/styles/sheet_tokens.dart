@@ -58,6 +58,9 @@ abstract final class AppSheetSize {
   static const double optionRowHeight = 56;
   static const double optionRadioSize = 22;
 
+  /// 单选行「代表色」色点直径（主题色选择等）
+  static const double optionSwatchSize = 20;
+
   static const double categoryTileSize = 76;
   static const double categoryIconSize = 30;
   static const int categoryColumns = 4;

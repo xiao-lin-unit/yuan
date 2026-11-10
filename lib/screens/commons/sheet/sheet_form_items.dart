@@ -30,20 +30,23 @@ sealed class SheetFormItem {
   final bool dividerAbove;
 }
 
-/// 单行 / 多行文本输入。
+/// 单行文本输入（紧凑表单行）。
 ///
-/// [validator] 返回非空字符串表示校验失败，错误文案由公共组件渲染在字段内。
-final class SheetFormTextItem extends SheetFormItem {
-  const SheetFormTextItem({
+/// 与 [SheetFormMultiLineTextItem] 是**两种不同的控件类型**，不再靠
+/// `maxLines > 1` 在渲染层猜。单行固定 1 行、label 与输入框在同一水平线上
+/// 垂直居中、上下留白由全局最小热区令牌决定，也不提供字数统计
+/// （counter 会把紧凑的行撑高，是之前「单行看起来过高」的成因之一）。
+///
+/// 使用方只需声明「这一项是单行」，控件选择、尺寸、对齐、清除按钮、
+/// 错误文案样式全部由公共组件与全局令牌负责。
+final class SheetFormSingleLineTextItem extends SheetFormItem {
+  const SheetFormSingleLineTextItem({
     required super.key,
     required super.label,
     this.initialValue = '',
     this.hint,
     this.maxLength,
-    this.maxLines = 1,
-    this.minLines,
     this.showClearButton = false,
-    this.showCounter = false,
     this.keyboardType,
     this.textInputAction,
     this.validator,
@@ -54,8 +57,42 @@ final class SheetFormTextItem extends SheetFormItem {
   final String initialValue;
   final String? hint;
   final int? maxLength;
+  final bool showClearButton;
+  final TextInputType? keyboardType;
+  final TextInputAction? textInputAction;
+  final String? Function(String value)? validator;
+  final ValueChanged<String>? onChanged;
+}
+
+/// 多行文本输入（textarea）。
+///
+/// label 顶部对齐首行文字，[minLines] / [maxLines] 决定高度，
+/// 字数统计默认开启（多行需要给用户长度反馈）。
+final class SheetFormMultiLineTextItem extends SheetFormItem {
+  const SheetFormMultiLineTextItem({
+    required super.key,
+    required super.label,
+    this.initialValue = '',
+    this.hint,
+    this.maxLength,
+    this.maxLines = 3,
+    this.minLines = 2,
+    this.showClearButton = false,
+    this.showCounter = true,
+    this.keyboardType,
+    this.textInputAction,
+    this.validator,
+    this.onChanged,
+    super.dividerAbove,
+  })  : assert(maxLines > 1, '多行文本 maxLines 必须 > 1'),
+        assert(minLines >= 1 && minLines <= maxLines,
+            'minLines 必须在 1..maxLines 之间');
+
+  final String initialValue;
+  final String? hint;
+  final int? maxLength;
   final int maxLines;
-  final int? minLines;
+  final int minLines;
   final bool showClearButton;
   final bool showCounter;
   final TextInputType? keyboardType;

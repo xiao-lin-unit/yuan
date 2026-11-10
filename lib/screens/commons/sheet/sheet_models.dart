@@ -35,17 +35,30 @@ class SheetTrendPoint {
 }
 
 /// 单选列表项。
+///
+/// 两种 leading 形态二选一：
+/// - [icon]：语义矢量图标，走全局图标表（排序方式、优先级等抽象选项）；
+/// - [swatch]：选项的代表色，由通用零件画成色点（主题色、分类色等）。
+///
+/// [swatch] 是**数据**（这个选项代表什么颜色），不是样式值；
+/// 色点的尺寸、描边、选中态仍全部由 `parts/sheet_selectors.dart`
+/// 按全局令牌渲染，业务层不写 BoxDecoration。
 @immutable
 class SheetOption<T> {
   const SheetOption({
     required this.value,
     required this.label,
-    required this.icon,
-  });
+    this.icon,
+    this.swatch,
+  }) : assert(
+          icon != null || swatch != null,
+          'SheetOption 需要 icon 或 swatch 之一作为 leading',
+        );
 
   final T value;
   final String label;
-  final IconData icon;
+  final IconData? icon;
+  final Color? swatch;
 }
 
 /// 分类网格项。颜色由 `SheetPalette.categoryTone(index)` 按位置派生，

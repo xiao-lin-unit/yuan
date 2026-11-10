@@ -113,7 +113,7 @@ class SheetCatalogScreen extends StatelessWidget {
           _CatalogEntry(
             index: '03',
             title: '表单编辑',
-            subtitle: '声明式 items：头像 · 文本 · 标签 · 开关 · 说明',
+            subtitle: '声明式 items：头像 · 单行 / 多行 · 标签 · 开关 · 说明',
             icon: AppIcons.edit,
             onTap: () => _show(
               context,
@@ -132,7 +132,7 @@ class SheetCatalogScreen extends StatelessWidget {
                     builder: (context, onChanged, size) =>
                         SheetFormAvatarPlaceholder(size: size),
                   ),
-                  const SheetFormTextItem(
+                  const SheetFormSingleLineTextItem(
                     key: 'name',
                     label: '昵称',
                     initialValue: '林小满',
@@ -141,7 +141,7 @@ class SheetCatalogScreen extends StatelessWidget {
                     showClearButton: true,
                     validator: _validateName,
                   ),
-                  const SheetFormTextItem(
+                  const SheetFormMultiLineTextItem(
                     key: 'bio',
                     label: '个人简介',
                     initialValue: '热爱生活，记录日常。\n分享镜头里的光。',
