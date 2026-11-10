@@ -9,10 +9,20 @@ import 'package:yuan/styles/theme_tokens.dart';
 /// 向上柔光阴影、顶部居中拖拽把手、底部 home indicator、24dp 内容留白、
 /// 90% 屏高上限。
 ///
-/// 键盘避让**只在 [show] 的 builder 里做一次**（AnimatedPadding + Align），
-/// 外壳内部不再读 viewInsets、不再加自己的 bottom padding：
-/// 双重避让会让 sheet 底部与键盘之间露出一条灰色间隙，并把内容整体
-/// 推到设备顶端。外壳只用 LayoutBuilder 拿到的「实际可用高度」限高。
+/// 键盘策略：**完全不抬 Sheet**。
+///
+/// 前几轮一直在「用 bottom padding 把 sheet 抬到键盘上方」里打转，
+/// 但「抬」这个动作本身就是把 sheet 往设备顶端推：只要 sheet 底部
+/// 被移离 view 底部、而高度又按较大的可用高度算，顶部必然溢出，
+/// 圆角被裁到状态栏，且底部露出 barrier 灰带。
+///
+/// 现在 Sheet 底部永远对齐 view 底部（`Align.bottomCenter`），
+/// 位置与键盘完全无关；键盘的可见性只通过**滚动内容内部**追加一段
+/// `viewInsets.bottom` 的 padding 来解决 —— 那是可滚动区域，不会
+/// 改变 Sheet 自身的位置或高度。
+///
+/// 外壳只用 LayoutBuilder 拿到的「实际可用高度」限高，因此顶部
+/// 恒为 `0.1 × 可用高度 > 0`，数学上不可能贴到设备顶端。
 ///
 /// 与已有的 `CommonBottomSheet` **并存，不修改它**：那个组件是
 /// `DraggableScrollableSheet` + 标题栏 + 确认按钮，业务里
@@ -68,37 +78,28 @@ class AppSheetShell extends StatelessWidget {
       isScrollControlled: true,
       isDismissible: barrierDismissible,
       enableDrag: barrierDismissible,
-      // 键盘避让的唯一入口。
+      // 这里**不读 viewInsets、不加任何 bottom padding、不做动画位移**。
       //
-      // ① AnimatedPadding 用 builder 自己的 context 读 viewInsets，
-      //    键盘弹出/收起时 MediaQuery 变化会触发重建，padding 带动画。
-      //    它把「键盘高度」这一层留白放在 sheet 之外，sheet 底部正好
-      //    贴在键盘上沿，中间不会出现原先那条透明灰色间隙。
-      // ② Align 是关键：showModalBottomSheet 会把 sheet 底部对齐屏幕
-      //    底部、并可能给出 tight 高度约束；Align 把它转成 loose，
-      //    外壳里的 ConstrainedBox 才真正能限高。少了这一层，
-      //    maxHeight 被 BoxConstraints.enforce 吃掉，sheet 会铺满
-      //    「屏幕 - 键盘」的全部高度，顶部圆角被推到状态栏 —— 这正是
-      //    上一轮改了 availableHeight 却仍然贴顶的原因。
-      builder: (BuildContext sheetContext) => AnimatedPadding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.viewInsetsOf(sheetContext).bottom,
-        ),
-        duration: AppMotion.medium,
-        curve: Curves.easeOut,
-        child: Align(
-          alignment: Alignment.bottomCenter,
-          child: AppSheetShell(
-            title: title,
-            subtitle: subtitle,
-            leading: leading,
-            trailing: trailing,
-            centeredHeader: centeredHeader,
-            showGrabber: showGrabber,
-            showHomeIndicator: showHomeIndicator,
-            scrollable: scrollable,
-            child: child,
-          ),
+      // AndroidManifest 是 adjustResize：键盘弹出时 Flutter view 本身
+      // 已被缩到键盘上方，showModalBottomSheet 的 route 铺在这个已缩小
+      // 的 view 里，Sheet 底部自然就贴在键盘上沿。再手动加一次
+      // bottom padding 等于把键盘高度扣两遍 —— 前几轮「灰色间隙 +
+      // 顶部被推到状态栏」就是这么来的。
+      //
+      // 只保留 Align：它把框架可能给出的 tight 高度约束转成 loose，
+      // 让外壳里的 ConstrainedBox 限高真正生效（不改位置，只改约束）。
+      builder: (_) => Align(
+        alignment: Alignment.bottomCenter,
+        child: AppSheetShell(
+          title: title,
+          subtitle: subtitle,
+          leading: leading,
+          trailing: trailing,
+          centeredHeader: centeredHeader,
+          showGrabber: showGrabber,
+          showHomeIndicator: showHomeIndicator,
+          scrollable: scrollable,
+          child: child,
         ),
       ),
     );
@@ -109,10 +110,9 @@ class AppSheetShell extends StatelessWidget {
     final p = SheetPalette.of(context);
     final bool hasHeader = title != null || leading != null || trailing != null;
 
-    // 键盘高度已由 [show] 的 AnimatedPadding 扣掉，这里拿到的
-    // constraints.maxHeight 就是「键盘上方的真实可用高度」。
-    // 不再自己读 viewInsets、不再加 bottom Padding —— 外壳内部再做一次
-    // 避让是上一轮留下的问题：等于把同一份键盘高度算了两遍。
+    // Sheet 的位置与键盘完全解耦：底部始终对齐 view 底部，
+    // 高度只由「view 实际可用高度 × factor」决定（adjustResize 下这个
+    // 值已经是键盘上方高度）。顶部恒为 0.1 × available > 0。
     return SafeArea(
       top: false,
       bottom: false,
@@ -122,6 +122,23 @@ class AppSheetShell extends StatelessWidget {
               ? constraints.maxHeight
               : MediaQuery.sizeOf(context).height;
           final double maxHeight = available * maxHeightFactor;
+
+          // 键盘补偿放在「滚动内容」里，而不是 Sheet 外层：
+          // 它让内容能滚出键盘遮挡区，但不会把 Sheet 自身往上推。
+          // 若 adjustResize 已经缩小了 view，这段 padding 只是多出
+          // 一块可滚动留白，完全无害。
+          final double keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+          final EdgeInsetsGeometry basePadding = contentPadding ??
+              const EdgeInsets.fromLTRB(
+                AppSheetSize.horizontalPadding,
+                0,
+                AppSheetSize.horizontalPadding,
+                AppSheetSize.bottomPadding,
+              );
+          final EdgeInsetsGeometry effectivePadding = keyboardInset > 0
+              ? basePadding.add(EdgeInsets.only(bottom: keyboardInset))
+              : basePadding;
+
           return ConstrainedBox(
             constraints: BoxConstraints(maxHeight: maxHeight),
             child: ClipRRect(
@@ -181,23 +198,13 @@ class AppSheetShell extends StatelessWidget {
                       Flexible(
                         child: scrollable
                             ? SingleChildScrollView(
-                                padding: contentPadding ??
-                                    const EdgeInsets.fromLTRB(
-                                      AppSheetSize.horizontalPadding,
-                                      0,
-                                      AppSheetSize.horizontalPadding,
-                                      AppSheetSize.bottomPadding,
-                                    ),
+                                padding: effectivePadding,
+                                keyboardDismissBehavior:
+                                    ScrollViewKeyboardDismissBehavior.onDrag,
                                 child: child,
                               )
                             : Padding(
-                                padding: contentPadding ??
-                                    const EdgeInsets.fromLTRB(
-                                      AppSheetSize.horizontalPadding,
-                                      0,
-                                      AppSheetSize.horizontalPadding,
-                                      AppSheetSize.bottomPadding,
-                                    ),
+                                padding: effectivePadding,
                                 child: child,
                               ),
                       ),
