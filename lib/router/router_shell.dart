@@ -15,7 +15,10 @@ class RouteNavigation {
   final String path;
   final int index;
   final Widget widget;
-  final Widget icon;
+
+  /// 直接存 IconData：鲜明档下由 AppShell 按 tab 语义给未选中/选中
+  /// 两种状态分别上色，不需要在路由表写死任何 Color。
+  final IconData icon;
 
   const RouteNavigation(
     this.label,
@@ -29,11 +32,11 @@ class RouteNavigation {
 /// 图标一律取自 AppIcons（全软件唯一语义表），
 /// 不再在路由层直接写 Icons.xxx 或 emoji。
 const List<RouteNavigation> tabs = [
-  RouteNavigation('记账', '/', 0, EntryScreen(), Icon(AppIcons.entry)),
-  RouteNavigation('资债', '/ledger', 1, LedgerScreen(), Icon(AppIcons.ledger)),
-  RouteNavigation('账户', '/accounts', 2, AccountsScreen(), Icon(AppIcons.accounts)),
-  RouteNavigation('分析', '/analysis', 3, AnalysisScreen(), Icon(AppIcons.analysis)),
-  RouteNavigation('我的', '/profile', 4, ProfileScreen(), Icon(AppIcons.profile)),
+  RouteNavigation('记账', '/', 0, EntryScreen(), AppIcons.entry),
+  RouteNavigation('资债', '/ledger', 1, LedgerScreen(), AppIcons.ledger),
+  RouteNavigation('账户', '/accounts', 2, AccountsScreen(), AppIcons.accounts),
+  RouteNavigation('分析', '/analysis', 3, AnalysisScreen(), AppIcons.analysis),
+  RouteNavigation('我的', '/profile', 4, ProfileScreen(), AppIcons.profile),
 ];
 
 class AppShell extends StatelessWidget {
@@ -46,28 +49,16 @@ class AppShell extends StatelessWidget {
     final found = tabs.indexWhere((t) => location == t.path);
     final index = found < 0 ? 0 : found;
 
-    // 底导是高频导航，按 M3 不铺多色图标：图标保持单色 +
-    // 选中/未选中区分，彩色只落在 indicator 容器上，并随当前 tab
-    // 的语义色变化（记账绿 / 资债琥珀 / 账户蓝 / 分析第三色 / 我的主色）。
-    // 色值从当前主题派生，切主题色或明暗时自动重算。
     final iconTone = AppIconTone.of(context);
+    // 鲜明档：当前 tab 的 indicator 用饱和渐变首色，选中图标用自动
+    // 反色前景；未选中图标各自取色环上的语义色（不再是统一灰）。
+    // 克制档自动退回单色图标 + 淡彩 indicator，同一份代码。
     final pair = iconTone.resolve(
       iconTone.forTab(index),
       AppIconEmphasis.tonal,
     );
-    final container = pair.container;
-    final selectedIconColor = pair.foreground;
-    final cs = Theme.of(context).colorScheme;
-
     final navTheme = Theme.of(context).navigationBarTheme.copyWith(
-          indicatorColor: container,
-          iconTheme: WidgetStateProperty.resolveWith<IconThemeData?>((states) {
-            final isSelected = states.contains(WidgetState.selected);
-            return IconThemeData(
-              size: AppIconSize.large,
-              color: isSelected ? selectedIconColor : cs.onSurfaceVariant,
-            );
-          }),
+          indicatorColor: pair.container,
         );
 
     return Scaffold(
@@ -79,7 +70,22 @@ class AppShell extends StatelessWidget {
           selectedIndex: index,
           onDestinationSelected: (i) => context.go(tabs[i].path),
           destinations: tabs
-              .map((t) => NavigationDestination(icon: t.icon, label: t.label))
+              .asMap()
+              .entries
+              .map((e) {
+                final i = e.key;
+                final t = e.value;
+                final tabColor = iconTone
+                    .resolve(iconTone.forTab(i), AppIconEmphasis.standard)
+                    .foreground;
+                return NavigationDestination(
+                  icon: Icon(t.icon,
+                      size: AppIconSize.large, color: tabColor),
+                  selectedIcon: Icon(t.icon,
+                      size: AppIconSize.large, color: pair.foreground),
+                  label: t.label,
+                );
+              })
               .toList(),
         ),
       ),

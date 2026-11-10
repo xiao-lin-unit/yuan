@@ -39,8 +39,9 @@ class MenuItemData {
 /// 容器装饰、文字角色、间距、热区全部取自全局样式层。
 class MenuItem extends StatelessWidget {
   final MenuItemData data;
+  final int index;
 
-  const MenuItem({super.key, required this.data});
+  const MenuItem({super.key, required this.data, this.index = 0});
 
   @override
   Widget build(BuildContext context) {
@@ -72,7 +73,9 @@ class MenuItem extends StatelessWidget {
                           icon: data.icon!,
                           // key 是业务语义标识（knowledge / export / trash…），
                           // 颜色由全局 AppIconTone 映射，业务层不用传 Color。
+                          // 鲜明档下无显式语义的项按 index 铺 12 色相环。
                           toneKey: data.key,
+                          index: index,
                         )
                       : Text(
                           data.emoji ?? '',

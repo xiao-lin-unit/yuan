@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../styles/app_decorations.dart';
 import '../../../styles/app_icon_tone.dart';
 import '../../../styles/app_typography.dart';
 import '../../../styles/theme_tokens.dart';
@@ -7,13 +8,15 @@ import '../../../styles/theme_tokens.dart';
 // ── 组件私有样式（只服务本文件）────────────────────────────────
 const double _kTrailingGap = 6;
 const double _kTrailingIconSize = 18;
+const double _kTrailingBadgeSize = 28;
 
 /// 公共分组标题：统一所有分区的上下留白与文字层级。
 ///
 /// 尾图标以前固定 `onSurfaceVariant` 灰，是「素」的来源之一。
-/// 现在按标题走全局语义映射（关于=信息蓝 / 管理=第三色 / 功能=主色），
-/// 颜色取自 ColorScheme 与 AppThemeTokens，换主题自动重算；
-/// 保留 [toneKey] 作为显式覆盖，业务侧默认零改动。
+/// - 克制档：换成语义色单色图标（standard 档，不铺底）；
+/// - 鲜明档：换成 28dp 彩色渐变圆底 + 自动反色图标，与菜单徽章
+///   同一套色对，三个分区标题各得一色。
+/// 色值全部从 ColorScheme / AppThemeTokens 派生，换主题自动重算。
 class SectionHeader extends StatelessWidget {
   const SectionHeader({
     super.key,
@@ -34,11 +37,34 @@ class SectionHeader extends StatelessWidget {
     final base = toneKey != null
         ? iconTone.forMenuKey(toneKey)
         : iconTone.forSectionTitle(title);
-    // 尾图标属于 16–20px 高频功能图标，用 standard 档（单色不铺底），
-    // 只把灰色换成语义色，避免一屏内出现过多彩色块。
-    final foreground = iconTone
-        .resolve(base, AppIconEmphasis.standard)
-        .foreground;
+    final emphasis = iconTone.isVivid
+        ? AppIconEmphasis.tonal
+        : AppIconEmphasis.standard;
+    final pair = iconTone.resolve(base, emphasis);
+
+    Widget? trailingWidget;
+    if (trailing != null) {
+      final Widget iconWidget = IconTheme(
+        data: IconThemeData(
+          size: _kTrailingIconSize,
+          color: pair.foreground,
+        ),
+        child: trailing!,
+      );
+      trailingWidget = iconTone.isVivid
+          ? Container(
+              width: _kTrailingBadgeSize,
+              height: _kTrailingBadgeSize,
+              alignment: Alignment.center,
+              decoration: AppDecorations.iconBadge(
+                context,
+                pair.container,
+                gradient: pair.gradient,
+              ),
+              child: iconWidget,
+            )
+          : iconWidget;
+    }
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(
@@ -50,15 +76,9 @@ class SectionHeader extends StatelessWidget {
       child: Row(
         children: [
           Text(title, style: context.appText.sectionHeader),
-          if (trailing != null) ...[
+          if (trailingWidget != null) ...[
             const SizedBox(width: _kTrailingGap),
-            IconTheme(
-              data: IconThemeData(
-                size: _kTrailingIconSize,
-                color: foreground,
-              ),
-              child: trailing!,
-            ),
+            trailingWidget!,
           ],
         ],
       ),

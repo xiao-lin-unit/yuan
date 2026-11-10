@@ -131,17 +131,28 @@ class SheetIconBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 确认 / 概览弹层里这是整屏唯一的图标锚点，用 filled 实色 +
-    // 自动黑/白前景，与空状态徽章同一档；语义色（danger/warning/…）
-    // 仍由 sheetIntentTone 传入，换主题自动重算。
-    final pair = AppIconTone.of(context)
-        .resolve(tone, AppIconEmphasis.filled);
+    // 确认 / 概览弹层里这是整屏唯一的图标锚点，用 filled 档 +
+    // 自动黑/白前景；鲜明档自动换成双色渐变圆 + 同色光晕，
+    // 与空状态徽章同一档。语义色（danger/warning/…）仍由
+    // sheetIntentTone 传入，换主题自动重算。
+    final iconTone = AppIconTone.of(context);
+    final pair = iconTone.resolve(tone, AppIconEmphasis.filled);
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: pair.container,
+        color: pair.gradient == null ? pair.container : null,
+        gradient: pair.gradient,
         shape: BoxShape.circle,
+        boxShadow: iconTone.isVivid
+            ? <BoxShadow>[
+                BoxShadow(
+                  color: pair.container.withValues(alpha: AppOpacity.outline),
+                  blurRadius: AppElevation.sheetBlur,
+                  offset: AppElevation.cardOffset,
+                ),
+              ]
+            : null,
       ),
       child: Icon(
         icon,
