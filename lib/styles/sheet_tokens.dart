@@ -2,6 +2,7 @@ import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 
+import 'app_stroke.dart';
 import 'app_typography.dart';
 import 'color_math.dart';
 import 'theme_tokens.dart';
@@ -55,7 +56,10 @@ abstract final class AppSheetSize {
   /// 表单行：左侧 label 固定宽度（全软件表单对齐一致）
   static const double formLabelWidth = 72;
 
-  static const double optionRowHeight = 56;
+  /// 单选行：56dp 是 M3 双行 list tile 的高度，本行只有一行 16px 文字，
+  /// 用 56 会上下各留约 17dp 空白。改 48dp（= 最小点击区 kMinTapTarget）
+  /// 后配合紧凑行距，留白降到约 13dp，字号不变、可点区域仍达标。
+  static const double optionRowHeight = 48;
   static const double optionRadioSize = 22;
 
   /// 单选行「代表色」色点直径（主题色选择等）
@@ -81,7 +85,8 @@ abstract final class AppSheetSize {
 abstract final class AppSheetOpacity {
   static const double glassLight = 0.94;
   static const double glassDark = 0.88;
-  static const double glassOutline = 0.6;
+  /// 玻璃弹层 / 选项容器的描边：旧版 0.6 中灰实边，等于给容器画了一圈墙。
+  static const double glassOutline = 0.22;
   static const double glowLight = 0.34;
   static const double glowDark = 0.18;
   static const double glowDangerLight = 0.30;
@@ -189,7 +194,7 @@ class SheetPalette {
             : AppSheetOpacity.glassLight,
       );
 
-  Color get glassBorder => cs.outlineVariant.withValues(
+  Color get glassBorder => AppStroke.colorFor(cs).withValues(
         alpha: AppSheetOpacity.glassOutline,
       );
 
@@ -295,6 +300,37 @@ class SheetText {
       AppTypography.optionLabel.copyWith(color: cs.onSurface);
   TextStyle get fieldValue =>
       AppTypography.optionLabel.copyWith(color: cs.onSurfaceVariant);
+
+  /// 单行输入专用：把 1.40 行高压到 1.0。
+  ///
+  /// [AppTypography.optionLabel] 的 height 1.40 是为多行 / 换行准备的，
+  /// 单行 TextField 带着这段额外 leading 时，文字在自身行框里偏上，
+  /// 外层再怎么居中看起来都像「顶到上边框」。单行与多行从 style 上
+  /// 就分开，不再共用同一个 TextStyle。
+  TextStyle get fieldLabelSingleLine =>
+      AppTypography.optionLabel.copyWith(
+        color: cs.onSurface,
+        height: 1.0,
+      );
+  TextStyle get fieldValueSingleLine =>
+      AppTypography.optionLabel.copyWith(
+        color: cs.onSurfaceVariant,
+        height: 1.0,
+      );
+
+  /// 单选行 / 紧凑列表专用：字号不变，只收行距。
+  /// 配合 AppSheetSize.optionRowHeight(48) 消除「行高有余、字很小」的空。
+  TextStyle get optionLabelCompact =>
+      AppTypography.optionLabel.copyWith(
+        color: cs.onSurface,
+        height: 1.2,
+      );
+  TextStyle get optionLabelCompactSelected =>
+      AppTypography.optionLabel.copyWith(
+        color: cs.primary,
+        fontWeight: FontWeight.w600,
+        height: 1.2,
+      );
 }
 
 extension SheetTextX on BuildContext {

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'app_stroke.dart';
 import 'color_math.dart';
 
 /// 8pt 间距网格
@@ -36,8 +37,10 @@ abstract final class AppOpacity {
   static const double selected = 0.10;
   static const double disabled = 0.38;
   static const double disabledContainer = 0.12;
-  static const double outline = 0.5;
-  static const double outlineDark = 0.35;
+  /// 划分性描边的不透明度。旧版 0.5 叠中灰实色，界限过硬；
+  /// 现在叠的是 [AppStroke.colorFor] 的近背景中性色，0.34 已足够淡。
+  static const double outline = 0.34;
+  static const double outlineDark = 0.30;
   static const double hint = 0.7;
   static const double scrim = 0.4;
 }
@@ -90,10 +93,15 @@ abstract final class AppIconSize {
   static const double empty = 32;
 }
 
-/// 描边宽度：常规 1dp，聚焦 2dp（M3 filled text field 规范）
+/// 描边宽度：常规 0.6dp 发丝线，强调 1.5dp。
+///
+/// 旧版 1dp / 2dp 在高分屏上等于 2~4 个物理像素，加上中灰实色，
+/// 全屏卡片、列表、输入框都被框出很深的分界。現在按「划分是暗示
+/// 而不是墙」处理：细到只有贴近内容时才察觉，聚焦 / 选中仍保留
+/// 可辨识的强调宽度。所有 Divider thickness 也走这里，一处生效。
 abstract final class AppBorder {
-  static const double thin = 1;
-  static const double focused = 2;
+  static const double thin = 0.6;
+  static const double focused = 1.5;
 }
 
 /// 页面级布局节奏：统一所有页面的留白与最小高度，
@@ -191,7 +199,9 @@ class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
       card: dark ? cs.surfaceContainerHigh : cs.surfaceContainerLow,
       field: cs.surfaceContainerHighest,
       sheet: dark ? cs.surfaceContainer : cs.surfaceContainerLow,
-      divider: cs.outlineVariant,
+      // 划分线不再用 M3 outlineVariant 实色（亮色偏深、暗色成深沟），
+      // 统一走 AppStroke：往背景掺一点 onSurface 的中性色。
+      divider: AppStroke.colorFor(cs),
       shadow: cs.shadow,
     );
   }

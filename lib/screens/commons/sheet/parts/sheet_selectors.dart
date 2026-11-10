@@ -148,7 +148,9 @@ class SheetOptionList<T> extends StatelessWidget {
               ),
               if (i < options.length - 1)
                 Divider(
-                  height: AppBorder.thin,
+                  // height 是 Divider 占用的总空间，保持 1dp 呼吸；
+                  // thickness 走全局发丝线，颜色由 AppStroke 派生。
+                  height: 1,
                   thickness: AppBorder.thin,
                   color: p.dividerColor,
                 ),
@@ -195,8 +197,8 @@ class _OptionRow<T> extends StatelessWidget {
                   child: Text(
                     option.label,
                     style: selected
-                        ? text.optionLabelSelected
-                        : text.optionLabel,
+                        ? text.optionLabelCompactSelected
+                        : text.optionLabelCompact,
                   ),
                 ),
                 Icon(

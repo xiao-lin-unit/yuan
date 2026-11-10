@@ -6,6 +6,7 @@ import 'package:yuan/service/image/image_category.dart';
 import 'package:yuan/service/image/image_policy.dart';
 import 'package:yuan/service/image/image_ref.dart';
 import 'package:yuan/service/image/image_validator.dart';
+import '../../../styles/app_stroke.dart';
 import '../../../styles/theme_tokens.dart';
 
 import '../icons/app_icons.dart';
@@ -146,7 +147,7 @@ class _SingleImagePickerWidgetState extends State<SingleImagePickerWidget> {
         height: widget.size,
         decoration: BoxDecoration(
           borderRadius: _borderRadius,
-          border: Border.all(color: cs.outlineVariant, width: AppBorder.thin),
+          border: AppStroke.allFor(cs),
           color: cs.surfaceContainerLow,
         ),
         child: _busy
@@ -371,7 +372,7 @@ class _MultiImagePickerWidgetState extends State<MultiImagePickerWidget> {
           borderRadius: BorderRadius.circular(
             widget.shape == ImageShape.circle ? widget.size / 2 : widget.radius,
           ),
-          border: Border.all(color: cs.outlineVariant, width: AppBorder.thin),
+          border: AppStroke.allFor(cs),
           color: cs.surfaceContainerLow,
         ),
         child: _busy
@@ -395,7 +396,7 @@ class _MultiImagePickerWidgetState extends State<MultiImagePickerWidget> {
           height: widget.size,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(widget.radius),
-            border: Border.all(color: cs.outlineVariant),
+            border: AppStroke.allFor(cs),
             color: cs.surfaceContainerLow,
           ),
           child: Icon(AppIcons.block, size: AppIconSize.medium + 2, color: cs.onSurfaceVariant.withValues(alpha: AppOpacity.disabled)),

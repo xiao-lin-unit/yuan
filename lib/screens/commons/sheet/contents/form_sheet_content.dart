@@ -333,7 +333,7 @@ class _FormSheetContentState extends State<FormSheetContent> {
               ),
             if (widget.items[i].dividerAbove) ...<Widget>[
               Divider(
-                height: AppBorder.thin,
+                height: 1,
                 thickness: AppBorder.thin,
                 color: p.dividerColor,
               ),

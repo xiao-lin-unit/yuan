@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'app_stroke.dart';
 import 'theme_tokens.dart';
 
 /// 全软件共用的**容器装饰**工厂。
@@ -21,7 +22,7 @@ abstract final class AppDecorations {
       borderRadius: BorderRadius.circular(AppRadius.card),
       border: Border.all(
         color: t.divider.withValues(
-          alpha: dark ? AppOpacity.outlineDark : AppOpacity.outline + 0.1,
+          alpha: dark ? AppOpacity.outlineDark : AppOpacity.outline,
         ),
         width: AppBorder.thin,
       ),
@@ -124,10 +125,7 @@ abstract final class AppDecorations {
     return BoxDecoration(
       color: cs.surfaceContainerLow,
       borderRadius: BorderRadius.circular(AppRadius.item),
-      border: Border.all(
-        color: cs.outlineVariant,
-        width: AppBorder.thin,
-      ),
+      border: AppStroke.all(context),
     );
   }
 }

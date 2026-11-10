@@ -93,7 +93,7 @@ class _AboutRow extends StatelessWidget {
         ),
         Divider(
           color: tokens.divider,
-          height: AppBorder.thin,
+          height: 1,
           thickness: AppBorder.thin,
         ),
       ],

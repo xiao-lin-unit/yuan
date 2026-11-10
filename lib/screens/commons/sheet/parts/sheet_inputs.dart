@@ -41,12 +41,18 @@ class _FormFieldShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final sheetText = SheetText.of(context);
     return Container(
       constraints: BoxConstraints(
         minHeight: singleLine
             ? _kSingleLineFieldHeight
             : _kMultiLineFieldMinHeight,
       ),
+      // 关键：Container 的 minHeight 只约束自身，不会把矮 child 撑开。
+      // 单行 child（一行文字 ≈ 16dp）远小于 48dp 时，默认 alignment 会把
+      // 它顶在上边缘 —— 这正是「input 顶到上边框」的真正原因。
+      // 显式 centerLeft 保证 label 与 input 一起垂直居中。
+      alignment: singleLine ? Alignment.centerLeft : null,
       decoration: AppDecorations.field(context),
       padding: EdgeInsets.symmetric(
         horizontal: _kFieldPaddingH,
@@ -61,7 +67,12 @@ class _FormFieldShell extends StatelessWidget {
             width: AppSheetSize.formLabelWidth,
             child: Padding(
               padding: EdgeInsets.only(top: singleLine ? 0 : _kLabelTopInset),
-              child: Text(label, style: SheetText.of(context).fieldLabel),
+              child: Text(
+                label,
+                style: singleLine
+                    ? sheetText.fieldLabelSingleLine
+                    : sheetText.fieldLabel,
+              ),
             ),
           ),
           const SizedBox(width: _kLabelGap),
@@ -74,9 +85,16 @@ class _FormFieldShell extends StatelessWidget {
 
 /// 单行文本输入行。
 ///
-/// label 与 input 在同一水平线上垂直居中；48dp 行高、零垂直内边距，
-/// 上下留白完全由行高与文字高度的差值自然形成（约 12dp），
-/// 不再叠加 12dp padding + 56dp minHeight 造成「虚胖」。
+/// 与多行**显式区分三处**，不再共用一个 style / 一套对齐：
+/// 1. 外壳 `Alignment.centerLeft` —— Container 的 minHeight 只撑自身，
+///    不撑 child；以前只有 `crossAxisAlignment.center` 时，矮小的
+///    TextFormField 仍被顶在上边缘，看起来「input 贴着上边框」；
+/// 2. TextField 自身拿 `minHeight: 48` 约束 + `textAlignVertical.center`，
+///    文字在输入框内部就垂直居中，不依赖外层猜位置；
+/// 3. `fieldValueSingleLine` / `fieldLabelSingleLine` 把行高压到 1.0，
+///    去掉多行用的 1.40 额外 leading（它会把单行文字往上推）。
+///
+/// 48dp 行高、零垂直内边距，上下留白由行高与文字高度差自然形成；
 /// 不渲染字数统计；清除按钮只占行内右侧，不改变行高。
 class SheetSingleLineFormField extends StatelessWidget {
   const SheetSingleLineFormField({
@@ -115,32 +133,42 @@ class SheetSingleLineFormField extends StatelessWidget {
       // 注册稳定；只有「清除按钮」这一个随输入变化的部分在 builder 里。
       child: ValueListenableBuilder<TextEditingValue>(
         valueListenable: controller,
-        child: TextFormField(
-          controller: controller,
-          maxLength: maxLength,
-          maxLines: 1,
-          minLines: 1,
-          keyboardType: keyboardType,
-          textInputAction: textInputAction,
-          validator: validator,
-          onChanged: onChanged,
-          style: text.fieldValue,
-          decoration: InputDecoration(
-            border: InputBorder.none,
-            enabledBorder: InputBorder.none,
-            focusedBorder: InputBorder.none,
-            errorBorder: InputBorder.none,
-            focusedErrorBorder: InputBorder.none,
-            filled: false,
-            isDense: true,
-            contentPadding: EdgeInsets.zero,
-            hintText: hintText,
-            counterText: '',
-            errorMaxLines: 1,
-            hintStyle: text.fieldValue.copyWith(
-              color: p.mutedText.withValues(alpha: AppOpacity.hint),
+        // 让 TextField 自身拿到 48dp 的最小高度，文字在它内部就居中，
+        // 而不是靠外层去猜一个 16dp 小框该放哪。minHeight 而非固定
+        // height：校验失败时 error 文案仍能把行撑高，不会被裁掉。
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(
+            minHeight: _kSingleLineFieldHeight,
+          ),
+          child: TextFormField(
+            controller: controller,
+            maxLength: maxLength,
+            maxLines: 1,
+            minLines: 1,
+            keyboardType: keyboardType,
+            textInputAction: textInputAction,
+            validator: validator,
+            onChanged: onChanged,
+            // 与多行区分：height 1.0 + 垂直居中，不再带 1.40 的额外 leading。
+            textAlignVertical: TextAlignVertical.center,
+            style: text.fieldValueSingleLine,
+            decoration: InputDecoration(
+              border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+              errorBorder: InputBorder.none,
+              focusedErrorBorder: InputBorder.none,
+              filled: false,
+              isDense: true,
+              contentPadding: EdgeInsets.zero,
+              hintText: hintText,
+              counterText: '',
+              errorMaxLines: 1,
+              hintStyle: text.fieldValueSingleLine.copyWith(
+                color: p.mutedText.withValues(alpha: AppOpacity.hint),
+              ),
+              errorStyle: text.caption.copyWith(color: cs.error),
             ),
-            errorStyle: text.caption.copyWith(color: cs.error),
           ),
         ),
         builder: (context, value, field) {

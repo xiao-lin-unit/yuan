@@ -202,7 +202,11 @@ class _CommonBottomSheetState extends State<CommonBottomSheet> {
                       ),
                     ),
 
-                  Divider(color: t.divider, height: AppBorder.thin, thickness: AppBorder.thin),
+                  Divider(
+                    color: t.divider,
+                    height: 1,
+                    thickness: AppBorder.thin,
+                  ),
 
                   /// ===== 内容区（可滚动） =====
                   Expanded(

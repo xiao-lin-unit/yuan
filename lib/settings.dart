@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:yuan/screens/commons/icons/app_icons.dart';
+import 'package:yuan/styles/app_stroke.dart';
 import 'package:yuan/styles/app_typography.dart';
 import 'package:yuan/styles/theme_tokens.dart';
 
@@ -168,7 +169,7 @@ class ThemeSetting {
       OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: cs.primary,
-          side: BorderSide(color: cs.outline),
+          side: AppStroke.sideFor(cs),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(t.radiusItem),
           ),
@@ -181,8 +182,8 @@ class ThemeSetting {
   ///
   /// M3 filled text field 规范：
   ///  容器 = surfaceContainerHighest，输入文字 = onSurface，
-  ///  label / hint / icon = onSurfaceVariant，聚焦指示线 = primary(2dp)，
-  ///  未聚焦指示线 = onSurfaceVariant(1dp)，容器高 56dp，左右内边距 16dp。
+  ///  label / hint / icon = onSurfaceVariant，聚焦指示线 = primary(1.5dp)，
+  ///  未聚焦指示线 = AppStroke 低对比中性色(0.6dp)，容器高 56dp，左右 16dp。
   ///
   /// 旧版：`filled: true` 却不给 fillColor，`enabledBorder: BorderSide()`
   /// 是默认黑色 1px 边框，focusedBorder 也是黑；再加弹层写死白底，
@@ -209,10 +210,13 @@ class ThemeSetting {
       constraints: const BoxConstraints(minHeight: AppLayout.fieldMinHeight),
       isDense: false,
       alignLabelWithHint: true,
-      border: line(cs.onSurfaceVariant, AppBorder.thin),
-      enabledBorder: line(cs.onSurfaceVariant, AppBorder.thin),
+      // 未聚焦指示线以前用 onSurfaceVariant（接近正文色），在 filled
+      // 容器底边画出一圈深色墙；改走 AppStroke 的低对比中性色。
+      // 聚焦 / 错误仍用语义实色 + 稍宽，保证功能可辨识。
+      border: line(AppStroke.colorFor(cs), AppBorder.thin),
+      enabledBorder: line(AppStroke.colorFor(cs), AppBorder.thin),
       focusedBorder: line(cs.primary, AppBorder.focused),
-      errorBorder: line(cs.error, AppBorder.thin),
+      errorBorder: line(cs.error, AppStroke.emphasisWidth),
       focusedErrorBorder: line(cs.error, AppBorder.focused),
       disabledBorder: line(cs.onSurface.withValues(alpha: AppOpacity.disabledContainer), AppBorder.thin),
       hintStyle: textTheme.bodyLarge?.copyWith(color: cs.onSurfaceVariant),
@@ -575,7 +579,7 @@ class ThemeSetting {
           WidgetStateProperty.resolveWith<Color?>((Set<WidgetState> states) =>
               states.contains(WidgetState.selected) ? cs.primary : null),
       todayBorder:
-          BorderSide(color: cs.primary, width: AppBorder.thin),
+          BorderSide(color: cs.primary, width: AppStroke.emphasisWidth),
       yearStyle: textTheme.bodyMedium?.copyWith(color: cs.onSurface),
       yearForegroundColor: yearForeground,
       yearBackgroundColor: yearBackground,
