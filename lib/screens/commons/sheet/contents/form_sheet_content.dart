@@ -29,9 +29,12 @@ class FormSheetContent extends StatefulWidget {
     super.key,
     required this.title,
     required this.items,
-    required this.submitLabel,
+    this.submitLabel = '提交修改',
     this.cancelLabel = '取消',
     this.saveLabel = '保存',
+    this.save = false,
+    this.submit = false,
+    this.cancel = false,
     this.onCancel,
     this.onSave,
     this.onSubmit,
@@ -58,6 +61,12 @@ class FormSheetContent extends StatefulWidget {
 
   /// 外部控制的保存态（与内部 `_saving` 合并）
   final bool loading;
+
+  final bool save;
+
+  final bool submit;
+
+  final bool cancel;
 
   @override
   State<FormSheetContent> createState() => _FormSheetContentState();
@@ -271,18 +280,18 @@ class _FormSheetContentState extends State<FormSheetContent> {
           SheetHeader(
             title: widget.title,
             centered: true,
-            leading: SheetTextAction(
+            leading: widget.cancel ? SheetTextAction(
               label: widget.cancelLabel,
               onTap: widget.onCancel ??
                   () => unawaited(Navigator.maybePop(context)),
-            ),
-            trailing: SheetTextAction(
+            ) : null,
+            trailing: widget.save ? SheetTextAction(
               label: widget.saveLabel,
               emphasized: true,
               onTap: _busy
                   ? () {}
                   : () => unawaited(_submit(useOnSave: true)),
-            ),
+            ) : null,
           ),
           const SizedBox(height: AppSheetSize.sectionGap),
           for (var i = 0; i < widget.items.length; i++) ...<Widget>[
@@ -303,13 +312,17 @@ class _FormSheetContentState extends State<FormSheetContent> {
             ],
             _buildItem(widget.items[i]),
           ],
-          const SizedBox(height: AppSheetSize.sectionGap),
-          SheetGradientButton(
-            label: widget.submitLabel,
-            // 保持非 null 以留住渐变与光晕；loading 由公共组件负责禁用点击
-            onPressed: () => unawaited(_submit()),
-            loading: _busy,
-          ),
+          if (widget.submit) ...[
+            const SizedBox(height: AppSheetSize.sectionGap),
+            SheetGradientButton(
+              label: widget.submitLabel,
+              // 保持非 null 以留住渐变与光晕；loading 由公共组件负责禁用点击
+              onPressed: () => unawaited(_submit()),
+              loading: _busy,
+            ),
+          ]
+
+
         ],
       ),
     );

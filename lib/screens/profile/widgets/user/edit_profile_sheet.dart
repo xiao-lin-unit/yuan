@@ -49,7 +49,8 @@ class EditProfileSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     return FormSheetContent(
       title: '编辑资料',
-      submitLabel: '保存修改',
+      save: true,
+      cancel: true,
       onSubmit: onSave,
       items: <SheetFormItem>[
         // ① 头像：公共组件提供整圆容器 + 相机角标 + 尺寸，
