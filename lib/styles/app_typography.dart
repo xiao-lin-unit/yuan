@@ -90,6 +90,88 @@ abstract final class AppTypography {
       fontWeight: FontWeight.w600,
       height: 1.27
   );
+
+  // ── Sheet 语义角色（无颜色，颜色由 SheetText 注入）────────────
+  static const TextStyle sheetTitle = TextStyle(
+    fontSize: 24,
+    fontWeight: FontWeight.w700,
+    height: 1.30,
+  );
+  static const TextStyle sheetSubtitle = TextStyle(
+    fontSize: 14,
+    fontWeight: FontWeight.w400,
+    height: 1.50,
+  );
+  static const TextStyle sheetCaption = TextStyle(
+    fontSize: 12,
+    fontWeight: FontWeight.w400,
+    height: 1.45,
+  );
+  static const TextStyle sectionLabel = TextStyle(
+    fontSize: 13,
+    fontWeight: FontWeight.w500,
+    height: 1.40,
+  );
+  static const TextStyle metricLabel = TextStyle(
+    fontSize: 13,
+    fontWeight: FontWeight.w400,
+    height: 1.40,
+  );
+  static const TextStyle metricValue = TextStyle(
+    fontSize: 28,
+    fontWeight: FontWeight.w700,
+    height: 1.20,
+  );
+  static const TextStyle metricUnit = TextStyle(
+    fontSize: 13,
+    fontWeight: FontWeight.w500,
+    height: 1.40,
+  );
+  static const TextStyle buttonLabel = TextStyle(
+    fontSize: 16,
+    fontWeight: FontWeight.w600,
+    height: 1.40,
+  );
+  static const TextStyle optionLabel = TextStyle(
+    fontSize: 16,
+    fontWeight: FontWeight.w500,
+    height: 1.40,
+  );
+  static const TextStyle confirmTitle = TextStyle(
+    fontSize: 22,
+    fontWeight: FontWeight.w700,
+    height: 1.35,
+  );
+  static const TextStyle confirmBody = TextStyle(
+    fontSize: 15,
+    fontWeight: FontWeight.w400,
+    height: 1.60,
+  );
+  static const TextStyle mediaTitle = TextStyle(
+    fontSize: 22,
+    fontWeight: FontWeight.w600,
+    height: 1.30,
+  );
+  static const TextStyle mediaSubtitle = TextStyle(
+    fontSize: 14,
+    fontWeight: FontWeight.w400,
+    height: 1.40,
+  );
+  static const TextStyle categoryLabel = TextStyle(
+    fontSize: 13,
+    fontWeight: FontWeight.w500,
+    height: 1.40,
+  );
+  static const TextStyle chipLabel = TextStyle(
+    fontSize: 14,
+    fontWeight: FontWeight.w500,
+    height: 1.40,
+  );
+  static const TextStyle trendLabel = TextStyle(
+    fontSize: 12,
+    fontWeight: FontWeight.w400,
+    height: 1.40,
+  );
 }
 
 /// 把语义角色配上当前主题的文字色。

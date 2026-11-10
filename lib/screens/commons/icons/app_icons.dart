@@ -50,6 +50,38 @@ abstract final class AppIcons {
   static const IconData block = Icons.block;
   static const IconData calendarMonth = Icons.calendar_month_outlined;
 
+  // ── Sheet：确认 / 选择 / 表单 ────────────────────────────────
+  static const IconData radioChecked = Icons.check_circle;
+  static const IconData radioUnchecked = Icons.radio_button_unchecked;
+  static const IconData camera = Icons.photo_camera_outlined;
+  static const IconData sort = Icons.sort_outlined;
+  static const IconData public = Icons.public_outlined;
+  static const IconData schedule = Icons.schedule_outlined;
+  static const IconData queue = Icons.queue_music_outlined;
+  static const IconData more = Icons.more_horiz;
+
+  // ── Sheet：媒体控制 ──────────────────────────────────────────
+  static const IconData repeat = Icons.repeat_outlined;
+  static const IconData skipPrevious = Icons.skip_previous_outlined;
+  static const IconData skipNext = Icons.skip_next_outlined;
+  static const IconData play = Icons.play_arrow;
+  static const IconData pause = Icons.pause;
+  static const IconData volume = Icons.volume_up_outlined;
+
+  // ── Sheet：支出分类 ──────────────────────────────────────────
+  static const IconData restaurant = Icons.restaurant_outlined;
+  static const IconData car = Icons.directions_car_outlined;
+  static const IconData basket = Icons.shopping_basket_outlined;
+  static const IconData housing = Icons.home_outlined;
+  static const IconData utility = Icons.bolt_outlined;
+  static const IconData apparel = Icons.checkroom_outlined;
+  static const IconData entertainment = Icons.sports_esports_outlined;
+  static const IconData medical = Icons.medical_services_outlined;
+  static const IconData study = Icons.menu_book_outlined;
+  static const IconData gift = Icons.card_giftcard_outlined;
+  static const IconData finance = Icons.account_balance_outlined;
+  static const IconData other = Icons.category_outlined;
+
   // ── 品牌（保留 FontAwesome，品牌 logo 不参与线宽统一）────────
   static const IconData github = FaBrandsIcons.icn_github;
   static const IconData apple = FaBrandsIcons.icn_apple;
