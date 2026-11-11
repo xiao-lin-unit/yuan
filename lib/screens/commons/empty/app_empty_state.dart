@@ -5,10 +5,12 @@ import '../../../styles/app_typography.dart';
 import '../../../styles/sheet_tokens.dart';
 import '../../../styles/theme_tokens.dart';
 import '../icon/app_icon_badge.dart';
+import '../state/app_state_frame.dart';
 
 // ── 组件私有样式（只服务本文件）────────────────────────────────
+/// 空状态特有的徽章尺寸。居中/限宽/节奏已上提到 [AppStateFrame]，
+/// 与 loading / error 两态共用，本文件不再重复定义。
 const double _kIllustrationSize = AppSheetSize.iconBadgeSize;
-const double _kContentMaxWidth = 280;
 
 /// 全软件统一的空状态 / 占位态。
 ///
@@ -37,46 +39,37 @@ class AppEmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = context.appText;
-    return Padding(
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: _kContentMaxWidth),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              AppIconBadge(
-                icon: icon,
-                tone: tone,
-                // 空状态是整页唯一的视觉锚点，用 filled 实色 + 自动反色前景。
-                // 不传 tone 时按图标数据稳定派生色相，四个占位页各得一色，
-                // 且随主题色 / 明暗自动重算，业务层不用决定用什么颜色。
-                emphasis: AppIconEmphasis.filled,
-                size: _kIllustrationSize,
-                iconSize: AppIconSize.empty,
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              Text(
-                title,
-                textAlign: TextAlign.center,
-                style: text.emptyTitle,
-              ),
-              if (description != null) ...[
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  description!,
-                  textAlign: TextAlign.center,
-                  style: text.emptyDescription,
-                ),
-              ],
-              if (action != null) ...[
-                const SizedBox(height: AppSpacing.lg),
-                action!,
-              ],
-            ],
-          ),
+    return AppStateFrame(
+      children: <Widget>[
+        AppIconBadge(
+          icon: icon,
+          tone: tone,
+          // 空状态是整页唯一的视觉锚点，用 filled 实色 + 自动反色前景。
+          // 不传 tone 时按图标数据稳定派生色相，四个占位页各得一色，
+          // 且随主题色 / 明暗自动重算，业务层不用决定用什么颜色。
+          emphasis: AppIconEmphasis.filled,
+          size: _kIllustrationSize,
+          iconSize: AppIconSize.empty,
         ),
-      ),
+        const SizedBox(height: AppSpacing.lg),
+        Text(
+          title,
+          textAlign: TextAlign.center,
+          style: text.emptyTitle,
+        ),
+        if (description != null) ...<Widget>[
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            description!,
+            textAlign: TextAlign.center,
+            style: text.emptyDescription,
+          ),
+        ],
+        if (action != null) ...<Widget>[
+          const SizedBox(height: AppSpacing.lg),
+          action!,
+        ],
+      ],
     );
   }
 }

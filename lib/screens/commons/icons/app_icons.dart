@@ -39,6 +39,11 @@ abstract final class AppIcons {
   static const IconData category = Icons.label_outline;
   static const IconData trash = Icons.delete_outline;
 
+  // ── 状态（loading / error / 重试，供三态骨架使用）─────────────
+  static const IconData error = Icons.error_outline;
+  static const IconData warning = Icons.warning_amber_outlined;
+  static const IconData refresh = Icons.refresh;
+
   // ── 表单 / 交互 ─────────────────────────────────────────────
   static const IconData edit = Icons.settings_outlined;
   static const IconData clear = Icons.close;

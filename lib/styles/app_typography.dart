@@ -16,6 +16,18 @@ import 'theme_tokens.dart';
 ///
 /// 规则：这里只出现「全软件通用」的角色名，不出现任何组件名或页面名。
 abstract final class AppTypography {
+  // ── 系统字体缩放的夹取范围 ──────────────────────────────────
+  /// 为什么需要：Android 14+ / iOS 允许系统把字号放大到 200%~300%，
+  /// 而项目里的 48dp 热区、56dp 行高、72dp 底导、640/840 限宽、Sheet
+  /// 0.9 屏高全是固定 dp。不夹取会让文字溢出按钮、Sheet 内容被裁。
+  ///
+  /// 取 0.9~1.3 是「尊重用户设置但不破坏布局」的折中：
+  /// 低于 0.9 的小字不再缩小（可读性），高于 1.3 的大字由布局自身
+  /// 的滚动/换行承担，而不是无限放大把容器撑爆。
+  /// 唯一消费点：lib/app_root.dart 的 MediaQuery 覆盖。
+  static const double minTextScaleFactor = 0.9;
+  static const double maxTextScaleFactor = 1.3;
+
   static const TextTheme textTheme = TextTheme(
     displayLarge: TextStyle(fontSize: 57, fontWeight: FontWeight.w400, height: 1.12),
     displayMedium: TextStyle(fontSize: 45, fontWeight: FontWeight.w400, height: 1.15),
