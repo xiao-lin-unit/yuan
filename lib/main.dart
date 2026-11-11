@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:sqflite/sqflite.dart';
+import 'app_root.dart';
+import 'components.dart';
 import 'database/database_shell.dart';
 import 'router/router_shell.dart';
 import 'theme.dart';
-import 'components.dart';
 
 
 class YuanApp extends StatelessWidget {
@@ -27,6 +28,12 @@ class YuanApp extends StatelessWidget {
             theme: AppTheme.light(t.seed, contrast: t.contrast),
             darkTheme: AppTheme.dark(t.seed, contrast: t.contrast),
             themeMode: t.mode,
+            // 全软件唯一的全局装配点：包住整个 Navigator（含 Sheet 弹层
+            // 所在的 Overlay）。后续断点 / 三态骨架 / 国际化 / 横屏 /
+            // 文本缩放 / 主题过渡全部挂这里，五个页面零改动。
+            // 本轮只立闸：AppRoot 把 child 原样透传，界面与之前完全一致。
+            // 工作逻辑与两条硬约束见 lib/app_root.dart 顶部注释。
+            builder: (_, child) => AppRoot(child: child),
             routerConfig: appRouter,
           )
     ));
