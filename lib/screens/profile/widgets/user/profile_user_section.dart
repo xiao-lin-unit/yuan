@@ -47,7 +47,9 @@ class ProfileUserSection extends StatelessWidget {
     required ImageRef? initialRef,
     required Future<void> Function(SheetFormValues values) onSave,
   }) async {
-    // [AppSheetShell] 负责玻璃/把手/滚动/键盘避让，
+    // 旧实现：自带外壳 + 外部 TextEditingController +
+    // tempAvatar 临时变量 + 手写 onConfirm 校验。
+    // 现在：唯一的 [AppSheetShell] 负责玻璃/把手/滚动/键盘避让，
     // EditProfileSheet 只是一份「填进 child 的内容」；
     // 这里只剩「把初始值传进去、把结果接出来」。
     await AppSheetShell.show<SheetFormValues>(

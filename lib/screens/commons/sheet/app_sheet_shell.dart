@@ -106,6 +106,12 @@ class AppSheetShell extends StatelessWidget {
                 : MediaQuery.sizeOf(context).height;
             final double maxHeight = available * maxHeightFactor;
 
+            // 固定头部槽位：内容里的 SheetHeader / SheetPinned 会通过
+            // SheetActions.pin 把自己提升到这里。它位于 Flexible
+            // （滚动区）**之外**，所以永远不会被内容滚动带走。
+            // 壳不认识 header 的类型，只负责提供一个渲染位置。
+            final sheetScope = SheetScope.maybeOf(context);
+
             // 键盘可见时只补一个固定小安全距，兼容输入法工具栏比
             // viewInsets 略高的情况；聚焦输入框的自动滚动由
             // TextField.scrollPadding（sheet_inputs.dart）负责。
@@ -165,6 +171,27 @@ class AppSheetShell extends StatelessWidget {
                               bottom: AppSpacing.xs,
                             ),
                             child: SheetGrabber(),
+                          ),
+                        if (sheetScope != null)
+                          ValueListenableBuilder<Widget?>(
+                            valueListenable: sheetScope.pinnedHeader,
+                            builder: (BuildContext context, Widget? header, _) {
+                              if (header == null) {
+                                return const SizedBox.shrink();
+                              }
+                              // 左右 24dp 与滚动内容对齐；下方 12dp
+                              // 是固定留白，内容里原有的 sectionGap
+                              // 作为首项间距，滚动后内容顶到这 12dp 处。
+                              return Padding(
+                                padding: const EdgeInsets.fromLTRB(
+                                  AppSheetSize.horizontalPadding,
+                                  AppSpacing.xs,
+                                  AppSheetSize.horizontalPadding,
+                                  AppSpacing.sm,
+                                ),
+                                child: header,
+                              );
+                            },
                           ),
                         Flexible(
                           child: scrollable
