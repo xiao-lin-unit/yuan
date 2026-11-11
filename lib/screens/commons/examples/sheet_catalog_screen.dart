@@ -42,11 +42,13 @@ const List<SheetCategory<String>> _kCategories = <SheetCategory<String>>[
   SheetCategory<String>(value: 'other', label: '其他', icon: AppIcons.other),
 ];
 
-/// 6 张原型对应的可运行目录页。
+/// Sheet 组件目录：7 个入口，**全部走同一个 [AppSheetShell.show]**。
 ///
+/// 01~06 只是往同一个壳的 `child` 里填不同 `contents/` 组件；
+/// 07 连 child 都不传，用来验证「壳唯一、空壳也能打开」。
 /// 临时挂一条路由、或在 main.dart 里
 /// `runApp(MaterialApp(home: SheetCatalogScreen()))` 即可逐张查看；
-/// 然后在「主题」里循环 8 个预设 / 切明暗，观察 6 张 Sheet 是否同步变化。
+/// 然后在「主题」里循环 8 个预设 / 切明暗，观察所有 Sheet 是否同步变化。
 /// 这一页只放**示例数据**，不含任何颜色 / 字号 / 圆角定义。
 class SheetCatalogScreen extends StatelessWidget {
   const SheetCatalogScreen({super.key});
@@ -252,6 +254,15 @@ class SheetCatalogScreen extends StatelessWidget {
                 hint: '点击分类即可完成选择',
               ),
             ),
+          ),
+          // 07：不塞任何内容也能打开 —— 证明壳是唯一的、且不依赖内容。
+          // 所有 01~06 与这里走的是同一个 AppSheetShell、同一个 show。
+          _CatalogEntry(
+            index: '07',
+            title: '空壳（无内容）',
+            subtitle: '不传 child 也能打开 · 壳唯一、可空',
+            icon: AppIcons.home,
+            onTap: () => AppSheetShell.show<void>(context),
           ),
         ],
       ),

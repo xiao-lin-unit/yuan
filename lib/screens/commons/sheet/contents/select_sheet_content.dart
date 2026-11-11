@@ -83,8 +83,9 @@ class _SelectSheetContentState<T> extends State<SelectSheetContent<T>> {
       } else {
         widget.onApply?.call(value);
       }
-      // 只有确认成功才关闭，并把选中值回传给 AppSheetShell.show<T>
-      if (mounted) unawaited(Navigator.maybePop<T>(context, value));
+      // 只有确认成功才请求关闭，并把选中值回传给 AppSheetShell.show<T>。
+      // 内容不碰 Navigator：脱离 Sheet 复用时由业务回调自行处理。
+      if (mounted) SheetActions.close<T>(context, value);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

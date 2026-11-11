@@ -61,7 +61,7 @@ class OperationSheetContent extends StatelessWidget {
             const Spacer(),
             SheetTextAction(
               label: collapseLabel,
-              onTap: onCollapse ?? () => Navigator.maybePop(context),
+              onTap: onCollapse ?? () => SheetActions.close(context),
             ),
           ],
         ),

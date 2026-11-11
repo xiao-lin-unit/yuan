@@ -23,7 +23,8 @@ import 'package:yuan/styles/theme_tokens.dart';
 ///
 /// 提交语义沿用前面修过的 await 链路：
 /// 先 `validate()`，再 `await onSubmit(values)`；保存中禁用重复点击，
-/// 抛异常时保留弹窗并提示，成功后才 `Navigator.pop`。
+/// 抛异常时保留弹窗并提示，成功后才通过 [SheetActions.close] 请求关闭
+/// （内容组件不直接操作 Navigator，可脱离 Sheet 复用）。
 class FormSheetContent extends StatefulWidget {
   const FormSheetContent({
     super.key,
@@ -199,14 +200,14 @@ class _FormSheetContentState extends State<FormSheetContent> {
     final handler = useOnSave ? (widget.onSave ?? widget.onSubmit) : widget.onSubmit;
 
     if (handler == null) {
-      if (mounted) unawaited(Navigator.maybePop(context, values));
+      if (mounted) SheetActions.close(context, values);
       return;
     }
 
     setState(() => _saving = true);
     try {
       await handler(values);
-      if (mounted) unawaited(Navigator.maybePop(context, values));
+      if (mounted) SheetActions.close(context, values);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -312,7 +313,7 @@ class _FormSheetContentState extends State<FormSheetContent> {
             leading: widget.cancel ? SheetTextAction(
               label: widget.cancelLabel,
               onTap: widget.onCancel ??
-                  () => unawaited(Navigator.maybePop(context)),
+                  () => SheetActions.close(context),
             ) : null,
             trailing: widget.save ? SheetTextAction(
               label: widget.saveLabel,

@@ -1,9 +1,41 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:yuan/screens/commons/icons/app_icons.dart';
 import 'package:yuan/screens/commons/sheet/sheet_models.dart';
 import 'package:yuan/styles/app_icon_tone.dart';
 import 'package:yuan/styles/sheet_tokens.dart';
 import 'package:yuan/styles/theme_tokens.dart';
+
+// ── 壳 / 内容之间的唯一契约 ─────────────────────────────────────
+//
+// 内容组件（contents/*.dart）**不 import、不调用 Navigator**，也不
+// 知道自己被放进哪种容器。它只通过 [SheetActions.close] 发出
+// 「我完成了，请关闭」的意图；怎么关（现在是 Navigator.maybePop，
+// 以后换成路由控制器 / 带动画收起 / no-op）由这一层单点决定。
+//
+// [SheetScope] 由唯一的壳 [AppSheetShell] 注入，作用是标记
+// 「当前在一个 Sheet 容器内」。脱离 Sheet、把内容组件直接放进页面
+// 或测试 widget 时没有这个标记，close 自动降级为不操作 —— 由业务方
+// 的 onApply / onSubmit 等回调自行处理，不会误把页面 pop 掉。
+class SheetScope extends InheritedWidget {
+  const SheetScope({super.key, required super.child});
+
+  static SheetScope? maybeOf(BuildContext context) =>
+      context.getInheritedWidgetOfExactType<SheetScope>();
+
+  @override
+  bool updateShouldNotify(covariant SheetScope oldWidget) => false;
+}
+
+/// 内容组件**唯一**的「请求关闭 / 回传结果」入口。
+abstract final class SheetActions {
+  static void close<T extends Object?>(BuildContext context, [T? value]) {
+    // 不在 Sheet 内时不碰 Navigator：内容可安全复用为普通页面组件。
+    if (SheetScope.maybeOf(context) == null) return;
+    unawaited(Navigator.maybePop<T>(context, value));
+  }
+}
 
 // ── 组件私有常量（只服务本文件；尺寸仍引用全局令牌）────────────
 const double _kHeaderTrailingMinWidth = kMinTapTarget;
@@ -313,7 +345,7 @@ class SheetCloseButton extends StatelessWidget {
         shape: const CircleBorder(),
         child: InkWell(
           customBorder: const CircleBorder(),
-          onTap: onTap ?? () => Navigator.maybePop(context),
+          onTap: onTap ?? () => SheetActions.close(context),
           child: Icon(
             AppIcons.clear,
             size: AppIconSize.medium,

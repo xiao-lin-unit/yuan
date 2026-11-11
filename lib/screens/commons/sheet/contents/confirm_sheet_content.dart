@@ -77,7 +77,7 @@ class ConfirmSheetContent extends StatelessWidget {
         SheetButtonPair(
           secondaryLabel: secondaryLabel,
           primaryLabel: primaryLabel,
-          onSecondary: onSecondary ?? () => Navigator.maybePop(context),
+          onSecondary: onSecondary ?? () => SheetActions.close(context),
           onPrimary: onPrimary,
           danger: danger,
           loading: loading,

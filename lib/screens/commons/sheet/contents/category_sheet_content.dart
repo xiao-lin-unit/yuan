@@ -53,7 +53,7 @@ class _CategorySheetContentState<T> extends State<CategorySheetContent<T>> {
   void _choose(T value) {
     setState(() => _selected = value);
     widget.onSelected?.call(value);
-    Navigator.maybePop(context, value);
+    SheetActions.close<T>(context, value);
   }
 
   @override
