@@ -9,6 +9,7 @@ import 'package:yuan/screens/commons/sheet/contents/operation_sheet_content.dart
 import 'package:yuan/screens/commons/sheet/contents/overview_sheet_content.dart';
 import 'package:yuan/screens/commons/sheet/contents/select_sheet_content.dart';
 import 'package:yuan/screens/commons/sheet/parts/sheet_inputs.dart';
+import 'package:yuan/screens/commons/sheet/parts/sheet_primitives.dart';
 import 'package:yuan/screens/commons/sheet/sheet_form_items.dart';
 import 'package:yuan/screens/commons/sheet/sheet_models.dart';
 import 'package:yuan/styles/app_decorations.dart';
@@ -45,7 +46,8 @@ const List<SheetCategory<String>> _kCategories = <SheetCategory<String>>[
 /// Sheet 组件目录：7 个入口，**全部走同一个 [AppSheetShell.show]**。
 ///
 /// 01~06 只是往同一个壳的 `child` 里填不同 `contents/` 组件；
-/// 07 连 child 都不传，用来验证「壳唯一、空壳也能打开」。
+/// 有标题栏的 4 张把 `SheetHeader` 传给 `header`（静态、固定在顶端）；
+/// 02 / 04 没有标准标题栏，不传 header；07 连 child 都不传。
 /// 临时挂一条路由、或在 main.dart 里
 /// `runApp(MaterialApp(home: SheetCatalogScreen()))` 即可逐张查看；
 /// 然后在「主题」里循环 8 个预设 / 切明暗，观察所有 Sheet 是否同步变化。
@@ -53,8 +55,8 @@ const List<SheetCategory<String>> _kCategories = <SheetCategory<String>>[
 class SheetCatalogScreen extends StatelessWidget {
   const SheetCatalogScreen({super.key});
 
-  void _show(BuildContext context, Widget child) {
-    AppSheetShell.show<void>(context, child: child);
+  void _show(BuildContext context, Widget child, {Widget? header}) {
+    AppSheetShell.show<void>(context, header: header, child: child);
   }
 
   @override
@@ -81,8 +83,6 @@ class SheetCatalogScreen extends StatelessWidget {
             onTap: () => _show(
               context,
               const OverviewSheetContent(
-                title: '本周概览',
-                detailLabel: '详情',
                 metrics: <SheetMetric>[
                   SheetMetric(label: '步数', value: '42,860'),
                   SheetMetric(label: '活跃时长', value: '6.2', unit: '小时'),
@@ -92,6 +92,10 @@ class SheetCatalogScreen extends StatelessWidget {
                 trend: _kTrend,
                 updatedAt: '数据更新于今日 09:30',
                 actionLabel: '查看完整报告',
+              ),
+              header: SheetHeader(
+                title: '本周概览',
+                trailing: SheetTextAction(label: '详情', onTap: () {}),
               ),
             ),
           ),
@@ -117,66 +121,83 @@ class SheetCatalogScreen extends StatelessWidget {
             title: '表单编辑',
             subtitle: '声明式 items：头像 · 单行 / 多行 · 标签 · 开关 · 说明',
             icon: AppIcons.edit,
-            onTap: () => _show(
-              context,
-              FormSheetContent(
-                title: '编辑资料',
-                submitLabel: '保存修改',
-                onSubmit: (values) async {
-                  // 使用方只按 key 取值，不再持有 controller / 临时变量
-                  debugPrint('表单值：${values.toMap()}');
-                },
-                items: <SheetFormItem>[
-                  SheetFormAvatarItem(
-                    key: 'avatar',
-                    // 未改动哨兵；真实业务里传 imageUndefined
-                    initialValue: const Object(),
-                    builder: (context, onChanged, size) =>
-                        SheetFormAvatarPlaceholder(size: size),
+            onTap: () {
+              // 顶栏「保存」要触发 FormSheetContent 内部的提交链路。
+              // 这是本项目唯一一处跨组件触发内部动作，工作逻辑见
+              // form_sheet_content.dart 里 FormSheetController 的注释
+              // （没有 Notifier / 跨帧注册，只是一个显式句柄）。
+              final formController = FormSheetController();
+              _show(
+                context,
+                FormSheetContent(
+                  controller: formController,
+                  submitLabel: '保存修改',
+                  onSubmit: (values) async {
+                    // 使用方只按 key 取值，不再持有 controller / 临时变量
+                    debugPrint('表单值：${values.toMap()}');
+                  },
+                  items: <SheetFormItem>[
+                    SheetFormAvatarItem(
+                      key: 'avatar',
+                      // 未改动哨兵；真实业务里传 imageUndefined
+                      initialValue: const Object(),
+                      builder: (context, onChanged, size) =>
+                          SheetFormAvatarPlaceholder(size: size),
+                    ),
+                    const SheetFormSingleLineTextItem(
+                      key: 'name',
+                      label: '昵称',
+                      initialValue: '林小满',
+                      hint: '怎么称呼你？',
+                      maxLength: 12,
+                      showClearButton: true,
+                      validator: _validateName,
+                    ),
+                    const SheetFormMultiLineTextItem(
+                      key: 'bio',
+                      label: '个人简介',
+                      initialValue: '热爱生活，记录日常。\n分享镜头里的光。',
+                      hint: '写点什么介绍自己',
+                      maxLength: 60,
+                      maxLines: 3,
+                      minLines: 2,
+                      showClearButton: true,
+                      showCounter: true,
+                    ),
+                    const SheetFormTagsItem(
+                      key: 'tags',
+                      label: '标签',
+                      options: <SheetTag<Object>>[
+                        SheetTag<Object>(value: 'photo', label: '摄影'),
+                        SheetTag<Object>(value: 'hike', label: '徒步'),
+                        SheetTag<Object>(value: 'coffee', label: '咖啡'),
+                      ],
+                      initialSelected: <Object>{'photo'},
+                    ),
+                    const SheetFormToggleItem(
+                      key: 'public',
+                      label: '设为公开',
+                      initialValue: true,
+                      dividerAbove: true,
+                    ),
+                    const SheetFormNoteItem(
+                      key: 'note',
+                      text: '资料仅保存在本设备，不会上传云端。',
+                    ),
+                  ],
+                ),
+                header: SheetHeader(
+                  title: '编辑资料',
+                  centered: true,
+                  leading: const SheetCancelAction(),
+                  trailing: SheetTextAction(
+                    label: '保存',
+                    emphasized: true,
+                    onTap: formController.submit,
                   ),
-                  const SheetFormSingleLineTextItem(
-                    key: 'name',
-                    label: '昵称',
-                    initialValue: '林小满',
-                    hint: '怎么称呼你？',
-                    maxLength: 12,
-                    showClearButton: true,
-                    validator: _validateName,
-                  ),
-                  const SheetFormMultiLineTextItem(
-                    key: 'bio',
-                    label: '个人简介',
-                    initialValue: '热爱生活，记录日常。\n分享镜头里的光。',
-                    hint: '写点什么介绍自己',
-                    maxLength: 60,
-                    maxLines: 3,
-                    minLines: 2,
-                    showClearButton: true,
-                    showCounter: true,
-                  ),
-                  const SheetFormTagsItem(
-                    key: 'tags',
-                    label: '标签',
-                    options: <SheetTag<Object>>[
-                      SheetTag<Object>(value: 'photo', label: '摄影'),
-                      SheetTag<Object>(value: 'hike', label: '徒步'),
-                      SheetTag<Object>(value: 'coffee', label: '咖啡'),
-                    ],
-                    initialSelected: <Object>{'photo'},
-                  ),
-                  const SheetFormToggleItem(
-                    key: 'public',
-                    label: '设为公开',
-                    initialValue: true,
-                    dividerAbove: true,
-                  ),
-                  const SheetFormNoteItem(
-                    key: 'note',
-                    text: '资料仅保存在本设备，不会上传云端。',
-                  ),
-                ],
-              ),
-            ),
+                ),
+              );
+            },
           ),
           _CatalogEntry(
             index: '04',
@@ -205,8 +226,6 @@ class SheetCatalogScreen extends StatelessWidget {
             onTap: () => _show(
               context,
               SelectSheetContent<String>(
-                title: '排序方式',
-                subtitle: '选择内容的排列顺序',
                 actionLabel: '应用',
                 initialValue: 'latest',
                 options: <SheetOption<String>>[
@@ -232,6 +251,10 @@ class SheetCatalogScreen extends StatelessWidget {
                   ),
                 ],
               ),
+              header: const SheetHeader(
+                title: '排序方式',
+                subtitle: '选择内容的排列顺序',
+              ),
             ),
           ),
           _CatalogEntry(
@@ -242,8 +265,6 @@ class SheetCatalogScreen extends StatelessWidget {
             onTap: () => _show(
               context,
               CategorySheetContent<String>(
-                title: '选择支出分类',
-                subtitle: '选择后自动归入该分类',
                 recent: <SheetCategory<String>>[
                   _kCategories[0],
                   _kCategories[1],
@@ -252,6 +273,11 @@ class SheetCatalogScreen extends StatelessWidget {
                 categories: _kCategories,
                 initialSelected: 'food',
                 hint: '点击分类即可完成选择',
+              ),
+              header: const SheetHeader(
+                title: '选择支出分类',
+                subtitle: '选择后自动归入该分类',
+                trailing: SheetCloseButton(),
               ),
             ),
           ),

@@ -11,6 +11,7 @@ import '../../../commons/menu/menu_item.dart';
 import '../../../commons/menu/menu_list.dart';
 import '../../../commons/sheet/app_sheet_shell.dart';
 import '../../../commons/sheet/contents/select_sheet_content.dart';
+import '../../../commons/sheet/parts/sheet_primitives.dart';
 import '../../../commons/sheet/sheet_models.dart';
 
 // ── 组件私有内容（只服务本分区）────────────────────────────────
@@ -40,9 +41,13 @@ class ProfileFunctionSection extends StatelessWidget {
 
     await AppSheetShell.show<String>(
       context,
-      child: SelectSheetContent<String>(
+      // 静态顶栏：构造期传入，壳固定在滚动区之外。
+      // 标题 / 副标题只在这里声明一次，内容组件不再重复持有。
+      header: const SheetHeader(
         title: _kThemeSheetTitle,
         subtitle: _kThemeSheetSubtitle,
+      ),
+      child: SelectSheetContent<String>(
         actionLabel: _kThemeApplyLabel,
         action: false,
         // 当前颜色默认高亮，用户不改直接「应用」不会产生无意义写盘

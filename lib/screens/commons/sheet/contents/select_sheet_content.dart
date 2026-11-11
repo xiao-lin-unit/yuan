@@ -7,8 +7,10 @@ import 'package:yuan/screens/commons/sheet/parts/sheet_selectors.dart';
 import 'package:yuan/screens/commons/sheet/sheet_models.dart';
 import 'package:yuan/styles/sheet_tokens.dart';
 
-/// 原型 ⑤「单选列表」：标题 + 说明 + 圆角容器内的选项列表 +
-/// 底部渐变「应用」按钮。
+/// 原型 ⑤「单选列表」：圆角容器内的选项列表 + 底部渐变「应用」按钮。
+///
+/// 标题/副标题由调用方**静态**传给 `AppSheetShell.show(header: SheetHeader(...))`，
+/// 由壳固定在顶端；本组件只渲染会滚动的内容部分，不含任何标题代码。
 ///
 /// 泛型 [T] 用 `==` 比较，建议传 String / enum 这类可比较值。
 /// 选中态由组件内部持有，**点「应用」确认后**才把值交给使用方。
@@ -22,19 +24,15 @@ import 'package:yuan/styles/sheet_tokens.dart';
 class SelectSheetContent<T> extends StatefulWidget {
   const SelectSheetContent({
     super.key,
-    required this.title,
     required this.options,
     this.actionLabel = '应用',
     this.action = true,
-    this.subtitle,
     this.initialValue,
     this.onChanged,
     this.onApply,
     this.onApplyAsync,
   });
 
-  final String title;
-  final String? subtitle;
   final List<SheetOption<T>> options;
   final String actionLabel;
   final bool action;
@@ -103,11 +101,6 @@ class _SelectSheetContentState<T> extends State<SelectSheetContent<T>> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
-        SheetHeader(
-          title: widget.title,
-          subtitle: widget.subtitle,
-        ),
-        const SizedBox(height: AppSheetSize.sectionGap),
         SheetOptionList<T>(
           options: widget.options,
           value: _value,

@@ -33,6 +33,7 @@ class EditProfileSheet extends StatelessWidget {
     required this.initialSub,
     required this.initialRef,
     required this.onSave,
+    required this.controller,
   });
 
   final String initialName;
@@ -45,12 +46,14 @@ class EditProfileSheet extends StatelessWidget {
   /// 抛异常 = 保存失败，弹窗保持打开并提示。
   final Future<void> Function(SheetFormValues values) onSave;
 
+  /// 顶栏「保存」按钮的触发器（与外层 header 共用同一个实例）。
+  /// 工作逻辑见 form_sheet_content.dart 的 [FormSheetController] 注释。
+  final FormSheetController controller;
+
   @override
   Widget build(BuildContext context) {
     return FormSheetContent(
-      title: '编辑资料',
-      save: true,
-      cancel: true,
+      controller: controller,
       onSubmit: onSave,
       items: <SheetFormItem>[
         // ① 头像：公共组件提供整圆容器 + 相机角标 + 尺寸，

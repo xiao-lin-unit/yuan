@@ -5,8 +5,12 @@ import 'package:yuan/screens/commons/sheet/sheet_models.dart';
 import 'package:yuan/styles/sheet_tokens.dart';
 import 'package:yuan/styles/theme_tokens.dart';
 
-/// 原型 ⑥「分类网格」：标题 + 圆形关闭 + 说明 + 「最近使用」胶囊 +
-/// 「全部 / N 个」小标题 + 4 列彩色图标网格 + 底部提示。
+/// 原型 ⑥「分类网格」：「最近使用」胶囊 + 「全部 / N 个」小标题 +
+/// 4 列彩色图标网格 + 底部提示。
+///
+/// 标题/副标题/关闭按钮由调用方**静态**传给
+/// `AppSheetShell.show(header: SheetHeader(title: ..., trailing: SheetCloseButton()))`，
+/// 由壳固定在顶端；本组件只渲染会滚动的内容部分。
 ///
 /// 点击任一分格即完成选择（原型提示「点击分类即可完成选择」），
 /// 不需要额外主按钮；选中项由组件内部持有并立即外抛 + 关闭。
@@ -15,9 +19,7 @@ import 'package:yuan/styles/theme_tokens.dart';
 class CategorySheetContent<T> extends StatefulWidget {
   const CategorySheetContent({
     super.key,
-    required this.title,
     required this.categories,
-    this.subtitle,
     this.recent = const [],
     this.recentLabel = '最近使用',
     this.allLabel = '全部',
@@ -26,8 +28,6 @@ class CategorySheetContent<T> extends StatefulWidget {
     this.onSelected,
   });
 
-  final String title;
-  final String? subtitle;
   final List<SheetCategory<T>> categories;
   final List<SheetCategory<T>> recent;
   final String recentLabel;
@@ -62,13 +62,7 @@ class _CategorySheetContentState<T> extends State<CategorySheetContent<T>> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
-        SheetHeader(
-          title: widget.title,
-          subtitle: widget.subtitle,
-          trailing: const SheetCloseButton(),
-        ),
         if (widget.recent.isNotEmpty) ...<Widget>[
-          const SizedBox(height: AppSheetSize.sectionGap),
           SheetSectionLabel(label: widget.recentLabel),
           const SizedBox(height: AppSpacing.sm),
           SheetTagGroup<T>(
@@ -82,7 +76,10 @@ class _CategorySheetContentState<T> extends State<CategorySheetContent<T>> {
             onToggle: _choose,
           ),
         ],
-        const SizedBox(height: AppSheetSize.sectionGap),
+        // 有「最近使用」时这里充当 tags → all 的间距；没有时壳的
+        // 固定留白已经承担 header → all，不再重复加 20dp。
+        if (widget.recent.isNotEmpty)
+          const SizedBox(height: AppSheetSize.sectionGap),
         SheetSectionLabel(
           label: widget.allLabel,
           count: '${widget.categories.length} 个',

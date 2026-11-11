@@ -6,8 +6,12 @@ import 'package:yuan/screens/commons/sheet/sheet_models.dart';
 import 'package:yuan/styles/sheet_tokens.dart';
 import 'package:yuan/styles/theme_tokens.dart';
 
-/// 原型 ①「展示 / 概览」：标题 + 详情动作 + 并排指标卡 +
-/// 趋势胶囊 + 极简柱图 + 更新时间 + 底部渐变主操作。
+/// 原型 ①「展示 / 概览」：并排指标卡 + 趋势胶囊 + 极简柱图 +
+/// 更新时间 + 底部渐变主操作。
+///
+/// 标题与「详情」动作由调用方**静态**传给
+/// `AppSheetShell.show(header: SheetHeader(title: ..., trailing: SheetTextAction(...)))`，
+/// 由壳固定在顶端；本组件只渲染会滚动的内容部分。
 ///
 /// 组件只负责**布局与排版节奏**；颜色、字号、圆角、间距全部来自
 /// `SheetPalette / SheetText / AppSheetSize / AppSpacing`。
@@ -15,22 +19,16 @@ import 'package:yuan/styles/theme_tokens.dart';
 class OverviewSheetContent extends StatelessWidget {
   const OverviewSheetContent({
     super.key,
-    required this.title,
     required this.metrics,
     required this.actionLabel,
-    this.detailLabel,
-    this.onDetail,
     this.changeLabel,
     this.trend = const <SheetTrendPoint>[],
     this.updatedAt,
     this.onAction,
   });
 
-  final String title;
   final List<SheetMetric> metrics;
   final String actionLabel;
-  final String? detailLabel;
-  final VoidCallback? onDetail;
   final String? changeLabel;
   final List<SheetTrendPoint> trend;
   final String? updatedAt;
@@ -42,16 +40,6 @@ class OverviewSheetContent extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
-        SheetHeader(
-          title: title,
-          trailing: detailLabel == null
-              ? null
-              : SheetTextAction(
-                  label: detailLabel!,
-                  onTap: onDetail ?? () {},
-                ),
-        ),
-        const SizedBox(height: AppSheetSize.sectionGap),
         SheetMetricRow(metrics: metrics),
         if (changeLabel != null) ...<Widget>[
           const SizedBox(height: AppSpacing.md),

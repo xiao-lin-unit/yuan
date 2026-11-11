@@ -9,12 +9,43 @@ import 'package:yuan/screens/commons/sheet/sheet_form_items.dart';
 import 'package:yuan/styles/sheet_tokens.dart';
 import 'package:yuan/styles/theme_tokens.dart';
 
+/// 表单顶栏「保存」按钮的显式触发器。
+///
+/// 【本项目唯一一处「跨组件触发内部动作」的动态逻辑，把工作逻辑写清楚】
+///
+/// 为什么需要它：
+///   · 壳的 header 是**静态** Widget 槽位（构造期定死、固定在滚动区外）；
+///   · 但「点保存 → 校验 → await onSubmit → 成功才关闭」必须留在
+///     [FormSheetContent] 内部：它持有 FormState、各 TextEditingController、
+///     _saving 防连点标记，外部拿不到这些。
+///   · 所以用一个小句柄，把「调用方 header 里的静态按钮」接到「内部提交方法」。
+///
+/// 工作逻辑（只有 3 步；没有 InheritedWidget / Notifier / 跨帧回调）：
+///   1. 调用方 new 一个 controller，同一个实例同时传给
+///      header 的保存按钮（`onTap: controller.submit`）和
+///      [FormSheetContent.controller]；
+///   2. initState 把内部 `_submit` 包一层赋给 `controller._submit`，
+///      dispose 时置空；
+///   3. 点按钮 → `controller.submit()` → 内部走原来的 await 提交链路。
+///
+/// 未传 controller、或组件已销毁时 submit 是空操作，不会崩。
+/// 如果不想用这个句柄：把保存按钮留在内容里、只保留底部渐变主按钮即可，
+/// 那样全静态，但表单顶栏就没有「保存」了。
+class FormSheetController {
+  VoidCallback? _submit;
+
+  void submit() => _submit?.call();
+}
+
 /// 原型 ③「表单编辑」的**公共表单组件**。
 ///
 /// 职责边界（通用 / 私有分开）：
 /// - 本组件只做「编排 + 状态 + 值收集」：遍历 [items]、按控件类型分发、
 ///   管理 TextEditingController / 标签 / 开关 / 图片值、校验、防连点提交、
-///   统一的标题栏、分隔线与渐变主按钮。
+///   分隔线与渐变主按钮。
+/// - 顶栏（标题 + 取消 + 保存）由调用方**静态**传给
+///   `AppSheetShell.show(header: SheetHeader(...))`，壳固定在顶端；
+///   「保存」按钮通过 [FormSheetController] 触发本组件内部的提交。
 /// - 每一项长什么样由 `parts/` 里的通用零件决定（全部引用全局令牌）；
 ///   使用方只传 [SheetFormItem]，描述「label + 控件类型 + 初值 + 校验」，
 ///   **不写样式、不创建 controller、不碰 Navigator**。
@@ -28,34 +59,18 @@ import 'package:yuan/styles/theme_tokens.dart';
 class FormSheetContent extends StatefulWidget {
   const FormSheetContent({
     super.key,
-    required this.title,
     required this.items,
     this.submitLabel = '提交修改',
-    this.cancelLabel = '取消',
-    this.saveLabel = '保存',
-    this.save = false,
     this.submit = false,
-    this.cancel = false,
-    this.onCancel,
-    this.onSave,
     this.onSubmit,
     this.loading = false,
+    this.controller,
   });
-
-  final String title;
 
   /// 表单项声明（label + 控件类型 + 配置），顺序即渲染顺序。
   final List<SheetFormItem> items;
 
   final String submitLabel;
-  final String cancelLabel;
-  final String saveLabel;
-
-  /// 顶部「取消」
-  final VoidCallback? onCancel;
-
-  /// 顶部「保存」。不传时与底部按钮一样走 [onSubmit]。
-  final Future<void> Function(SheetFormValues values)? onSave;
 
   /// 底部主按钮提交。不传时只做校验并回传值（预览 / 只读场景）。
   final Future<void> Function(SheetFormValues values)? onSubmit;
@@ -63,11 +78,11 @@ class FormSheetContent extends StatefulWidget {
   /// 外部控制的保存态（与内部 `_saving` 合并）
   final bool loading;
 
-  final bool save;
+  /// 顶栏「保存」按钮的触发器。工作逻辑见 [FormSheetController] 注释。
+  final FormSheetController? controller;
 
+  /// 是否显示底部渐变主按钮（顶栏「保存」走 controller，两者可并存）。
   final bool submit;
-
-  final bool cancel;
 
   @override
   State<FormSheetContent> createState() => _FormSheetContentState();
@@ -91,11 +106,18 @@ class _FormSheetContentState extends State<FormSheetContent> {
   void initState() {
     super.initState();
     _resetFromItems();
+    // [FormSheetController] 工作逻辑第 2 步：把内部提交方法挂到句柄上。
+    widget.controller?._submit = () => unawaited(_submit());
   }
 
   @override
   void didUpdateWidget(covariant FormSheetContent oldWidget) {
     super.didUpdateWidget(oldWidget);
+    // 换了 controller 就把旧的解绑、新的绑上（正常弹层不会换，这里只是兜底）。
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller?._submit = null;
+      widget.controller?._submit = () => unawaited(_submit());
+    }
     // 仅在「字段集合真的变了」时重置，避免普通 rebuild 冲掉用户已输入的内容
     if (!_sameItemKeys(oldWidget.items, widget.items)) {
       for (final c in _controllers.values) {
@@ -148,6 +170,8 @@ class _FormSheetContentState extends State<FormSheetContent> {
 
   @override
   void dispose() {
+    // 弹层关闭后，顶栏按钮不应再触发已销毁的提交逻辑。
+    widget.controller?._submit = null;
     for (final c in _controllers.values) {
       c.dispose();
     }
@@ -191,13 +215,13 @@ class _FormSheetContentState extends State<FormSheetContent> {
   }
 
   // ── 提交 ──────────────────────────────────────────────────────
-  Future<void> _submit({bool useOnSave = false}) async {
+  Future<void> _submit() async {
     if (_busy) return;
     final form = _formKey.currentState;
     if (form != null && !form.validate()) return;
 
     final values = _collect();
-    final handler = useOnSave ? (widget.onSave ?? widget.onSubmit) : widget.onSubmit;
+    final handler = widget.onSubmit;
 
     if (handler == null) {
       if (mounted) SheetActions.close(context, values);
@@ -307,23 +331,6 @@ class _FormSheetContentState extends State<FormSheetContent> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          SheetHeader(
-            title: widget.title,
-            centered: true,
-            leading: widget.cancel ? SheetTextAction(
-              label: widget.cancelLabel,
-              onTap: widget.onCancel ??
-                  () => SheetActions.close(context),
-            ) : null,
-            trailing: widget.save ? SheetTextAction(
-              label: widget.saveLabel,
-              emphasized: true,
-              onTap: _busy
-                  ? () {}
-                  : () => unawaited(_submit(useOnSave: true)),
-            ) : null,
-          ),
-          const SizedBox(height: AppSheetSize.sectionGap),
           for (var i = 0; i < widget.items.length; i++) ...<Widget>[
             if (i > 0)
               SizedBox(

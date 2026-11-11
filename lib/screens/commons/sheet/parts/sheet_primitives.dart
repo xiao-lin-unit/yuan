@@ -9,103 +9,42 @@ import 'package:yuan/styles/theme_tokens.dart';
 
 // ── 壳 / 内容之间的唯一契约 ─────────────────────────────────────
 //
-// 内容组件（contents/*.dart）**不 import、不调用 Navigator**，也不
-// 知道自己被放进哪种容器。它通过 [SheetActions] 只发出两种意图：
-//   · close  —— 「我完成了，请关闭」
-//   · pin    —— 「这块内容要固定在壳顶端，别跟着滚动」
-// 怎么关、怎么固定，都由这一层单点决定。
+// 【这里只有一处"动态"逻辑，把工作逻辑写清楚，别靠猜】
 //
-// [SheetScope] 由唯一的壳 [AppSheetShell] 注入，作用是标记
-// 「当前在一个 Sheet 容器内」，并持有一个「固定头部槽位」。
-// 脱离 Sheet、把内容组件直接放进页面或测试 widget 时没有这个标记：
-// close 降级为不操作、pin 降级为就地渲染 —— 内容仍可安全复用。
-class SheetScope extends StatefulWidget {
-  const SheetScope({super.key, required this.child});
+// 内容组件（contents/*.dart）不 import、不调用 Navigator，也不
+// 知道自己被放进哪种容器。它们只在"我完成了"时调 [SheetActions.close]。
+//
+// 为什么需要 [SheetScope]：同一个内容组件有时是 Sheet 的 child（要 pop
+// 一个 route），有时被直接放进普通页面 / widget 测试（那里没有 route 可
+// pop，硬弹会把页面关掉）。所以壳在 build 时注入一个 InheritedWidget
+// 作为"我在 Sheet 内"的标记，close 时查一下：
+//   · 查得到 → Navigator.maybePop(context, value)
+//   · 查不到 → 什么都不做，由调用方自己的 onApply / onSubmit 收尾
+//
+// 这是能力探测（和 Theme.of / Navigator.of 同一类），**不是运行时注册**：
+// 没有 ValueNotifier、没有 postFrame 回调、没有跨帧写入、没有子级提升。
+// 壳不因为它而认识任何内容类型，内容也不因为它多出"两种模式"。
+//
+// 注意：查标记必须用「渲染时的 context」（build 里拿到的那个），
+// 不能用调用方构造 Widget 时捕获的页面 context —— 那个 context 在
+// SheetScope 之外，会查不到。本项目里所有默认关闭按钮
+// （SheetCloseButton / SheetCancelAction）都在自己的 build 里取 context。
+class SheetScope extends InheritedWidget {
+  const SheetScope({super.key, required super.child});
 
-  final Widget child;
-
-  /// 供壳在 Column 里读取槽位；内容组件用 [SheetActions] 即可，不直接取。
-  static _SheetScopeAccess? maybeOf(BuildContext context) =>
-      context.getInheritedWidgetOfExactType<_SheetScopeAccess>();
+  static SheetScope? maybeOf(BuildContext context) =>
+      context.getInheritedWidgetOfExactType<SheetScope>();
 
   @override
-  State<SheetScope> createState() => _SheetScopeState();
+  bool updateShouldNotify(covariant SheetScope oldWidget) => false;
 }
 
-class _SheetScopeState extends State<SheetScope> {
-  /// 当前被提升到壳顶端的 Widget（null = 无固定头部）。
-  /// 壳用 ValueListenableBuilder 在滚动区**之外**渲染它。
-  final ValueNotifier<Widget?> pinnedHeader = ValueNotifier<Widget?>(null);
-
-  @override
-  void dispose() {
-    pinnedHeader.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => _SheetScopeAccess(
-        pinnedHeader: pinnedHeader,
-        child: widget.child,
-      );
-}
-
-class _SheetScopeAccess extends InheritedWidget {
-  const _SheetScopeAccess({
-    required this.pinnedHeader,
-    required super.child,
-  });
-
-  final ValueNotifier<Widget?> pinnedHeader;
-
-  @override
-  bool updateShouldNotify(covariant _SheetScopeAccess oldWidget) => false;
-}
-
-/// 内容组件与壳之间的**唯一**动作入口。
+/// 内容组件**唯一**的「请求关闭 / 回传结果」入口。
 abstract final class SheetActions {
   static void close<T extends Object?>(BuildContext context, [T? value]) {
-    // 不在 Sheet 内时不碰 Navigator：内容可安全复用为普通页面组件。
+    // 工作逻辑见 [SheetScope] 上方注释：查标记 → 有才 pop。
     if (SheetScope.maybeOf(context) == null) return;
     unawaited(Navigator.maybePop<T>(context, value));
-  }
-
-  /// 把 [view] 提升到壳顶端固定（不随内容滚动）。
-  ///
-  /// 用 post-frame 上报：内容组件的 build 发生在壳 build 之后，
-  /// 直接在 build 里改 notifier 会触发 "markNeedsBuild during build"。
-  /// 弹层有入场动画，1 帧延迟无感。相同 view 不重复通知。
-  static void pin(BuildContext context, Widget view) {
-    final access = SheetScope.maybeOf(context);
-    if (access == null) return; // 不在 Sheet 内 → 由调用方就地渲染
-    final notifier = access.pinnedHeader;
-    if (identical(notifier.value, view)) return;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (identical(notifier.value, view)) return;
-      notifier.value = view;
-    });
-  }
-
-  // 刻意不提供 unpin：弹层里的头部都是静态结构，弹层关闭时
-  // notifier 随 SheetScope 一起销毁；在 State.dispose 里反向通知
-  // 反而容易撞上「notifier 已 dispose」或 unmount 阶段 setState。
-  // 后注册的 header 会覆盖前一个，条件渲染的极端场景由业务自行保证。
-}
-
-/// 把任意一块内容固定到壳顶端（扩展点）。
-///
-/// 用法与 [SheetHeader] 一样：放在内容组件里，外观由自己决定，
-/// 但渲染位置由壳统一负责。不在 Sheet 内时退化为就地渲染。
-class SheetPinned extends StatelessWidget {
-  const SheetPinned({super.key, required this.child});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    if (SheetScope.maybeOf(context) == null) return child;
-    SheetActions.pin(context, child);
-    return const SizedBox.shrink();
   }
 }
 
@@ -156,80 +95,21 @@ class SheetHomeIndicator extends StatelessWidget {
   }
 }
 
-/// 统一标题栏。
+/// 统一标题栏（**静态零件**：StatelessWidget，无状态、无注册、无副作用）。
 ///
 /// [centered] = true → 三栏（取消 / 标题 / 保存），标题真居中；
 /// false → 标题与副标题靠左，右侧可放「详情」「关闭」等动作。
 /// 两种形态在 6 张原型里都出现过，用同一个组件避免各写一套 Row。
-/// Sheet 标题栏：全软件**唯一**的标题零件。
 ///
-/// 位置由壳统一决定：在 `AppSheetShell` 内时自动提升到滚动区**之外**
-/// 的固定槽位（不随内容滚动）；脱离 Sheet 单独使用时就地渲染。
-///
-/// 因此 6 个内容组件照旧写 `SheetHeader(...)` 就行 —— 要不要固定、
-/// 固定区加多少内边距、要不要跟拖拽把手一起联动，全部只改壳一个文件。
-class SheetHeader extends StatefulWidget {
+/// 用法（固定与否是**布局**决定的，不是本组件决定的）：
+///   AppSheetShell.show(context, header: SheetHeader(title: '主题颜色'),
+///                      child: SelectSheetContent(...));
+/// 壳把 header 放在 Column 的 Flexible（滚动区）之前 → 标题恒定可见。
+/// 本组件只负责"长什么样"，不负责"在哪"。看构造函数就知道全部内容，
+/// 没有隐藏分支，脱离 Sheet 单独渲染也是同一个 Row。
+class SheetHeader extends StatelessWidget {
   const SheetHeader({
     super.key,
-    required this.title,
-    this.subtitle,
-    this.leading,
-    this.trailing,
-    this.centered = false,
-  });
-
-  final String title;
-  final String? subtitle;
-  final Widget? leading;
-  final Widget? trailing;
-  final bool centered;
-
-  @override
-  State<SheetHeader> createState() => _SheetHeaderState();
-}
-
-class _SheetHeaderState extends State<SheetHeader> {
-  /// 交给槽位的「纯渲染体」，不含上报逻辑 —— 避免在固定槽位里
-  /// 再次触发提升造成无限循环。
-  late Widget _view;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _view = _SheetHeaderView(
-      title: widget.title,
-      subtitle: widget.subtitle,
-      leading: widget.leading,
-      trailing: widget.trailing,
-      centered: widget.centered,
-    );
-  }
-
-  @override
-  void didUpdateWidget(covariant SheetHeader oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    _view = _SheetHeaderView(
-      title: widget.title,
-      subtitle: widget.subtitle,
-      leading: widget.leading,
-      trailing: widget.trailing,
-      centered: widget.centered,
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    // 不在 Sheet 内（普通页面 / 测试 widget）→ 就地渲染，行为与以前一致。
-    if (SheetScope.maybeOf(context) == null) return _view;
-    SheetActions.pin(context, _view);
-    // 内容树里不再占位：标题已由壳在滚动区外渲染。
-    return const SizedBox.shrink();
-  }
-}
-
-/// [SheetHeader] 的纯渲染体（不含提升逻辑）。
-class _SheetHeaderView extends StatelessWidget {
-  const _SheetHeaderView({
     required this.title,
     this.subtitle,
     this.leading,
@@ -464,6 +344,27 @@ class SheetTextAction extends StatelessWidget {
       ),
     );
   }
+}
+
+/// 顶栏「取消」文字按钮（静态零件）。
+///
+/// 【为什么单独做一个零件，而不是让调用方传 onTap】
+/// [SheetActions.close] 必须用"渲染时的 context"才能查到 [SheetScope]
+/// （详见该文件顶部契约注释）。调用方在 `AppSheetShell.show(...)` 之前
+/// 构造 header 时捕获的是页面 context，位于 SheetScope 之外，
+/// 直接写 `onTap: () => SheetActions.close(context)` 会静默 no-op。
+/// 所以这里不接收 onTap，在自己的 build 里取 context 再关闭。
+/// 行为固定、一眼能读完，没有任何动态注册。
+class SheetCancelAction extends StatelessWidget {
+  const SheetCancelAction({super.key, this.label = '取消'});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => SheetTextAction(
+        label: label,
+        onTap: () => SheetActions.close(context),
+      );
 }
 
 /// 右上角圆形关闭按钮（分类选择弹层）。
