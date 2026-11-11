@@ -67,6 +67,10 @@ abstract final class AppComponentSize {
   static const double drawerWidth = 304;
   static const double popupMenuMinWidth = 224;
 
+  /// 侧边导航：折叠态只放图标，展开态放图标 + 常驻文字。
+  static const double railWidth = 80;
+  static const double railExtendedWidth = 256;
+
   static const double badgeSmallSize = 6;
   static const double badgeLargeSize = 16;
   static const double linearProgressHeight = 4;
@@ -104,6 +108,34 @@ abstract final class AppBorder {
   static const double focused = 1.5;
 }
 
+/// 窗口尺寸档位（Material 3 自适应断点）。
+///
+/// 【这是本任务引入的**动态布局**，把工作逻辑写清楚，别靠猜】
+///
+/// 为什么需要动态：同一份代码要跑在手机 / 平板竖屏 / 平板横屏 /
+/// 桌面窗口 / Web 上，宽度是运行时才有的，构造期定不死。
+/// 判定只发生在一处（[AppLayout.windowSizeOf]），结果只驱动两件事：
+///   ① AppShell 用底部 NavigationBar 还是侧边 NavigationRail；
+///   ② AppPageScaffold 的内容列最大宽度。
+/// 除此之外没有任何组件读它，不扩散到业务页面。
+///
+/// 分步工作逻辑：
+///   1. AppShell 的 LayoutBuilder 拿到 `constraints.maxWidth`（整屏宽）；
+///   2. 调 [windowSizeOf] 得到档位；
+///   3. compact → 底导 + maxContentWidth(640)；
+///      medium  → 折叠式 rail + 640；
+///      expanded → 展开式 rail + expandedContentWidth(840)；
+///   4. 宽度 < 0 / 无穷大时按 compact 处理（边界见函数注释）。
+///
+/// 阈值取 M3 标准的 600 / 840，是「大众选择」而非拍脑袋：
+/// 600 以下手机，600~840 平板竖屏 / 折叠屏展开，840 以上平板横屏 / 桌面。
+/// 想调形态只需改这两个常量，五个页面零改动。
+enum AppWindowSize {
+  compact,
+  medium,
+  expanded,
+}
+
 /// 页面级布局节奏：统一所有页面的留白与最小高度，
 /// 避免 ProfileScreen 里 18 / 12 / 4 / 4 / 24 这类无规律数字。
 abstract final class AppLayout {
@@ -116,7 +148,50 @@ abstract final class AppLayout {
   static const double fieldMinHeight = 56;
   static const double listItemMinHeight = 56;
   static const double formRowMinHeight = 64;
+
+  /// 窄屏 / 中屏内容列上限。手机（<600）时 640 不生效，等于不限宽。
   static const double maxContentWidth = 640;
+
+  /// 宽屏内容列上限：比窄屏宽一档，但仍是「居中一列」而不是铺满，
+  /// 避免 1200dp 桌面窗口里一行文字拉到 2 米长。
+  static const double expandedContentWidth = 840;
+
+  // ── 断点 ──────────────────────────────────────────────────────
+  /// < 600 → compact；600..839 → medium；>= 840 → expanded。
+  static const double compactMaxWidth = 600;
+  static const double mediumMaxWidth = 840;
+
+  /// >= 600 就从底导切到侧边 rail（medium 折叠 / expanded 展开）。
+  static const double railMinWidth = compactMaxWidth;
+
+  /// 按可用宽度判档位。
+  ///
+  /// 边界行为（明确写清，免得以后猜）：
+  ///   · 非有限值（infinity / NaN，出现在无约束的测试 widget 里）→ compact；
+  ///   · 负数 / 0（窗口被压到极小）→ compact；
+  ///   · 恰好 600 → medium，恰好 840 → expanded（左闭右开，无重叠）。
+  static AppWindowSize windowSizeOf(double width) {
+    if (!width.isFinite || width < compactMaxWidth) {
+      return AppWindowSize.compact;
+    }
+    if (width < mediumMaxWidth) return AppWindowSize.medium;
+    return AppWindowSize.expanded;
+  }
+
+  /// 该档位下页面内容列的最大宽度。只有 AppPageScaffold 调用。
+  static double contentMaxWidthFor(AppWindowSize size) => switch (size) {
+        AppWindowSize.compact => maxContentWidth,
+        AppWindowSize.medium => maxContentWidth,
+        AppWindowSize.expanded => expandedContentWidth,
+      };
+
+  /// 该档位是否用侧边 NavigationRail（否则用底部 NavigationBar）。
+  static bool useNavigationRail(AppWindowSize size) =>
+      size != AppWindowSize.compact;
+
+  /// 该档位的 rail 是否展开显示文字（只有 expanded 展开）。
+  static bool isRailExtended(AppWindowSize size) =>
+      size == AppWindowSize.expanded;
 }
 
 /// 最小可点击区域（Material 无障碍 48dp，WCAG 2.2 AAA 44px）

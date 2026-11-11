@@ -9,29 +9,37 @@ import 'package:flutter/material.dart';
 /// 这是唯一能「一处改、五个页面 + 六张 Sheet 全同步」的位置。
 /// 没有它，以后每个全局行为都得散到五个页面各写一遍。
 ///
-/// ── 本轮只立闸，不改任何界面表现 ───────────────────────────────
-/// 当前实现 = 把 child 原样透传。真机跑起来必须和加之前**一模一样**，
-/// 这就是本轮的回归判据。立闸的目的是让后续任务有唯一落点。
+/// ── 当前实现：仍是纯透传 ───────────────────────────────────────
+/// `return child` 原样返回，没有加任何包裹层。总闸已经立好，但暂时
+/// 是空的 —— 这是刻意的：第 ① 项任务（断点 + 收敛嵌套 Scaffold）落在
+/// `AppShell` / `AppPageScaffold`，不需要在总闸外包 MediaQuery，
+/// 因为 Scaffold 自己就能给子树正确的约束。
 ///
-/// 后续三个任务，按下面顺序**全部插在 [build] 这一处**，页面零改动：
+/// 剩余两项任务，按下面顺序**插在 [build] 这一处**，页面零改动：
 ///
-///   ① 断点 + 收敛嵌套 Scaffold → 在 AppShell / AppPageScaffold 改，
-///      但断点常量与「宽屏切 NavigationRail」的判断入口挂这里；
-///   ② 三态骨架 + 国际化 → 这里包 Localizations / Directionality /
+///   ✅ ① 断点 + 收敛嵌套 Scaffold —— 已完成。
+///       落点：`AppLayout`（断点常量 + windowSizeOf）、`AppShell`
+///       （唯一 Scaffold + LayoutBuilder 切 NavigationBar / NavigationRail）、
+///       `AppPageScaffold`（降级为纯内容骨架 + 按档位限宽）。
+///       全局现在只有一个 Scaffold、一个 resizeToAvoidBottomInset。
+///
+///   ⬜ ② 三态骨架 + 国际化 → 这里包 Localizations / Directionality /
 ///      全局 ErrorWidget.builder 与 loading/error 兜底；
-///   ③ 横屏 / 转场 / 键盘底导 / 全局 ScrollConfiguration → 这里包
+///   ⬜ ③ 横屏 / 转场 / 键盘底导 / 全局 ScrollConfiguration → 这里包
 ///      MediaQuery 覆盖与 ScrollBehavior。
 ///
 /// 另两项（文本缩放夹取、AnimatedTheme 主题过渡）同样挂这里，
-/// 随 ②③ 一起落地，不另开入口。
+/// 随 ②③ 落地，不另开入口。
 ///
 /// ── 两条硬约束，违反会出全局 bug ───────────────────────────────
 /// 1. **child 必须原样返回**（它是 GoRouter 的 Navigator）。不要在这里
 ///    包 Scaffold / SafeArea / 第二层 MediaQuery：
-///      · `AppShell` 已经是 Scaffold（含 resizeToAvoidBottomInset: true）；
-///      · 页面是 `AppPageScaffold`（自带 Scaffold + SafeArea）。
-///    重复包会造成双 SafeArea、双键盘避让 —— 前几轮 Sheet 被键盘顶到
-///    状态栏、内容被遮挡，根子就在这种重复层叠上。
+///      · `AppShell` 是全局唯一的 Scaffold（含
+///        resizeToAvoidBottomInset: true —— 前几轮键盘修复的根开关）；
+///      · `AppPageScaffold` 已降级为纯内容骨架（只保留一处 SafeArea，
+///        它包的是页面内容，不包 Navigator 的 Overlay）。
+///    重复包会造成双 Scaffold、双键盘避让 —— 之前 Sheet 被键盘顶到
+///    状态栏、最下方内容被遮挡，根子就在这种重复层叠上。
 /// 2. **不要在这里读 Provider / 做异步**。builder 会随路由变化重建；
 ///    主题状态由外层 `YuanApp` 的 Consumer 提供，取 `Theme.of(context)`
 ///    即可；持久化写在 `main()` 的 await 链路里，不在这里。

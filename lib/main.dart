@@ -29,10 +29,10 @@ class YuanApp extends StatelessWidget {
             darkTheme: AppTheme.dark(t.seed, contrast: t.contrast),
             themeMode: t.mode,
             // 全软件唯一的全局装配点：包住整个 Navigator（含 Sheet 弹层
-            // 所在的 Overlay）。后续断点 / 三态骨架 / 国际化 / 横屏 /
-            // 文本缩放 / 主题过渡全部挂这里，五个页面零改动。
-            // 本轮只立闸：AppRoot 把 child 原样透传，界面与之前完全一致。
-            // 工作逻辑与两条硬约束见 lib/app_root.dart 顶部注释。
+            // 所在的 Overlay）。后续三态骨架 / 国际化 / 横屏 / 文本缩放 /
+            // 主题过渡挂这里，五个页面零改动。AppRoot 目前仍是纯透传
+            // （断点那项落在 AppShell / AppPageScaffold，不需要总闸外包
+            // MediaQuery）。工作逻辑与两条硬约束见 lib/app_root.dart 顶部。
             builder: (_, child) => AppRoot(child: child),
             routerConfig: appRouter,
           )

@@ -135,6 +135,44 @@ class ThemeSetting {
         }),
       );
 
+  /// 侧边导航（宽屏断点新增控件）。
+  ///
+  /// 与 [navigationBarTheme] 同一套取色与圆角，避免「手机底导」和
+  /// 「平板 rail」选中态两种长相：底色 surfaceContainer、指示容器
+  /// secondaryContainer、圆角 Stadium、未选中 onSurfaceVariant。
+  /// 换主题色 / 切明暗时由 ThemeData 一处重算，AppShell 不写任何 Color。
+  static NavigationRailThemeData navigationRailTheme(
+          ColorScheme cs, AppThemeTokens t) =>
+      NavigationRailThemeData(
+        backgroundColor: cs.surfaceContainer,
+        elevation: 0,
+        indicatorColor: cs.secondaryContainer,
+        indicatorShape: const StadiumBorder(),
+        selectedIconTheme: IconThemeData(
+          size: AppIconSize.large,
+          color: cs.onSecondaryContainer,
+        ),
+        unselectedIconTheme: IconThemeData(
+          size: AppIconSize.large,
+          color: cs.onSurfaceVariant,
+        ),
+        selectedLabelTextStyle: textTheme.labelMedium?.copyWith(
+          color: cs.onSurface,
+          fontWeight: FontWeight.w600,
+        ),
+        unselectedLabelTextStyle: textTheme.labelMedium?.copyWith(
+          color: cs.onSurfaceVariant,
+          fontWeight: FontWeight.w500,
+        ),
+        // labelType 刻意不在这里定：它由 AppShell 按档位显式传
+        // （medium=selected / expanded=extended 时不传），避免 theme 默认值
+        // 与运行时形态打架。分组本项目不用，groupAlignment 留统一档位。
+        groupAlignment: -1,
+        minWidth: AppComponentSize.railWidth,
+        minExtendedWidth: AppComponentSize.railExtendedWidth,
+        useIndicator: true,
+      );
+
   static ElevatedButtonThemeData elevatedButtonTheme(
           ColorScheme cs, AppThemeTokens t) =>
       ElevatedButtonThemeData(

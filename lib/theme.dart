@@ -68,6 +68,7 @@ class AppTheme {
 
       appBarTheme: ThemeSetting.appBarTheme(cs),
       navigationBarTheme: ThemeSetting.navigationBarTheme(cs),
+      navigationRailTheme: ThemeSetting.navigationRailTheme(cs, tokens),
       elevatedButtonTheme: ThemeSetting.elevatedButtonTheme(cs, tokens),
       textButtonTheme: ThemeSetting.textButtonTheme(cs),
       outlinedButtonTheme: ThemeSetting.outlinedButtonTheme(cs, tokens),
