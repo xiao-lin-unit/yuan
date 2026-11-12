@@ -27,6 +27,20 @@ const String _kFootIncome =
 const String _kDeleteTitle = '删除分类';
 const String _kDeleteBody = '已记过的账不受影响，这条分类会进回收站，30 天内可恢复。';
 
+/// 统计条三个格子对应的列表筛选（顺序 = 格子的下标，别调乱）。
+///
+/// 【静态映射说明】`_filter.index` 直接作为 `AppStatBar.selectedIndex`，
+/// `onSelected(i)` 直接用 `values[i]` 反查。这是构造期一一对应，没有
+/// 运行时注册；新增一格只需在枚举里加一项 + 在 [_rowsFor] 补一个 case。
+enum _CategoryFilter { active, hidden, custom }
+
+/// 每种筛选下的空态文案。
+const Map<_CategoryFilter, String> _kEmptyText = <_CategoryFilter, String>{
+  _CategoryFilter.active: '这里还没有在用分类，点右上角的 ＋ 新建一个。',
+  _CategoryFilter.hidden: '还没有隐藏的分类。在「在用」里点一下「在用」就能藏起来。',
+  _CategoryFilter.custom: '还没有自定义分类，点右上角的 ＋ 新建一个。',
+};
+
 /// 【我的】→ 管理 → 分类管理（原型 page-category-management）。
 ///
 /// ── 功能页结构嵌套（本任务第 3 条）──────────────────────────────
@@ -36,8 +50,8 @@ const String _kDeleteBody = '已记过的账不受影响，这条分类会进回
 ///     └ Column
 ///        ├ AppSegmentTabs        支出分类 / 收入分类
 ///        ├ AppHintBanner         可关闭提示
-///        ├ AppStatBar            在用 / 已隐藏 / 自定义
-///        ├ AppFunctionSection    标题 + 「显示已隐藏」+ 列表
+///        ├ AppStatBar(tab 模式)  在用 / 已隐藏 / 自定义 → 直接筛选列表
+///        ├ AppFunctionSection    标题 + 列表
 ///        │   └ ReorderableListView → CategoryListTile
 ///        └ 底部说明
 /// ```
@@ -46,7 +60,7 @@ const String _kDeleteBody = '已记过的账不受影响，这条分类会进回
 ///
 /// 【动态状态，工作逻辑写清楚】本页是 StatefulWidget，只有 3 个状态：
 ///   1. `_kind`：点分段按钮切换支出/收入，只影响「取哪一组数据」；
-///   2. `_showHidden`：点「显示已隐藏」切换，只影响列表过滤；
+///   2. `_filter`：点统计条三个格子切换列表过滤，规则见 [_rowsFor]；
 ///   3. `_tipVisible`：点提示条 ✕ 隐藏，纯 UI。
 /// 三者都不持久化、不跨页面；真正的分类数据**全部**来自
 /// `context.watch<CategoryController>()` 的内存快照，页面不另存一份。
@@ -63,15 +77,33 @@ class CategoryManagementScreen extends StatefulWidget {
 class _CategoryManagementScreenState
     extends State<CategoryManagementScreen> {
   CategoryKind _kind = CategoryKind.expense;
-  bool _showHidden = false;
+  _CategoryFilter _filter = _CategoryFilter.active;
   bool _tipVisible = true;
+
+  /// 列表过滤：统计条三格 ↔ 三条规则，一一对应。
+  ///
+  /// 【工作逻辑】先取该类型**全量**（含隐藏），再按 [_filter] 过滤出要
+  /// 显示的行。全量单独保留，是为了给每行算「真实排序号」以及让
+  /// [CategoryController.moveTo] 收到全量下标（见 [_buildList] 注释）。
+  /// 边界：`custom` 含已隐藏的自定义分类（它仍是用户自己建的）；
+  /// `hidden` 含预设分类（预设也能隐藏）。
+  List<CategoryRecord> _rowsFor(List<CategoryRecord> all) =>
+      switch (_filter) {
+        _CategoryFilter.active =>
+          all.where((CategoryRecord r) => !r.hidden).toList(growable: false),
+        _CategoryFilter.hidden =>
+          all.where((CategoryRecord r) => r.hidden).toList(growable: false),
+        _CategoryFilter.custom =>
+          all.where((CategoryRecord r) => !r.preset).toList(growable: false),
+      };
 
   @override
   Widget build(BuildContext context) {
     final CategoryController controller =
         context.watch<CategoryController>();
-    final List<CategoryRecord> rows =
-        controller.managed(_kind, includeHidden: _showHidden);
+    final List<CategoryRecord> allRows =
+        controller.managed(_kind, includeHidden: true);
+    final List<CategoryRecord> rows = _rowsFor(allRows);
     final CategoryStats stats = controller.statsOf(_kind);
 
     return AppPageScaffold(
@@ -128,27 +160,31 @@ class _CategoryManagementScreenState
               message: _kTip,
               onDismiss: () => setState(() => _tipVisible = false),
             ),
+          // 统计条同时是筛选 tab：数字照旧显示，点哪格就只列哪一类。
+          // 原型里那个「显示/隐藏」文字开关已由这里的「已隐藏」格取代。
           AppStatBar(
             items: <AppStatItem>[
               AppStatItem(label: '在用', value: '${stats.active}'),
               AppStatItem(label: '已隐藏', value: '${stats.hidden}'),
               AppStatItem(label: '自定义', value: '${stats.custom}'),
             ],
+            selectedIndex: _filter.index,
+            onSelected: (int index) => setState(
+              () => _filter = _CategoryFilter.values[index],
+            ),
           ),
           AppFunctionSection(
             title: _kListTitle,
-            actionLabel: _showHidden ? '隐藏已隐藏' : '显示已隐藏',
-            onAction: () => setState(() => _showHidden = !_showHidden),
             child: rows.isEmpty
-                ? const Padding(
-                    padding: EdgeInsets.only(top: AppSpacing.lg),
+                ? Padding(
+                    padding: const EdgeInsets.only(top: AppSpacing.lg),
                     child: AppEmptyState(
                       icon: AppIcons.category,
                       title: '这里还没有分类',
-                      description: '点右上角的 ＋ 新建一个。',
+                      description: _kEmptyText[_filter]!,
                     ),
                   )
-                : _buildList(context, controller, rows),
+                : _buildList(context, controller, allRows, rows),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(
@@ -171,9 +207,21 @@ class _CategoryManagementScreenState
   /// 用 shrinkWrap + NeverScrollableScrollPhysics，把滚动交给外层一处，
   /// 避免两个可滚动 widget 抢手势。拖拽手柄用
   /// [ReorderableDragStartListener] 显式绑定 index。
+  ///
+  /// 【下标映射，工作逻辑】三个筛选 tab 下显示的都是 `rows`（子集），
+  /// 但两个地方需要「全量列表里真实的排序号」：
+  ///   ① 行里的「排序 N」与序号按钮文案 → `displayIndex: fullIndex`；
+  ///   ② 「填序号改排序」→ [CategoryController.moveTo] 是按全量列表
+  ///      （含隐藏）算目标位置的，所以 [_askOrder] 也必须收 fullIndex。
+  /// 而 `dragIndex: i` 仍是子集下标，因为 ReorderableListView 只认识
+  /// 自己 itemCount 里的位置。
+  /// 拖拽提交时把**子集 ids** 交给 [CategoryController.reorder]，它内部
+  /// 会把不在这批 ids 里的记录留在原排序槽位，所以筛选视图下拖拽不会
+  /// 把隐藏项 / 其它项挤到末尾。
   Widget _buildList(
     BuildContext context,
     CategoryController controller,
+    List<CategoryRecord> allRows,
     List<CategoryRecord> rows,
   ) =>
       Padding(
@@ -196,11 +244,15 @@ class _CategoryManagementScreenState
           },
           itemBuilder: (BuildContext context, int i) {
             final CategoryRecord record = rows[i];
+            final int fullIndex = allRows.indexWhere(
+              (CategoryRecord r) => r.id == record.id,
+            );
+            final int displayIndex = fullIndex < 0 ? i : fullIndex;
             return CategoryListTile(
               // ReorderableListView 要求每个 child 有稳定 key。
               key: ValueKey<int>(record.id ?? i),
               record: record,
-              displayIndex: i,
+              displayIndex: displayIndex,
               dragIndex: i,
               onEdit: () => unawaited(
                 showCategoryEditorSheet(
@@ -213,7 +265,9 @@ class _CategoryManagementScreenState
               onToggleHidden: () => unawaited(
                 _run(context, () => controller.toggleHidden(record.id!)),
               ),
-              onOrderTap: () => unawaited(_askOrder(context, controller, record, i)),
+              onOrderTap: () => unawaited(
+                _askOrder(context, controller, record, displayIndex),
+              ),
               onDelete: () => unawaited(_confirmDelete(context, controller, record)),
             );
           },
@@ -234,6 +288,8 @@ class _CategoryManagementScreenState
   }
 
   /// 「填序号改排序」（原型 promptOrder）：Material 对话框，主题已统一配置。
+  /// [currentIndex] 是全量列表里的 0-based 位置，与 [CategoryController.moveTo]
+  /// 的口径一致。
   Future<void> _askOrder(
     BuildContext context,
     CategoryController controller,

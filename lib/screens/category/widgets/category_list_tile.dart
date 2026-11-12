@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 
 import '../../../database/category/category_record.dart';
 import '../../../styles/app_decorations.dart';
@@ -20,8 +19,16 @@ const double _kHiddenOpacity = 0.5;
 /// 分类管理页的一行。业务私有组件：只服务本页面，样式仍全部引用全局令牌，
 /// 颜色只从 ColorScheme / AppThemeTokens 取，不写死任何 hex。
 ///
-/// 结构照原型：拖拽手柄 → 圆形图标（可点开编辑器）→ 名称 + 徽章 + 元信息
-/// → 操作区（序号 / 在用 / 编辑 / 删除）。
+/// 结构：拖拽手柄 → 圆形图标（可点开编辑器）→ 【名称独占一行】+
+/// 【排序 + 徽章 Wrap】→ 操作区（序号 / 在用 / 编辑 / 删除）。
+///
+/// 【布局说明】名称原来和「预设 / 已隐藏 / 语义」几个固定宽度徽章挤在
+/// 同一个 Row 里：隐藏项多一个「已隐藏」徽章就会把整行撑出约 43dp，
+/// Flutter 在右侧画出 "RIGHT OVERFLOWED BY ... PIXELS" 竖排溢出提示，
+/// 名称也常被 ellipsis 挤没。现在拆成两行：
+///   ① 名称单独一行，只受 Expanded 的宽度约束，必然显示得出来；
+///   ② 排序数字与所有徽章放进 [Wrap]，徽章多时自动折行，横向永不溢出。
+/// 修改时间按需求不再在这行展示，元信息只留「排序 N」。
 class CategoryListTile extends StatelessWidget {
   const CategoryListTile({
     super.key,
@@ -88,16 +95,24 @@ class CategoryListTile extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: <Widget>[
-                    Row(
+                    // ① 名称：独占一行，保证始终可见
+                    Text(
+                      record.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: text.menuTitle,
+                    ),
+                    const SizedBox(height: AppSpacing.xxs),
+                    // ② 排序 + 徽章：Wrap 自动折行，不再横向溢出
+                    Wrap(
+                      spacing: AppSpacing.xxs,
+                      runSpacing: AppSpacing.xxs,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: <Widget>[
-                        Flexible(
-                          child: Text(
-                            record.name,
-                            overflow: TextOverflow.ellipsis,
-                            style: text.menuTitle,
-                          ),
+                        Text(
+                          '排序 ${displayIndex + 1}',
+                          style: text.caption,
                         ),
-                        const SizedBox(width: AppSpacing.xxs),
                         _Badge(
                           label: record.preset ? '预设' : '自定义',
                           background: record.preset
@@ -107,39 +122,27 @@ class CategoryListTile extends StatelessWidget {
                               ? cs.onSurfaceVariant
                               : cs.onPrimaryContainer,
                         ),
-                        if (record.hidden) ...<Widget>[
-                          const SizedBox(width: AppSpacing.xxs),
+                        if (record.hidden)
                           _Badge(
                             label: '已隐藏',
                             background: cs.tertiaryContainer,
                             foreground: cs.onTertiaryContainer,
                           ),
-                        ],
                         if (record.kind == CategoryKind.expense &&
-                            record.necessity != CategoryNecessity.unset) ...<Widget>[
-                          const SizedBox(width: AppSpacing.xxs),
+                            record.necessity != CategoryNecessity.unset)
                           _Badge(
                             label: record.necessity.label,
                             background: cs.primaryContainer,
                             foreground: cs.onPrimaryContainer,
                           ),
-                        ],
                         if (record.kind == CategoryKind.income &&
-                            record.stability != CategoryStability.unset) ...<Widget>[
-                          const SizedBox(width: AppSpacing.xxs),
+                            record.stability != CategoryStability.unset)
                           _Badge(
                             label: record.stability.label,
                             background: cs.tertiaryContainer,
                             foreground: cs.onTertiaryContainer,
                           ),
-                        ],
                       ],
-                    ),
-                    const SizedBox(height: AppSpacing.xxs),
-                    Text(
-                      '排序 ${displayIndex + 1} · 改于 '
-                      '${DateFormat('yyyy-MM-dd').format(record.updatedAt)}',
-                      style: text.caption,
                     ),
                   ],
                 ),
@@ -176,6 +179,9 @@ class CategoryListTile extends StatelessWidget {
 }
 
 /// 圆形分类图标：内置矢量 / 上传图片 / 名称首字三种形态。
+///
+/// 原型里右下角有个相机角标，按本轮需求删除：整个图标就是一块干净的圆，
+/// 点它照旧打开编辑器（点击热区由外层 GestureDetector 提供）。
 class _Leading extends StatelessWidget {
   const _Leading({required this.record});
 
@@ -183,7 +189,6 @@ class _Leading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     final Widget core = switch (record.icon.kind) {
       CategoryIconKind.image when record.icon.imageRef != null => AppImage(
           ref: record.icon.imageRef,
@@ -203,36 +208,7 @@ class _Leading extends StatelessWidget {
     return SizedBox(
       width: _kTileIconSize,
       height: _kTileIconSize,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: <Widget>[
-          ClipOval(child: core),
-          // 右下角相机角标：纯装饰，显式忽略指针，避免挡住整行的点击。
-          Positioned(
-            right: -2,
-            bottom: -2,
-            child: IgnorePointer(
-              child: Container(
-                width: 15,
-                height: 15,
-                decoration: BoxDecoration(
-                  color: cs.primary,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: cs.surface,
-                    width: AppBorder.focused,
-                  ),
-                ),
-                child: Icon(
-                  AppIcons.camera,
-                  size: AppIconSize.small - 6,
-                  color: cs.onPrimary,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
+      child: ClipOval(child: core),
     );
   }
 }

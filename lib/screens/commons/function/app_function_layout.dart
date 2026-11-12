@@ -10,6 +10,7 @@ import '../icons/app_icons.dart';
 const double _kStatCellHeight = 56;
 const double _kHintRadius = AppRadius.item;
 const double _kSegmentMinHeight = AppComponentSize.segmentedButtonHeight;
+const double _kStatIndicatorHeight = 2;
 
 /// 功能页的**结构层**（不是样式层，不是状态层）。
 ///
@@ -79,51 +80,134 @@ class AppStatItem {
 
 /// 三格统计条（原型「在用 / 已隐藏 / 自定义」「总入账 / 总出账 / 净变动」
 /// 都是同一形态）。卡片装饰、分隔线宽度、文字角色全部来自全局层。
+///
+/// 两种用法，构造期一眼可辨：
+///   · **纯展示**（默认，不传 [selectedIndex] / [onSelected]）：三格只是数字，
+///     完全静态，行为与旧版一致；
+///   · **可点 tab**（成对传入 [selectedIndex] + [onSelected]）：每格变成
+///     可点击，选中格用 primaryContainer 底 + 2dp 主色底部指示线。
+///
+/// 【动态逻辑说明】tab 模式是通用结构件里唯一一处动态行为，分步写清：
+///   ① 页面持有「当前选中第几格」的状态，把下标和回调一起传进来；
+///   ② 组件自己**不持有**任何选中状态，只按 [selectedIndex] 渲染；
+///   ③ 点某格 → `onSelected(i)` → 页面 setState → 组件重建 → 高亮同步；
+///   ④ 边界：两个参数必须成对（assert 保证）；下标越界时按「无选中」渲染，
+///      不会崩；未传回调时格子不可点、也不画高亮。
+/// 高亮色与文字色全部取自 ColorScheme，换主题色 / 切明暗自动跟随。
 class AppStatBar extends StatelessWidget {
-  const AppStatBar({super.key, required this.items});
+  const AppStatBar({
+    super.key,
+    required this.items,
+    this.selectedIndex,
+    this.onSelected,
+  }) : assert(
+          (selectedIndex == null) == (onSelected == null),
+          'tab 模式必须同时传 selectedIndex 和 onSelected',
+        );
 
   final List<AppStatItem> items;
 
+  /// 当前选中格下标；null = 纯展示模式。
+  final int? selectedIndex;
+
+  /// 点某格的回调；null = 纯展示模式。
+  final ValueChanged<int>? onSelected;
+
   @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-        child: Container(
-          decoration: AppDecorations.card(context),
-          clipBehavior: Clip.antiAlias,
-          child: IntrinsicHeight(
-            child: Row(
-              children: <Widget>[
-                for (var i = 0; i < items.length; i++) ...<Widget>[
-                  if (i > 0)
-                    const VerticalDivider(
-                      width: 1,
-                      thickness: AppBorder.thin,
+  Widget build(BuildContext context) {
+    final bool tabMode = onSelected != null;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+      child: Container(
+        decoration: AppDecorations.card(context),
+        clipBehavior: Clip.antiAlias,
+        child: IntrinsicHeight(
+          child: Row(
+            children: <Widget>[
+              for (var i = 0; i < items.length; i++) ...<Widget>[
+                if (i > 0)
+                  const VerticalDivider(
+                    width: 1,
+                    thickness: AppBorder.thin,
+                  ),
+                Expanded(
+                  child: _StatCell(
+                    item: items[i],
+                    selected: tabMode && selectedIndex == i,
+                    onTap: tabMode ? () => onSelected!(i) : null,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 统计条的一格。样式全走全局令牌；是否可点由 [onTap] 决定。
+class _StatCell extends StatelessWidget {
+  const _StatCell({
+    required this.item,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final AppStatItem item;
+  final bool selected;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    // InkWell 的水波纹画在最近的一层 Material 上；若直接用带不透明底色的
+    // Container，splash 会被那层颜色盖住。所以这里显式给每格铺一层 Material，
+    // 未选中格透明，露出整条卡片的底色。
+    return Material(
+      color: selected ? cs.primaryContainer : Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: SizedBox(
+          height: _kStatCellHeight,
+          child: Stack(
+            alignment: Alignment.center,
+            children: <Widget>[
+              Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Text(
+                    item.label,
+                    style: context.appText.caption.copyWith(
+                      color: selected ? cs.onPrimaryContainer : null,
                     ),
-                  Expanded(
-                    child: SizedBox(
-                      height: _kStatCellHeight,
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: <Widget>[
-                          Text(
-                            items[i].label,
-                            style: context.appText.caption,
-                          ),
-                          const SizedBox(height: AppSpacing.xxs),
-                          Text(
-                            items[i].value,
-                            style: context.appText.menuTitle,
-                          ),
-                        ],
-                      ),
+                  ),
+                  const SizedBox(height: AppSpacing.xxs),
+                  Text(
+                    item.value,
+                    style: context.appText.menuTitle.copyWith(
+                      color: selected ? cs.onPrimaryContainer : null,
                     ),
                   ),
                 ],
-              ],
-            ),
+              ),
+              if (selected)
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: Container(
+                    height: _kStatIndicatorHeight,
+                    color: cs.primary,
+                  ),
+                ),
+            ],
           ),
         ),
-      );
+      ),
+    );
+  }
 }
 
 /// 提示条（原型「拖动右侧 ⠿ 可调整顺序…」）。
