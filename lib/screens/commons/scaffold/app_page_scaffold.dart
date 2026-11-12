@@ -53,6 +53,16 @@ class AppPageScaffold extends StatelessWidget {
   final List<Widget>? actions;
   final EdgeInsetsGeometry? padding;
 
+  /// 二级功能页的返回按钮（构造期静态传入，代码一眼看清去哪）。
+  /// 不传时交给 AppBar 自动推断；传了就关掉自动推断，避免两个箭头。
+  final Widget? leading;
+
+  /// 固定底部区（记账页的数字键盘、明细页的悬浮操作等）。
+  /// 它位于滚动区**之外**、Expanded 之后，所以长列表滚动时不动；
+  /// 键盘弹出时随外层唯一 Scaffold 的 resize 一起上移。
+  /// 与内容同样走 [AppLayout.contentMaxWidthFor] 限宽，宽屏不拉成两米长。
+  final Widget? bottom;
+
   const AppPageScaffold({
     super.key,
     this.title,
@@ -61,6 +71,8 @@ class AppPageScaffold extends StatelessWidget {
     this.showAppBar = true,
     this.actions,
     this.padding,
+    this.leading,
+    this.bottom,
   });
 
   @override
@@ -105,11 +117,21 @@ class AppPageScaffold extends StatelessWidget {
                 child: AppBar(
                   title: Text(title!),
                   actions: actions,
+                  leading: leading,
+                  automaticallyImplyLeading: leading == null,
                   // SafeArea 已处理状态栏，AppBar 不要再自己加一段。
                   primary: false,
                 ),
               ),
             Expanded(child: content),
+            if (bottom != null)
+              Align(
+                alignment: Alignment.bottomCenter,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: maxWidth),
+                  child: bottom!,
+                ),
+              ),
           ],
         ),
       ),

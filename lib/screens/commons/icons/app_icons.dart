@@ -73,7 +73,7 @@ abstract final class AppIcons {
   static const IconData pause = Icons.pause;
   static const IconData volume = Icons.volume_up_outlined;
 
-  // ── Sheet：支出分类 ──────────────────────────────────────────
+  // ── Sheet：支出分类（保留，供既有 Sheet 预览使用）──────────────
   static const IconData restaurant = Icons.restaurant_outlined;
   static const IconData car = Icons.directions_car_outlined;
   static const IconData basket = Icons.shopping_basket_outlined;
@@ -86,6 +86,101 @@ abstract final class AppIcons {
   static const IconData gift = Icons.card_giftcard_outlined;
   static const IconData finance = Icons.account_balance_outlined;
   static const IconData other = Icons.category_outlined;
+
+  // ── 收支分类（分类管理页 / 记账选择器）─────────────────────────
+  //
+  // 原型用 emoji，本项目按「全软件唯一矢量图标语言」换成 Material
+  // outlined 图标：线宽统一、随主题色与明暗取色、无暗色变体负担。
+  // 数据库只存下面这些**语义 key**，不存字体码点；换图标体系时
+  // 只改这张表，不需要迁移数据。语义相近的分类允许复用同一图标，
+  // 这是矢量图标语言相对「一分类一 emoji」的正常取舍。
+  static const IconData dragHandle = Icons.drag_handle;
+
+  static const IconData meal = Icons.restaurant_outlined;
+  static const IconData drink = Icons.local_cafe_outlined;
+  static const IconData fruit = Icons.apple_outlined;
+  static const IconData takeout = Icons.takeout_dining_outlined;
+  static const IconData grocery = Icons.shopping_basket_outlined;
+  static const IconData property = Icons.apartment_outlined;
+  static const IconData rent = Icons.home_outlined;
+  static const IconData phone = Icons.smartphone_outlined;
+  static const IconData daily = Icons.cleaning_services_outlined;
+  static const IconData transport = Icons.directions_bus_outlined;
+  static const IconData fuel = Icons.local_gas_station_outlined;
+  static const IconData taxi = Icons.local_taxi_outlined;
+  static const IconData beauty = Icons.face_retouching_natural_outlined;
+  static const IconData books = Icons.import_contacts_outlined;
+  static const IconData child = Icons.toys_outlined;
+  static const IconData elders = Icons.family_restroom_outlined;
+  static const IconData pet = Icons.pets_outlined;
+  static const IconData travel = Icons.flight_takeoff_outlined;
+  static const IconData tobacco = Icons.smoking_rooms_outlined;
+  static const IconData fitness = Icons.fitness_center_outlined;
+  static const IconData homeImprovement = Icons.handyman_outlined;
+  static const IconData digital = Icons.devices_outlined;
+  static const IconData insurance = Icons.shield_outlined;
+  static const IconData tax = Icons.receipt_outlined;
+  static const IconData salary = Icons.payments_outlined;
+  static const IconData bonus = Icons.emoji_events_outlined;
+  static const IconData sideJob = Icons.laptop_outlined;
+  static const IconData investment = Icons.trending_up_outlined;
+  static const IconData refund = Icons.undo_outlined;
+  static const IconData reimbursement = Icons.receipt_long_outlined;
+  static const IconData giftMoney = Icons.redeem_outlined;
+  static const IconData secondHand = Icons.swap_horiz_outlined;
+  static const IconData lottery = Icons.confirmation_number_outlined;
+
+  /// 语义 key → IconData。 CategoryDb 的 41 条预设分类全部命中这里；
+  /// 自定义分类的图标也从这张表里选，业务层不写 Icons.xxx。
+  static const Map<String, IconData> categoryIcons = <String, IconData>{
+    'meal': meal,
+    'drink': drink,
+    'fruit': fruit,
+    'takeout': takeout,
+    'grocery': grocery,
+    'utility': utility,
+    'property': property,
+    'rent': rent,
+    'phone': phone,
+    'medical': medical,
+    'daily': daily,
+    'transport': transport,
+    'fuel': fuel,
+    'taxi': taxi,
+    'apparel': apparel,
+    'beauty': beauty,
+    'study': study,
+    'books': books,
+    'child': child,
+    'elders': elders,
+    'pet': pet,
+    'gift': gift,
+    'entertainment': entertainment,
+    'travel': travel,
+    'tobacco': tobacco,
+    'fitness': fitness,
+    'homeImprovement': homeImprovement,
+    'digital': digital,
+    'insurance': insurance,
+    'tax': tax,
+    'other': other,
+    'salary': salary,
+    'bonus': bonus,
+    'sideJob': sideJob,
+    'investment': investment,
+    'refund': refund,
+    'reimbursement': reimbursement,
+    'giftMoney': giftMoney,
+    'secondHand': secondHand,
+    'lottery': lottery,
+  };
+
+  /// 编辑器图标网格的可选 key（稳定顺序 = map 的声明顺序）。
+  static List<String> get categoryIconKeys =>
+      categoryIcons.keys.toList(growable: false);
+
+  /// 坏数据兜底：未识别的 key 一律回退到「其他」，不让渲染崩。
+  static IconData categoryIcon(String key) => categoryIcons[key] ?? other;
 
   // ── 品牌（保留 FontAwesome，品牌 logo 不参与线宽统一）────────
   static const IconData github = FaBrandsIcons.icn_github;

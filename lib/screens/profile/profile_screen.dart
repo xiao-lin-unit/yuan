@@ -19,7 +19,10 @@ class ProfileScreen extends StatelessWidget {
 
   void _onItemTap(BuildContext context, String? key) {
     if (key == null) return;
-    final route = '/$key';
+    // 二级功能页统一挂在「我的」分支下（/profile/xxx）：
+    // AppShell 用前缀匹配保持底导高亮「我的」，且页面仍在 ShellRoute
+    // 内，键盘避让的根开关不丢。未注册的 key 仍走原来的 catch 兜底。
+    final route = '/profile/$key';
     try {
       context.push(route);
     } catch (_) {

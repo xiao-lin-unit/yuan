@@ -6,6 +6,7 @@ import '../screens/entry/entry_screen.dart';
 import '../screens/ledger/ledger_screen.dart';
 import '../screens/accounts/accounts_screen.dart';
 import '../screens/analysis/analysis_screen.dart';
+import '../screens/category/category_management_screen.dart';
 import '../screens/profile/profile_screen.dart';
 import '../styles/app_icon_tone.dart';
 import '../styles/theme_tokens.dart';
@@ -85,7 +86,17 @@ class AppShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final location = GoRouterState.of(context).uri.toString();
-    final found = tabs.indexWhere((t) => location == t.path);
+    // 【动态布局，工作逻辑】二级页挂在「我的」分支下（/profile/category），
+    // 用「精确匹配 + 前缀匹配」找出它属于哪个 tab：
+    //   1. 精确命中 tab.path → 该 tab；
+    //   2. 否则若 location 以 "<tab.path>/" 开头 → 仍算该 tab 的子页，
+    //      底导/rail 继续高亮「我的」，不会出现「在分类管理页却高亮记账」；
+    //   3. '/' 是所有路径的前缀，必须排除，只在精确匹配时算它；
+    //   4. 都没命中 → 0（兜底，保持原来的行为）。
+    // 只影响选中态，不影响导航形态与键盘根开关。
+    final found = tabs.indexWhere((RouteNavigation t) =>
+        location == t.path ||
+        (t.path != '/' && location.startsWith('${t.path}/')));
     final index = found < 0 ? 0 : found;
 
     final iconTone = AppIconTone.of(context);
@@ -215,9 +226,22 @@ final appRouter = GoRouter(
   routes: [
     ShellRoute(
       builder: (context, state, child) => AppShell(child: child),
-      routes: tabs
-          .map((t) => GoRoute(path: t.path, builder: (context, state) => t.widget))
-          .toList(),
+      routes: <RouteBase>[
+        ...tabs.map(
+          (RouteNavigation t) => GoRoute(
+            path: t.path,
+            builder: (context, state) => t.widget,
+          ),
+        ),
+        // 二级功能页：放在 ShellRoute **内部**，因此仍由 AppShell 那唯一
+        // 一个 Scaffold 覆盖 —— resizeToAvoidBottomInset: true 的键盘避让
+        // 对分类编辑器 Sheet 照样生效。若挂到顶层路由，编辑器弹层就
+        // 失去这个根开关，会重演「键盘把 Sheet 顶到状态栏」。
+        GoRoute(
+          path: '/profile/category',
+          builder: (context, state) => const CategoryManagementScreen(),
+        ),
+      ],
     ),
   ],
 );

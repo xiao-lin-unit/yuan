@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:yuan/database/db_module.dart';
+import 'package:yuan/database/category/category_db.dart';
 import 'package:yuan/database/user/user_db.dart';
 import 'package:yuan/service/image/image_migration.dart';
 
@@ -12,12 +13,14 @@ class DatabaseService {
   static final DatabaseService instance = DatabaseService._internal();
 
   static const _dbName = 'yuan.db';
-  // v1: 头像存 base64；v2: 统一图片引用（ImageRef），由 ImageMigration 收编旧数据
-  static const _dbVersion = 2;
+  // v1: 头像存 base64；v2: 统一图片引用（ImageRef），由 ImageMigration 收编旧数据；
+  // v3: 新增 categories（收支分类，一张表 + 41 条预设种子）
+  static const _dbVersion = 3;
   Database? _db;
 
-  final List<DbModule> _modules = [
-    UserDb()
+  final List<DbModule> _modules = <DbModule>[
+    UserDb(),
+    CategoryDb(),
   ];
 
   Future<Database> get database async {
@@ -57,6 +60,11 @@ class DatabaseService {
     if (oldV < 2) {
       // 统一图片迁移：任何表的旧图片列都走同一套逻辑
       await ImageMigration.run(db);
+    }
+    if (oldV < 3) {
+      // categories 表 + 索引 + 预设种子。CategoryDb.onCreate 是幂等的
+      // （IF NOT EXISTS / INSERT OR IGNORE），全新安装与 v2→v3 升级共用。
+      await CategoryDb().onCreate(db);
     }
   }
 

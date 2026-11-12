@@ -1,5 +1,7 @@
 import 'package:provider/provider.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:yuan/database/category/category_dao.dart';
+import 'package:yuan/service/category_controller.dart';
 import 'package:yuan/service/user_controller.dart';
 
 import 'database/user/user_dao.dart';
@@ -21,13 +23,18 @@ class Services {
     final userController = UserController(db, userDao);
     await userController.load();
 
-    Components.components.putIfAbsent(
-      "user",
-          () => userDao,
-    );
+    // 分类：启动时把 41 条预设 / 用户自定义分类读进内存快照，
+    // 分类管理页与以后的记账选择器共用这一份，不在页面各读一遍。
+    final categoryDao = CategoryDao();
+    final categoryController = CategoryController(db, categoryDao);
+    await categoryController.load();
 
-    return [
+    Components.components.putIfAbsent("user", () => userDao);
+    Components.components.putIfAbsent("category", () => categoryDao);
+
+    return <ChangeNotifierProvider>[
       ChangeNotifierProvider<UserController>.value(value: userController),
+      ChangeNotifierProvider<CategoryController>.value(value: categoryController),
     ];
   }
 }

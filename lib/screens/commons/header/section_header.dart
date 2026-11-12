@@ -23,10 +23,18 @@ class SectionHeader extends StatelessWidget {
     required this.title,
     this.trailing,
     this.toneKey,
+    this.actionLabel,
+    this.onAction,
   });
 
   final String title;
   final Widget? trailing;
+
+  /// 右侧文字动作（功能页的「显示已隐藏」「全部 ›」等）。
+  /// 与 [trailing] 图标可并存；两者都不传时就是纯标题行。
+  /// 这是构造期传入的静态数据，组件不持有任何状态。
+  final String? actionLabel;
+  final VoidCallback? onAction;
 
   /// 可选语义标识；不传时按 [title] 自动映射。
   final String? toneKey;
@@ -66,6 +74,23 @@ class SectionHeader extends StatelessWidget {
           : iconWidget;
     }
 
+    Widget? actionWidget;
+    if (actionLabel != null && onAction != null) {
+      actionWidget = TextButton(
+        onPressed: onAction,
+        style: TextButton.styleFrom(
+          minimumSize: const Size(kMinTapTarget, kMinTapTarget),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+        ),
+        child: Text(
+          actionLabel!,
+          style: context.appText.menuSubtitle.copyWith(
+            color: Theme.of(context).colorScheme.primary,
+          ),
+        ),
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.md,
@@ -80,6 +105,13 @@ class SectionHeader extends StatelessWidget {
             const SizedBox(width: _kTrailingGap),
             trailingWidget,
           ],
+          if (actionWidget != null)
+            Expanded(
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: actionWidget,
+              ),
+            ),
         ],
       ),
     );
