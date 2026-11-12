@@ -996,3 +996,160 @@ button { font-family: inherit; border: none; cursor: pointer; }
 
 /* 开关行不是末位时自身带顶线，避免和 cm-field 的 margin 叠成双线 */
 .cm-field .cm-switch-row:first-child { border-top:1px solid var(--border); }
+
+/* ==================== 账户页：长列表优化 ==================== */
+/* ① 合计卡横向滑动：一屏只看一类，不再三段各占一屏 */
+.acc-hero {
+  display: flex;
+  gap: 10px;
+  margin: 4px 0 8px;
+  padding: 0 16px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+.acc-hero::-webkit-scrollbar { display: none; }
+.ah-card {
+  flex: 0 0 86%;
+  scroll-snap-align: start;
+  padding: 16px 18px;
+  border-radius: 16px;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.12);
+}
+.ah-card.liquid { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); }
+.ah-card.credit { background: linear-gradient(135deg, #4a5568, #2d3748); }
+.ah-card.locked { background: linear-gradient(135deg, #b7791f, #975a16); }
+.ah-label { font-size: 12px; opacity: 0.88; }
+.ah-label small { opacity: 0.75; font-weight: 400; }
+.ah-value { font-size: 30px; font-weight: 700; line-height: 1.2; }
+.ah-sub { font-size: 11px; opacity: 0.9; }
+
+.ah-dots { display: flex; justify-content: center; gap: 5px; margin-bottom: 10px; }
+.ah-dots .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--border); transition: all 0.2s; }
+.ah-dots .dot.active { width: 14px; border-radius: 3px; background: var(--primary); }
+
+/* ② 搜索 + 排序 */
+.acc-toolbar { display: flex; gap: 8px; padding: 0 16px 10px; align-items: center; }
+.acc-search {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 10px;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.acc-search .as-ico { font-size: 13px; opacity: 0.55; flex-shrink: 0; }
+.acc-search input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--text);
+  min-width: 0;
+}
+.acc-search input::placeholder { color: var(--text-sub); }
+.acc-search .as-clear {
+  font-size: 11px; color: var(--text-sub);
+  background: #eee; border-radius: 50%;
+  width: 16px; height: 16px; line-height: 16px; text-align: center;
+  flex-shrink: 0; cursor: pointer;
+}
+.acc-sort { position: relative; flex-shrink: 0; }
+.sort-btn {
+  height: 36px;
+  padding: 0 10px;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--text);
+  white-space: nowrap;
+}
+.sort-menu {
+  display: none;
+  position: absolute;
+  right: 0; top: 42px;
+  z-index: 30;
+  width: 148px;
+  background: var(--white);
+  border-radius: 12px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.14);
+  padding: 6px;
+}
+.sort-menu.show { display: block; }
+.sort-menu .sm-title { display: block; font-size: 11px; color: var(--text-sub); padding: 4px 8px 6px; }
+.sort-menu .sm-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 9px 8px;
+  background: transparent;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--text);
+}
+.sort-menu .sm-item.active { background: #e6f7ef; color: var(--primary); font-weight: 600; }
+
+/* ③ 类型快筛 chips：横向一排，点一下跳到那类 */
+.acc-chips { display: flex; gap: 6px; padding: 0 16px 12px; overflow-x: auto; scrollbar-width: none; }
+.acc-chips::-webkit-scrollbar { display: none; }
+.acc-chip {
+  flex-shrink: 0;
+  height: 30px;
+  padding: 0 12px;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--text-sub);
+  white-space: nowrap;
+}
+.acc-chip b { font-weight: 600; margin-left: 2px; }
+.acc-chip.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+
+/* ④ 可折叠分段 */
+.acc-group { margin-bottom: 6px; }
+.ag-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 16px 8px;
+  cursor: pointer;
+}
+.ag-caret {
+  font-size: 16px; color: var(--text-sub);
+  transform: rotate(0deg); transition: transform 0.18s;
+  display: inline-block;
+}
+.ag-caret.open { transform: rotate(90deg); }
+.ag-label { font-size: 14px; font-weight: 600; flex: 1; }
+.ag-count {
+  font-size: 11px; color: var(--text-sub);
+  background: #eceef0; border-radius: 10px; padding: 1px 7px;
+}
+.ag-sum { font-size: 13px; font-weight: 600; color: var(--text); }
+.acc-group .card-list { animation: fadeIn 0.18s ease; }
+
+/* 信用卡卡内额度条 */
+.ac-bar { width: 100%; height: 4px; background: #f0f0f0; border-radius: 2px; margin-top: 6px; overflow: hidden; }
+.ac-bar-fill { height: 100%; background: var(--red); border-radius: 2px; }
+.account-card[draggable="true"] { cursor: grab; }
+.account-card[draggable="true"]:active { cursor: grabbing; }
+
+/* 搜索空态 */
+.empty-hint { padding: 40px 16px; text-align: center; display: flex; flex-direction: column; gap: 6px; }
+.empty-hint .eh-ico { font-size: 28px; opacity: 0.5; }
+.empty-hint .eh-text { font-size: 14px; color: var(--text-sub); display: flex; flex-direction: column; gap: 3px; }
+.empty-hint .eh-text small { font-size: 12px; opacity: 0.8; }

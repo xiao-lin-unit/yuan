@@ -312,5 +312,199 @@ function saveUserInfo() {
 window.addEventListener('DOMContentLoaded', () => {
   initCategories();                 // 先把预设分类铺好，记账弹层要用
   renderCategoryList();            // 分类管理页初始化
+  renderAccountHero();             // 账户页合计
+  renderAccountList();             // 账户页列表
+  initAccHeroDots();
   setTimeout(() => openSheet('onboard-sheet'), 400);
+});
+
+// ==================== 账户页：搜索 / 筛选 / 排序 / 折叠 ====================
+// 账户一多就滑不动，所以这一页不给"一列到底"：
+// 合计横滑 + 类型快筛 + 搜索 + 分段折叠 + 多种排序，任一手段都能少滑一半以上
+const ACCOUNTS = [
+  { id:'wx',    name:'微信零钱',   sub:'日常消费',              icon:'💬', group:'liquid', balance:2150,  top:false, order:0 },
+  { id:'alipay',name:'支付宝',     sub:'日常消费',              icon:'💙', group:'liquid', balance:1000,  top:false, order:1 },
+  { id:'cash',  name:'现金',       sub:'日常消费',              icon:'💵', group:'liquid', balance:300,   top:false, order:2 },
+  { id:'icbc',  name:'工商储蓄卡', sub:'工资卡 / 还款账户',     icon:'🏦', group:'liquid', balance:5800,  top:true,  order:3 },
+  { id:'cmb',   name:'招商信用卡', sub:'总额度 ¥10,000 · 已用 ¥6,800', icon:'💳', group:'credit',
+    balance:6800, top:true, order:4, badge:'还款日25号', limit:10000, used:6800 },
+  { id:'yibao', name:'医保账户',   sub:'🔒 仅限医疗相关用途',   icon:'🏥', group:'locked', balance:1200,  top:false, order:5 },
+  { id:'gjj',   name:'公积金',     sub:'🔒 仅限租房 / 装修 / 买房', icon:'🏠', group:'locked', balance:28000, top:false, order:6 }
+];
+
+const GROUP_META = {
+  top:    { label:'📌 常用账户', hint:'置顶的账户，打开就先看到' },
+  liquid: { label:'💳 流动资金账户', hint:'钱能自由花' },
+  credit: { label:'💰 信用卡账户', hint:'是花银行的钱，要还' },
+  locked: { label:'🔒 其他资金账户（受限）', hint:'有特定用途，不能随便花' }
+};
+
+let accFilter = 'all';
+let accSort = 'balance';
+let accCollapsed = {};          // 记录哪几段被折叠了
+let accDragId = null;
+
+function formatMoney(n) {
+  return '¥' + n.toLocaleString('zh-CN', { maximumFractionDigits: 0 });
+}
+
+// 合计按"当前显示的账户"实时算，切筛选时数字跟着变，不会出现上下对不上
+function computeHero(filter) {
+  const src = filter === 'all' ? ACCOUNTS : ACCOUNTS.filter(a => a.group === filter);
+  const sum = g => src.filter(a => a.group === g).reduce((s, a) => s + a.balance, 0);
+  const cnt = g => src.filter(a => a.group === g).length;
+  return {
+    liquid: { v: sum('liquid'), c: cnt('liquid') },
+    credit: { v: sum('credit'), c: cnt('credit') },
+    locked: { v: sum('locked'), c: cnt('locked') }
+  };
+}
+
+function renderAccountHero() {
+  const h = computeHero(accFilter);
+  const card = document.querySelector('#acc-hero .ah-card.liquid');
+  const nodes = document.querySelectorAll('#acc-hero .ah-card');
+  const set = (i, cls, val, sub) => {
+    const n = nodes[i];
+    if (!n) return;
+    n.querySelector('.ah-value').textContent = val;
+    n.querySelector('.ah-sub').textContent = sub;
+    n.style.display = (accFilter === 'all' || accFilter === cls) ? '' : 'none';
+  };
+  set(0, 'liquid', formatMoney(h.liquid.v), h.liquid.c + ' 个账户 · 随时可用');
+  set(1, 'credit', formatMoney(h.credit.v),
+      h.credit.c ? h.credit.c + ' 张卡 · 可用 ¥3,200 · 25 号还款' : '没有信用卡');
+  set(2, 'locked', formatMoney(h.locked.v),
+      h.locked.c + ' 个账户 · 需符合用途');
+  if (card) card.style.display = '';
+}
+
+function setAccountFilter(f, el) {
+  accFilter = f;
+  document.querySelectorAll('#acc-chips .acc-chip').forEach(c => c.classList.remove('active'));
+  if (el) el.classList.add('active');
+  renderAccountHero();
+  renderAccountList();
+}
+
+function clearAccountSearch() {
+  const i = document.getElementById('acc-search-input');
+  if (!i) return;
+  i.value = '';
+  renderAccountList();
+}
+
+function toggleAccountSort() {
+  document.getElementById('acc-sort-menu').classList.toggle('show');
+}
+
+function setAccountSort(mode) {
+  accSort = mode;
+  document.getElementById('acc-sort-menu').classList.remove('show');
+  const btn = document.getElementById('acc-sort-btn');
+  btn.textContent = { balance:'余额 ▾', name:'名称 ▾', custom:'自定义 ▾' }[mode];
+  document.querySelectorAll('#acc-sort-menu .sm-item').forEach(i => {
+    i.classList.toggle('active', i.dataset.sort === mode);
+  });
+  renderAccountList();
+}
+
+function toggleAccGroup(g) {
+  accCollapsed[g] = !accCollapsed[g];
+  renderAccountList();
+}
+
+// 自定义顺序：拖到目标卡片上就交换 order
+function onAccDrop(targetId) {
+  if (!accDragId || accDragId === targetId) return;
+  const a = ACCOUNTS.find(x => x.id === accDragId);
+  const b = ACCOUNTS.find(x => x.id === targetId);
+  if (a && b) { const t = a.order; a.order = b.order; b.order = t; }
+  accDragId = null;
+  renderAccountList();
+}
+
+function accountCardHtml(a) {
+  const badge = a.badge ? '<span class="ac-badge warn">' + a.badge + '</span>' : '';
+  const creditExtra = a.group === 'credit' && a.limit
+    ? '<div class="ac-bar"><div class="ac-bar-fill" style="width:' +
+      Math.round(a.used / a.limit * 100) + '%"></div></div>' : '';
+  const drag = accSort === 'custom'
+    ? ' draggable="true" ondragstart="accDragId=\'' + a.id + '\'" ondragend="accDragId=null" ondragover="event.preventDefault()" ondrop="onAccDrop(\'' + a.id + '\')"' : '';
+  const jump = a.group === 'credit'
+    ? 'onclick="switchTab(\'acc-detail-credit\')"'
+    : (a.group === 'liquid' ? 'onclick="switchTab(\'acc-detail-bank\')"' : 'onclick="switchTab(\'acc-detail-gjj\')"');
+  return '<div class="account-card ' + a.group + '"' + jump + drag + '>' +
+    '<div class="ac-icon">' + a.icon + '</div>' +
+    '<div class="ac-info"><span class="ac-name">' + a.name + '</span>' +
+    '<span class="ac-sub">' + a.sub + '</span>' + creditExtra + '</div>' +
+    '<div class="ac-right"><span class="ac-balance">' + formatMoney(a.balance) + '</span>' + badge + '</div>' +
+    '</div>';
+}
+
+function renderAccountList() {
+  const box = document.getElementById('acc-groups');
+  const empty = document.getElementById('acc-empty');
+  if (!box) return;
+
+  const kw = (document.getElementById('acc-search-input').value || '').trim().toLowerCase();
+  const clear = document.getElementById('acc-search-clear');
+  if (clear) clear.style.display = kw ? '' : 'none';
+
+  let list = ACCOUNTS.slice();
+  if (accFilter === 'top')      list = list.filter(a => a.top);
+  else if (accFilter !== 'all') list = list.filter(a => a.group === accFilter);
+  if (kw) list = list.filter(a => (a.name + a.sub + a.icon).toLowerCase().indexOf(kw) > -1);
+
+  if (accSort === 'balance')      list.sort((x, y) => y.balance - x.balance);
+  else if (accSort === 'name')    list.sort((x, y) => x.name.localeCompare(y.name, 'zh-CN'));
+  else                            list.sort((x, y) => x.order - y.order);
+
+  const groups = accFilter === 'top' ? [['top', list]]
+    : accFilter === 'all' && !kw
+      ? [['liquid', list.filter(a => a.group === 'liquid')],
+         ['credit', list.filter(a => a.group === 'credit')],
+         ['locked', list.filter(a => a.group === 'locked')]]
+      : [[accFilter === 'all' ? 'result' : accFilter, list]];
+
+  const html = [];
+  groups.forEach(([g, items]) => {
+    if (!items.length) return;
+    const isResult = g === 'result' || (kw && accFilter === 'all');
+    const meta = GROUP_META[g] || { label: kw ? '🔍 搜索结果' : '账户', hint: items.length + ' 个账户' };
+    const collapsed = !!accCollapsed[g] && !kw;      // 搜索时强制展开，不然会漏看
+    const total = items.reduce((s, a) => s + a.balance, 0);
+    html.push(
+      '<div class="acc-group">' +
+        '<div class="ag-head" onclick="toggleAccGroup(\'' + g + '\')">' +
+          '<span class="ag-caret ' + (collapsed ? '' : 'open') + '">›</span>' +
+          '<span class="ag-label">' + meta.label + '</span>' +
+          '<span class="ag-count">' + items.length + '</span>' +
+          '<span class="ag-sum">' + formatMoney(total) + '</span>' +
+        '</div>' +
+        (collapsed ? '' : '<div class="card-list">' + items.map(accountCardHtml).join('') + '</div>') +
+      '</div>'
+    );
+  });
+
+  box.innerHTML = html.join('');
+  if (empty) empty.style.display = list.length ? 'none' : '';
+}
+
+// 合计卡横滑时同步下面的小圆点
+function initAccHeroDots() {
+  const hero = document.getElementById('acc-hero');
+  const dots = document.querySelectorAll('#ah-dots .dot');
+  if (!hero || !dots.length) return;
+  hero.addEventListener('scroll', () => {
+    const i = Math.round(hero.scrollLeft / (hero.clientWidth * 0.86));
+    dots.forEach((d, k) => d.classList.toggle('active', k === Math.min(i, dots.length - 1)));
+  });
+}
+
+// 点排序菜单外面就收起
+document.addEventListener('click', e => {
+  const menu = document.getElementById('acc-sort-menu');
+  if (!menu) return;
+  if (!e.target.closest('.acc-sort')) menu.classList.remove('show');
 });

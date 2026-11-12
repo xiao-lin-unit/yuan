@@ -748,82 +748,65 @@
         <span class="nav-action" onclick="openSheet('account-add-sheet')">＋</span>
       </div>
 
-      <div class="account-summary">
-        <span class="as-sum-label">流动资金合计</span>
-        <span class="as-sum-value">¥8,320</span>
-      </div>
-
-      <div class="section-header"><span>流动资金账户</span></div>
-      <div class="card-list">
-        <div class="account-card" onclick="openSheet('card-detail-sheet')">
-          <div class="ac-icon">💬</div>
-          <div class="ac-info">
-            <span class="ac-name">微信零钱</span>
-            <span class="ac-sub">日常消费</span>
-          </div>
-          <div class="ac-right"><span class="ac-balance">¥2,150</span></div>
+      <!-- ① 合计：三段做成可横滑的卡，滑一下就换类，不再各占一屏 -->
+      <div class="acc-hero" id="acc-hero">
+        <div class="ah-card liquid">
+          <span class="ah-label">能花的钱 <small>· 流动资金</small></span>
+          <span class="ah-value">¥8,320</span>
+          <span class="ah-sub">4 个账户 · 随时可用</span>
         </div>
-        <div class="account-card">
-          <div class="ac-icon">💙</div>
-          <div class="ac-info">
-            <span class="ac-name">支付宝</span>
-            <span class="ac-sub">日常消费</span>
-          </div>
-          <div class="ac-right"><span class="ac-balance">¥1,000</span></div>
+        <div class="ah-card credit">
+          <span class="ah-label">欠银行的 <small>· 信用卡已用</small></span>
+          <span class="ah-value">¥6,800</span>
+          <span class="ah-sub">1 张卡 · 可用 ¥3,200 · 25 号还款</span>
         </div>
-        <div class="account-card">
-          <div class="ac-icon">💵</div>
-          <div class="ac-info">
-            <span class="ac-name">现金</span>
-            <span class="ac-sub">日常消费</span>
-          </div>
-          <div class="ac-right"><span class="ac-balance">¥300</span></div>
-        </div>
-        <div class="account-card">
-          <div class="ac-icon">🏦</div>
-          <div class="ac-info">
-            <span class="ac-name">工商储蓄卡</span>
-            <span class="ac-sub">工资卡 / 还款账户</span>
-          </div>
-          <div class="ac-right"><span class="ac-balance">¥5,800</span></div>
+        <div class="ah-card locked">
+          <span class="ah-label">动不了的 <small>· 受限资金</small></span>
+          <span class="ah-value">¥29,200</span>
+          <span class="ah-sub">2 个账户 · 需符合用途</span>
         </div>
       </div>
+      <div class="ah-dots" id="ah-dots">
+        <span class="dot active"></span><span class="dot"></span><span class="dot"></span>
+      </div>
 
-      <div class="section-header"><span>信用卡账户</span></div>
-      <div class="card-list">
-        <div class="account-card credit" onclick="openSheet('credit-detail-sheet')">
-          <div class="ac-icon">💳</div>
-          <div class="ac-info">
-            <span class="ac-name">招商信用卡</span>
-            <span class="ac-sub">总额度 ¥10,000 · 已用 ¥6,800</span>
-          </div>
-          <div class="ac-right">
-            <span class="ac-balance">可用 ¥3,200</span>
-            <span class="ac-badge warn">还款日25号</span>
+      <!-- ② 搜索 + 排序：账户再多也不用来回滑 -->
+      <div class="acc-toolbar">
+        <div class="acc-search">
+          <span class="as-ico">🔍</span>
+          <input id="acc-search-input" type="search" placeholder="搜账户名 / 尾号 / 备注"
+                 autocomplete="off" oninput="renderAccountList()">
+          <span class="as-clear" id="acc-search-clear" onclick="clearAccountSearch()">✕</span>
+        </div>
+        <div class="acc-sort">
+          <button class="sort-btn active" id="acc-sort-btn" onclick="toggleAccountSort()">余额 ▾</button>
+          <div class="sort-menu" id="acc-sort-menu">
+            <span class="sm-title">排序方式</span>
+            <button class="sm-item active" data-sort="balance" onclick="setAccountSort('balance')">余额高低</button>
+            <button class="sm-item" data-sort="name" onclick="setAccountSort('name')">名称 A→Z</button>
+            <button class="sm-item" data-sort="custom" onclick="setAccountSort('custom')">自定义 ⠿ 拖动顺序</button>
           </div>
         </div>
       </div>
 
-      <div class="section-header"><span>其他资金账户（受限）</span></div>
-      <div class="card-list">
-        <div class="account-card locked">
-          <div class="ac-icon">🏥</div>
-          <div class="ac-info">
-            <span class="ac-name">医保账户</span>
-            <span class="ac-sub">🔒 仅限医疗相关用途</span>
-          </div>
-          <div class="ac-right"><span class="ac-balance">¥1,200</span></div>
-        </div>
-        <div class="account-card locked">
-          <div class="ac-icon">🏠</div>
-          <div class="ac-info">
-            <span class="ac-name">公积金</span>
-            <span class="ac-sub">🔒 仅限租房 / 装修 / 买房</span>
-          </div>
-          <div class="ac-right"><span class="ac-balance">¥28,000</span></div>
-        </div>
+      <!-- ③ 快捷筛选：点一下直接定位到那类，跳过中间的卡片 -->
+      <div class="acc-chips" id="acc-chips">
+        <button class="acc-chip active" data-f="all" onclick="setAccountFilter('all',this)">全部 <b>7</b></button>
+        <button class="acc-chip" data-f="liquid" onclick="setAccountFilter('liquid',this)">💳 能花 <b>4</b></button>
+        <button class="acc-chip" data-f="credit" onclick="setAccountFilter('credit',this)">💰 欠银行 <b>1</b></button>
+        <button class="acc-chip" data-f="locked" onclick="setAccountFilter('locked',this)">🔒 受限 <b>2</b></button>
+        <button class="acc-chip" data-f="top" onclick="setAccountFilter('top',this)">📌 常用</button>
       </div>
 
+      <!-- ④ 分段列表：可折叠，只看想看的那一段 -->
+      <div id="acc-groups"></div>
+
+      <div class="empty-hint" id="acc-empty" style="display:none;">
+        <span class="eh-ico">🔍</span>
+        <span class="eh-text">没找到匹配的账户<small>换个关键词，或者点「全部」看看</small></span>
+      </div>
+
+      <!-- ⑤ 操作区收到底部，不再夹在卡片中间把列表撑长 -->
       <div class="section-header"><span>账户操作</span></div>
       <div class="tool-list">
         <div class="tool-item" onclick="openSheet('transfer-sheet')">
