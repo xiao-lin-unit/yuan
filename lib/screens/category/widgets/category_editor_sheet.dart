@@ -36,70 +36,65 @@ const int _kIconColumns = 8;
 const double _kIconPreviewSize = 44;
 const double _kIconCellSize = 34;
 
-/// 打开分类编辑器（新增 / 编辑共用同一个内容组件）。
+/// 打开分类编辑器（新增 / 编辑共用同一个入口）。
 ///
-/// 壳只有一个：header 是静态 [SheetHeader]（固定在顶端），child 是
-/// [CategoryEditorSheetContent]（纯 Column，不套壳、不碰 Navigator）。
-/// 保存按钮放在内容底部的 [SheetGradientButton]（由 FormSheetContent
-/// 的 `submit: true` 渲染），所以**不需要** FormSheetController：
-/// 顶栏没有保存按钮，整条链路静态可读完。
+/// 【项目约定】所有「修改 / 新增」类 Sheet 一律用 [FormSheetContent]，
+/// 由本函数直接声明 items；不新建 `XxxSheetContent` 之类的业务包装
+/// 组件。「图标网格 / 排序输入 / 语义标记」三个特殊控件只是
+/// [SheetFormCustomItem.builder] 里的私有字段，留在文件下半部分。
+///
+/// 结构（构造期静态可读完，与 showEditProfileSheet 逐行同构）：
+///   ① 算出显示用排序号（1-based），供排序初值与提交兜底；
+///   ② new 一个 [FormSheetController]；
+///   ③ header：取消 / 标题 / 保存（静态槽位，壳固定在顶端）；
+///   ④ child：[FormSheetContent]，同一个 controller 传进去 + items 声明；
+///   ⑤ await 壳的 show，弹层关闭后函数才返回。
+///
+/// 【唯一一处动态逻辑】顶栏「保存」要触发 [FormSheetContent] 内部的提交
+/// 链路（校验 → await _saveCategory → 成功才关闭）。header 是静态 Widget，
+/// 拿不到组件内部的 FormState / 防连点标记，所以用显式句柄接起来：
+/// 点保存 → controller.submit() → 内部 _submit()。
+/// 工作逻辑与 showEditProfileSheet 完全相同，见 form_sheet_content.dart
+/// 的 [FormSheetController] 注释。没有 Notifier / InheritedWidget / 跨帧注册。
 Future<void> showCategoryEditorSheet(
   BuildContext context, {
   required CategoryKind kind,
   required CategoryController controller,
   CategoryRecord? category,
-}) =>
-    AppSheetShell.show<void>(
-      context,
-      header: SheetHeader(
-        title: category == null
-            ? (kind == CategoryKind.expense ? '新增支出分类' : '新增收入分类')
-            : '编辑分类',
-        leading: const SheetCancelAction(),
+}) async {
+  final CategoryRecord? editing = category;
+
+  // ① 排序号：新增排末尾，编辑取当前位置（1-based）
+  final List<CategoryRecord> siblings =
+      controller.managed(kind, includeHidden: true);
+  final int displayOrder = editing == null
+      ? siblings.length + 1
+      : siblings.indexWhere((CategoryRecord r) => r.id == editing.id) + 1;
+
+  // ②③④ 与 showEditProfileSheet 逐行同构
+  final formController = FormSheetController();
+  await AppSheetShell.show<SheetFormValues>(
+    context,
+    header: SheetHeader(
+      title: editing == null
+          ? (kind == CategoryKind.expense ? '新增支出分类' : '新增收入分类')
+          : '编辑分类',
+      leading: const SheetCancelAction(),
+      trailing: SheetTextAction(
+        label: '保存',
+        emphasized: true,
+        onTap: formController.submit,
       ),
-      child: CategoryEditorSheetContent(
-        kind: kind,
+    ),
+    child: FormSheetContent(
+      controller: formController,
+      onSubmit: (SheetFormValues values) => _saveCategory(
         controller: controller,
-        category: category,
+        kind: kind,
+        category: editing,
+        fallbackOrder: displayOrder,
+        values: values,
       ),
-    );
-
-/// 原型「分类编辑器」的内容组件。
-///
-/// 它**不是**另一个 Sheet 组件：只是塞进唯一外壳的内容。
-/// 用项目已有的公共表单组件 [FormSheetContent] 渲染，使用方只声明
-/// 「每一项叫什么、用什么控件类型」；控件样式、校验、防连点、await
-/// 提交、失败不关闭全由公共组件负责。
-///
-/// 【动态逻辑说明】三处自定义字段（图标 / 排序 / 语义标记）各自持有
-/// 「当前选中」的局部 UI 状态，因为选项会随用户点击变化；它们通过
-/// `onChanged` 把值写回公共表单的 `SheetFormValues`，提交时统一从
-/// [SheetFormValues] 取值。本组件自身是 StatelessWidget，不持有业务状态。
-class CategoryEditorSheetContent extends StatelessWidget {
-  const CategoryEditorSheetContent({
-    super.key,
-    required this.kind,
-    required this.controller,
-    this.category,
-  });
-
-  final CategoryKind kind;
-  final CategoryController controller;
-  final CategoryRecord? category;
-
-  @override
-  Widget build(BuildContext context) {
-    final CategoryRecord? editing = category;
-    final List<CategoryRecord> siblings =
-        controller.managed(kind, includeHidden: true);
-    final int displayOrder = editing == null
-        ? siblings.length + 1
-        : siblings.indexWhere((CategoryRecord r) => r.id == editing.id) + 1;
-
-    return FormSheetContent(
-      submit: true,
-      submitLabel: '保存分类',
-      onSubmit: (SheetFormValues values) => _submit(values, displayOrder),
       items: <SheetFormItem>[
         if (editing?.preset == true)
           const SheetFormNoteItem(
@@ -185,55 +180,68 @@ class CategoryEditorSheetContent extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
+    ),
+  );
+}
 
-  Future<void> _submit(SheetFormValues values, int fallbackOrder) async {
-    final String name = values.text('name').trim();
+/// 分类表单的提交逻辑（本文件唯一一处业务动态逻辑）。
+///
+/// 工作逻辑：由 [FormSheetContent] 校验通过后回调 → 从 [SheetFormValues]
+/// 按 key 取值（用户没动过的字段用编辑对象初值兜底）→ `await controller.save`
+/// → 成功才由公共组件关闭弹层；抛异常则公共组件提示且弹窗保持打开。
+/// 图片落盘 / 删旧图的两阶段提交在 CategoryController 内部完成。
+Future<void> _saveCategory({
+  required CategoryController controller,
+  required CategoryKind kind,
+  required CategoryRecord? category,
+  required int fallbackOrder,
+  required SheetFormValues values,
+}) async {
+  final String name = values.text('name').trim();
 
-    // 用户没动过的字段用编辑对象的初值兜底（FormSheetValues 里是 null）。
-    final CategoryIconInput icon =
-        values.raw('icon') as CategoryIconInput? ?? _initialIcon();
-    final int targetIndex = ((values.raw('order') as int?) ?? fallbackOrder) - 1;
-    final bool visible = values.flag('visible');
-    final String mark = (values.raw(kind == CategoryKind.expense
-            ? 'necessity'
-            : 'stability') as String?) ??
-        'unset';
+  // 用户没动过的字段用编辑对象的初值兜底（FormSheetValues 里是 null）。
+  final CategoryIconInput icon =
+      values.raw('icon') as CategoryIconInput? ?? _initialIconFor(category);
+  final int targetIndex = ((values.raw('order') as int?) ?? fallbackOrder) - 1;
+  final bool visible = values.flag('visible');
+  final String mark = (values.raw(kind == CategoryKind.expense
+          ? 'necessity'
+          : 'stability') as String?) ??
+      'unset';
 
-    await controller.save(
-      id: category?.id,
-      kind: kind,
-      name: name,
-      icon: icon,
-      targetIndex: targetIndex < 0 ? 0 : targetIndex,
-      hidden: !visible,
-      necessity: kind == CategoryKind.expense
-          ? CategoryNecessity.fromDb(mark)
-          : CategoryNecessity.unset,
-      stability: kind == CategoryKind.income
-          ? CategoryStability.fromDb(mark)
-          : CategoryStability.unset,
-    );
-  }
+  await controller.save(
+    id: category?.id,
+    kind: kind,
+    name: name,
+    icon: icon,
+    targetIndex: targetIndex < 0 ? 0 : targetIndex,
+    hidden: !visible,
+    necessity: kind == CategoryKind.expense
+        ? CategoryNecessity.fromDb(mark)
+        : CategoryNecessity.unset,
+    stability: kind == CategoryKind.income
+        ? CategoryStability.fromDb(mark)
+        : CategoryStability.unset,
+  );
+}
 
-  CategoryIconInput _initialIcon() {
-    final CategoryIcon icon = category?.icon ??
-        const CategoryIcon(kind: CategoryIconKind.icon, value: 'other');
-    return switch (icon.kind) {
-      CategoryIconKind.icon => CategoryIconInput(
-          kind: CategoryIconKind.icon,
-          iconKey: icon.value,
-        ),
-      CategoryIconKind.image => CategoryIconInput(
-          kind: CategoryIconKind.image,
-          imageRef: icon.imageRef,
-        ),
-      CategoryIconKind.text => CategoryIconInput(
-          kind: CategoryIconKind.text,
-        ),
-    };
-  }
+/// 编辑对象没动图标时的兜底值（用户不改图标 → FormSheetValues 里是 null）。
+CategoryIconInput _initialIconFor(CategoryRecord? category) {
+  final CategoryIcon icon = category?.icon ??
+      const CategoryIcon(kind: CategoryIconKind.icon, value: 'other');
+  return switch (icon.kind) {
+    CategoryIconKind.icon => CategoryIconInput(
+        kind: CategoryIconKind.icon,
+        iconKey: icon.value,
+      ),
+    CategoryIconKind.image => CategoryIconInput(
+        kind: CategoryIconKind.image,
+        imageRef: icon.imageRef,
+      ),
+    CategoryIconKind.text => CategoryIconInput(
+        kind: CategoryIconKind.text,
+      ),
+  };
 }
 
 /// 图标选择：内置矢量图标网格 + 上传图片 / 恢复默认。

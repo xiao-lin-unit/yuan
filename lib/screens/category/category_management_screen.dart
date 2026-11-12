@@ -183,7 +183,7 @@ class _CategoryManagementScreenState
           physics: const NeverScrollableScrollPhysics(),
           buildDefaultDragHandles: false,
           itemCount: rows.length,
-          onReorder: (int oldIndex, int newIndex) async {
+          onReorderItem: (int oldIndex, int newIndex) async {
             final List<int> ids = rows
                 .map((CategoryRecord r) => r.id)
                 .whereType<int>()
