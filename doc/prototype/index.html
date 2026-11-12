@@ -93,6 +93,41 @@
       </div>
     </section>
 
+    <!-- ==================== 页面：分类管理（统一入口） ==================== -->
+    <section class="page" id="page-category-management">
+      <div class="nav-top">
+        <span class="nav-back" onclick="switchTab('mine')">‹</span>
+        <span class="nav-title">分类管理</span>
+        <span class="nav-action" onclick="openCategoryEditor()">＋</span>
+      </div>
+
+      <div class="cm-tabs">
+        <button class="cm-tab active" id="cm-tab-expense" onclick="switchCategoryType('expense')">支出分类</button>
+        <button class="cm-tab" id="cm-tab-income" onclick="switchCategoryType('income')">收入分类</button>
+      </div>
+
+      <div class="cm-tip" id="cm-tip">
+        <span class="cm-tip-icon">💡</span>
+        <span class="cm-tip-text" id="cm-tip-text">拖动右侧 ⠿ 可调整顺序。预设分类不能删除，但可以隐藏，隐藏后记账时不会出现。</span>
+        <span class="cm-tip-close" onclick="document.getElementById('cm-tip').style.display='none'">✕</span>
+      </div>
+
+      <div class="cm-stat">
+        <div class="cms-cell"><span>在用</span><b id="cm-count-active">0</b></div>
+        <div class="cms-cell"><span>已隐藏</span><b id="cm-count-hidden">0</b></div>
+        <div class="cms-cell"><span>自定义</span><b id="cm-count-custom">0</b></div>
+      </div>
+
+      <div class="section-header">
+        <span>分类列表</span>
+        <span class="link-btn" id="cm-toggle-hidden" onclick="toggleHiddenShown()">显示已隐藏</span>
+      </div>
+
+      <div class="cm-list" id="cm-list"></div>
+
+      <div class="cm-foot-hint" id="cm-foot-hint"></div>
+    </section>
+
     <!-- ==================== 模块2：资债 ==================== -->
     <section class="page" id="page-asset-liability">
       <div class="nav-top">
@@ -917,7 +952,7 @@
 
       <div class="section-header"><span>管理</span></div>
       <div class="menu-list">
-        <div class="menu-item">
+        <div class="menu-item" onclick="switchTab('category-management')">
           <span class="mn-icon">📂</span><span class="mn-text">分类管理<small>自定义收支分类</small></span><span class="mn-arrow">›</span>
         </div>
         <div class="menu-item">
@@ -1308,6 +1343,93 @@
   <div class="sheet-footer-btn primary" onclick="closeSheet()">开始 →</div>
 </div>
 
+<!-- ========== 弹层：分类编辑器（新增 / 编辑） ========== -->
+<div class="sheet sheet-large" id="category-editor-sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <span class="sheet-title" id="cm-editor-title">编辑分类</span>
+    <span class="sheet-close" onclick="closeSheet()">✕</span>
+  </div>
+
+  <div class="conflict-tip warn" id="cm-preset-lock" style="display:none;">
+    🔒 这是预定义分类，名字和图标可以改，但不能删除；不想看到它就直接隐藏。
+  </div>
+
+  <div class="cm-editor-body">
+
+    <div class="cm-field">
+      <span class="cm-label">分类名称</span>
+      <input class="cm-input" id="cm-name-input" maxlength="8" placeholder="比如：早餐、宠物用品、房租"
+             oninput="document.getElementById('cm-name-count').textContent=this.value.length;this.classList.remove('invalid')">
+      <div class="cm-counter"><span id="cm-name-count">0</span> / 8</div>
+    </div>
+
+    <div class="cm-field">
+      <span class="cm-label">图标 · 点选一个，或上传自己的图片</span>
+      <div class="cm-upload-row">
+        <div class="cm-preview" id="cm-icon-preview">📦</div>
+        <div class="cm-upload-btns">
+          <label class="cm-mini-btn primary" for="cm-icon-input">上传图片</label>
+          <input type="file" id="cm-icon-input" accept="image/*" style="display:none" onchange="onCategoryIconPicked(event)">
+          <div class="cm-mini-btn" id="cm-reset-icon" style="display:none" onclick="cmResetIcon()">恢复默认图标</div>
+        </div>
+      </div>
+      <div class="cm-emoji-grid" id="cm-emoji-grid"></div>
+      <div class="cm-upload-tip" id="cm-upload-tip"></div>
+    </div>
+
+    <div class="cm-field">
+      <span class="cm-label">排序 · 共 <b id="cm-order-max">0</b> 个分类</span>
+      <input class="cm-input" id="cm-order-input" type="number" min="1" max="99">
+      <div class="cm-counter">数字越小越靠前，记账时排在上面的更好点</div>
+    </div>
+
+    <div class="cm-field">
+      <span class="cm-label">显示</span>
+      <div class="cm-switch-row">
+        <span class="cm-switch-label">在记账时显示这个小类
+          <small>隐藏后记一笔时不会出现，已记过的账不受影响</small>
+        </span>
+        <div class="switch" id="cm-hidden-switch" onclick="cmToggleHidden()"><i></i></div>
+      </div>
+    </div>
+
+    <div class="cm-field" id="cm-must-box">
+      <span class="cm-label">这是必须花的钱吗</span>
+      <div class="cm-choice" id="cm-must-choice">
+        <button data-v="must" onclick="cmChooseMust('must')">必须花的</button>
+        <button data-v="" onclick="cmChooseMust('')">不标记</button>
+      </div>
+      <div class="cm-upload-tip">算"失业能撑几个月"时，只统计标了"必须花的"分类。不打标记就不参与判断。</div>
+    </div>
+
+    <div class="cm-field" id="cm-flex-box">
+      <span class="cm-label">这是可以省的钱吗</span>
+      <div class="cm-choice" id="cm-flex-choice">
+        <button data-v="flex" class="flex-on" onclick="cmChooseFlex('flex')">可以省的</button>
+        <button data-v="" onclick="cmChooseFlex('')">不标记</button>
+      </div>
+    </div>
+
+    <div class="cm-field" id="cm-fixed-box">
+      <span class="cm-label">这笔收入每月都有吗</span>
+      <div class="cm-choice" id="cm-fixed-choice">
+        <button data-v="fixed" onclick="cmChooseFixed('fixed')">每月都有</button>
+        <button data-v="" onclick="cmChooseFixed('')">偶尔才有 / 不标记</button>
+      </div>
+      <div class="cm-upload-tip">标了"每月都有"的会计入每月固定收入，用来判断现金流是否健康。</div>
+    </div>
+
+    <div class="conflict-tip" id="cm-edit-tip" style="display:none;"></div>
+  </div>
+
+  <div class="sheet-footer-btn primary" onclick="saveCategoryEditor()">保存分类</div>
+</div>
+
+<!-- 轻提示 -->
+<div class="cm-toast" id="cm-toast"></div>
+
+<script src="category.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

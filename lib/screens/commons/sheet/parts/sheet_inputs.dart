@@ -483,8 +483,10 @@ class SheetSwitchRow extends StatelessWidget {
 /// 公共组件只负责形状、尺寸、角标与点击热区；图像本体由使用方通过
 /// [image] 注入（一般是 `SingleImagePickerWidget`），不碰任何图片存储逻辑。
 ///
-/// 刻意不套 `ClipOval`：注入的图片组件自己已处理圆形与删除角标，
-/// 外层再裁一次会把它的角标裁掉。`Material` 的圆形背景提供无图时的占位。
+/// 刻意不套 `ClipOval`，也**不用** `Material(shape: CircleBorder())`：
+/// 注入的图片组件把删除角标放在右上角并溢出到圆外（top/right = -6），
+/// 绘制上不能裁它，命中判定更不能裁 —— 根因与修法见 build 里
+/// [Positioned.fill] 上方的注释。圆形底色由 `DecoratedBox` 只画不裁。
 class SheetAvatarField extends StatelessWidget {
   const SheetAvatarField({
     super.key,
@@ -514,38 +516,58 @@ class SheetAvatarField extends StatelessWidget {
         child: Stack(
           clipBehavior: Clip.none,
           children: <Widget>[
+            // 圆形底只负责「画」，不做任何形状裁剪。
+            //
+            // 【为什么不能用 Material(shape: CircleBorder())】
+            // Material 会生成 PhysicalShape(clipper: ShapeBorderClipper(shape))，
+            // 而 RenderPhysicalShape.hitTest 用这个 Path 判断命中，**与
+            // clipBehavior 无关**（clipBehavior 只管 paint 是否裁剪）。
+            // 注入的图片组件把删除角标放在右上角并溢出到圆外（top/right = -6）：
+            // 那里画得出来，却落在圆形 Path 之外 → hitTest 直接返回 false，
+            // 整棵 content 子树收不到点击，表现为「❌ 看得见、点不动」。
+            // 所以底色改用 DecoratedBox（不裁剪命中）；Material 仅在需要
+            // InkWell 时作为宿主出现，且不设 shape（默认矩形覆盖整个 96×96）。
             Positioned.fill(
-              child: Material(
-                color: p.unselectedTint,
-                shape: const CircleBorder(),
-                clipBehavior: Clip.none,
-                child: onTap == null
-                    ? content
-                    : InkWell(
-                        customBorder: const CircleBorder(),
-                        onTap: onTap,
-                        child: content,
-                      ),
-              ),
-            ),
-            Positioned(
-              right: 0,
-              bottom: 0,
-              child: Container(
-                width: AppSheetSize.avatarCameraBadge,
-                height: AppSheetSize.avatarCameraBadge,
+              child: DecoratedBox(
                 decoration: BoxDecoration(
                   color: p.unselectedTint,
                   shape: BoxShape.circle,
-                  border: Border.all(
-                    color: p.glassColor,
-                    width: AppBorder.focused,
-                  ),
                 ),
-                child: Icon(
-                  AppIcons.camera,
-                  size: AppIconSize.small,
-                  color: p.mutedText,
+                child: onTap == null
+                    ? content
+                    : Material(
+                        color: Colors.transparent,
+                        clipBehavior: Clip.none,
+                        child: InkWell(
+                          customBorder: const CircleBorder(),
+                          onTap: onTap,
+                          child: content,
+                        ),
+                      ),
+              ),
+            ),
+            // 相机角标是纯装饰：显式忽略指针，避免以后给它加子节点时
+            // 意外挡住右上角删除角标的点击。
+            Positioned(
+              right: 0,
+              bottom: 0,
+              child: IgnorePointer(
+                child: Container(
+                  width: AppSheetSize.avatarCameraBadge,
+                  height: AppSheetSize.avatarCameraBadge,
+                  decoration: BoxDecoration(
+                    color: p.unselectedTint,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: p.glassColor,
+                      width: AppBorder.focused,
+                    ),
+                  ),
+                  child: Icon(
+                    AppIcons.camera,
+                    size: AppIconSize.small,
+                    color: p.mutedText,
+                  ),
                 ),
               ),
             ),

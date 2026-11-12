@@ -23,7 +23,9 @@ function switchTab(tab) {
     // 负债明细
     'liability-detail-car': 'page-liability-detail-car',
     'liability-detail-credit': 'page-liability-detail-credit',
-    'liability-detail-friend': 'page-liability-detail-friend'
+    'liability-detail-friend': 'page-liability-detail-friend',
+    // 分类管理
+    'category-management': 'page-category-management'
   };
   const pageId = map[tab];
   if (pageId) document.getElementById(pageId).classList.add('active');
@@ -308,5 +310,7 @@ function saveUserInfo() {
 
 // 首次引导
 window.addEventListener('DOMContentLoaded', () => {
+  initCategories();                 // 先把预设分类铺好，记账弹层要用
+  renderCategoryList();            // 分类管理页初始化
   setTimeout(() => openSheet('onboard-sheet'), 400);
 });
