@@ -166,15 +166,22 @@ class AccountController extends ChangeNotifier {
     Set<int> bindingIds = const <int>{},
     String bookId = AccountDao.defaultBookId,
   }) async {
-    if (name.trim().isEmpty) throw ArgumentError('账户名不能为空');
-    if (initialBalance < 0) throw ArgumentError('金额只能填正数（10.6）');
+    if (name.trim().isEmpty) throw ArgumentError('账户名称不能为空');
+    // DDL 不再锁 type 取值；这里是唯一的数据层兜底，防止表单
+    // 传来「流动资金账户 + 公积金」这类错配（与枚举 supports 同源）。
+    // 工作逻辑：通用形态一律通过，专属形态必须与类别相等；不通过就
+    // 抛错让事务不开始，界面由 FormSheetContent 提示且弹层保持打开。
+    if (!type.supports(kind)) {
+      throw ArgumentError('账户形态与账户类别不匹配');
+    }
+    if (initialBalance < 0) throw ArgumentError('初始余额不得为负数');
     if (kind == AccountKind.credit) {
       if (creditLimit == null || creditLimit <= 0) {
-        throw ArgumentError('信用卡要填总额度');
+        throw ArgumentError('请填写信用卡总额度');
       }
       if (statementDay == null || statementDay < 1 || statementDay > 31 ||
           dueDay == null || dueDay < 1 || dueDay > 31) {
-        throw ArgumentError('信用卡要填账单日和还款日（1~31）');
+        throw ArgumentError('请填写账单日与还款日（1 ~ 31）');
       }
     }
     final AccountRecord? old = id == null ? null : await dao.byId(db, id);
@@ -265,13 +272,13 @@ class AccountController extends ChangeNotifier {
     required String note,
     DateTime? occurredAt,
   }) async {
-    if (fromId == toId) throw ArgumentError('转出和转入不能是同一个账户');
-    if (amount <= 0) throw ArgumentError('金额只能填正数（10.6）');
+    if (fromId == toId) throw ArgumentError('转出账户与转入账户不能相同');
+    if (amount <= 0) throw ArgumentError('转账金额必须大于 0');
     final AccountRecord? from = await dao.byId(db, fromId);
     final AccountRecord? to = await dao.byId(db, toId);
     if (from == null || to == null) throw StateError('账户不存在或已删除');
     if (from.kind == AccountKind.credit) {
-      throw StateError('信用卡不能转出；要还信用卡请选「还款」');
+      throw StateError('信用卡账户不支持转出，请使用还款功能');
     }
 
     final DateTime at = occurredAt ?? DateTime.now();
@@ -327,7 +334,7 @@ class AccountController extends ChangeNotifier {
     required String reason,
     DateTime? occurredAt,
   }) async {
-    if (reason.trim().isEmpty) throw ArgumentError('余额调整必须填原因（3.8）');
+    if (reason.trim().isEmpty) throw ArgumentError('请填写余额调整原因');
     final AccountRecord? account = await dao.byId(db, accountId);
     if (account == null) throw StateError('账户不存在或已删除');
     final double delta = actualBalance - account.balance;
@@ -356,10 +363,10 @@ class AccountController extends ChangeNotifier {
 
   /// 修改信用卡额度：只改属性，不动累计值，不写流水（额度不是余额）。
   Future<void> setCreditLimit(int accountId, double limit) async {
-    if (limit <= 0) throw ArgumentError('额度只能填正数（10.6）');
+    if (limit <= 0) throw ArgumentError('信用额度必须大于 0');
     final AccountRecord? old = await dao.byId(db, accountId);
     if (old == null || old.kind != AccountKind.credit) {
-      throw StateError('只有信用卡能调整额度');
+      throw StateError('仅信用卡账户支持调整额度');
     }
     final int affected = await dao.update(
       db,
@@ -377,7 +384,7 @@ class AccountController extends ChangeNotifier {
   Future<void> setBindings(int accountId, Set<int> categoryIds) async {
     final AccountRecord? old = await dao.byId(db, accountId);
     if (old == null || old.kind != AccountKind.restricted) {
-      throw StateError('只有其他资金账户需要绑定用途');
+      throw StateError('仅其他资金账户支持绑定用途');
     }
     // DAO 的 replaceBindings 不自建事务（事务内调用时不能嵌套）。
     // 这里是独立调用，所以自己包一层 db.transaction，保证「先删后插」
@@ -430,7 +437,7 @@ class AccountController extends ChangeNotifier {
   /// 记录本身永不物理删除。
   Future<int> countEntries(int id) => dao.countEntries(db, id);
 
-  Future<void> delete(int id, {String reason = '用户在账户页删除'}) async {
+  Future<void> delete(int id, {String reason = '用户于账户页删除'}) async {
     final int affected = await dao.softDelete(
       db,
       id,

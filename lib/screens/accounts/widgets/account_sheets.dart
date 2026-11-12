@@ -21,12 +21,13 @@ import '../../commons/sheet/sheet_form_items.dart';
 import '../../commons/sheet/sheet_models.dart';
 
 // ── 模块私有文案 / 校验上限（样式一律走全局令牌）────────────────
-const String _kNameHint = '比如：工资卡、微信零钱、公积金';
+const String _kNameHint = '例如：工资卡、微信零钱、公积金';
 const int _kNameMaxLength = 12;
-const String _kNumberError = '这里要填一个大于 0 的数字';
-const String _kTransferTip = '资金在账户之间划转，不产生收支，不影响本月结余。';
-const String _kAdjustTip = '差额会记成一条「调整」流水，不产生收支，事后能翻出来对账。';
-const String _kBindTip = '不选就是不限用途。绑定只影响记账时的账户下拉，是软提醒，不硬拦。';
+const String _kNumberError = '请输入大于 0 的数值';
+const String _kTransferTip = '资金在账户之间划转，不计入收支，不影响本期结余。';
+const String _kAdjustTip = '差额将记录为一条「调整」流水，不计入收支，可随时追溯核对。';
+const String _kBindTip =
+    '未选择表示不限制用途。绑定仅影响记账时的账户列表，为提示性约束，不作强制拦截。';
 
 /// ══════════════════════════════════════════════════════════════════
 /// Sheet 组件使用契约（项目约定）在本模块的落点
@@ -50,30 +51,30 @@ Future<AccountKind?> showAccountKindPicker(BuildContext context) =>
     AppSheetShell.show<AccountKind>(
       context,
       header: const SheetHeader(
-        title: '添加账户',
-        subtitle: '先告诉我这是哪一类账户',
+        title: '新增账户',
+        subtitle: '请选择账户类别',
         leading: SheetCloseButton(),
       ),
       child: CategorySheetContent<AccountKind>(
         categories: <SheetCategory<AccountKind>>[
           SheetCategory<AccountKind>(
             value: AccountKind.liquid,
-            label: '流动账户',
+            label: AccountKind.liquid.label,
             icon: AppIcons.accountBank,
           ),
           SheetCategory<AccountKind>(
             value: AccountKind.credit,
-            label: '信用卡',
+            label: AccountKind.credit.label,
             icon: AppIcons.accountCreditCard,
           ),
           SheetCategory<AccountKind>(
             value: AccountKind.restricted,
-            label: '非流动账户',
+            label: AccountKind.restricted.label,
             icon: AppIcons.locked,
           ),
         ],
-        allLabel: '账户类型',
-        hint: '点一下就选好了，名字和图标之后都能改。',
+        allLabel: '全部类型',
+        hint: '选择后仍可修改名称与图标。',
       ),
     );
 
@@ -124,24 +125,25 @@ Future<void> showAccountEditorSheet(
           validator: (String value) {
             final String name = value.trim();
             if (name.isEmpty || name.length > _kNameMaxLength) {
-              return '名字要填 1 ~ $_kNameMaxLength 个字';
+              return '名称长度需为 1 ~ $_kNameMaxLength 个字符';
             }
             if (controller.nameExists(name, excludeId: editing?.id)) {
-              return '已经有同名账户「$name」了';
+              return '账户「$name」已存在';
             }
             return null;
           },
         ),
 
-        // 账户形态：信用卡固定、其余可在同类里换；
+        // 账户形态：下拉按当前类别分组（AccountType.allowedTypesFor），
+        // 信用类可在信用卡 / 花呗 / 借呗之间选，不再写死单一形态。
         // 状态由下面的 _TypeField 局部持有并上抛（代码明显的局部状态）。
         SheetFormCustomItem(
           key: 'type',
           label: '具体类型',
           builder: (BuildContext ctx, ValueChanged<Object?> onChanged) =>
               _TypeField(
-            initial: editing?.type ?? _defaultType(kind),
-            fixed: kind == AccountKind.credit,
+            kind: kind,
+            initial: editing?.type ?? AccountType.defaultTypeFor(kind),
             onChanged: onChanged,
           ),
         ),
@@ -150,7 +152,7 @@ Future<void> showAccountEditorSheet(
           key: 'note',
           label: '备注',
           initialValue: editing?.note ?? '',
-          hint: '比如：工资入账账户 / 存房租',
+          hint: '例如：工资入账账户 / 房租储蓄',
         ),
 
         // 3.8：只有开户时允许填初始余额；编辑时不显示这一项，
@@ -163,7 +165,7 @@ Future<void> showAccountEditorSheet(
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             validator: (String value) =>
                 (double.tryParse(value.trim()) ?? -1) < 0
-                    ? '金额只能填正数（10.6）'
+                    ? '余额不得为负数'
                     : null,
           ),
 
@@ -178,7 +180,7 @@ Future<void> showAccountEditorSheet(
           ),
           SheetFormSingleLineTextItem(
             key: 'statementDay',
-            label: '账单日（每月几号）',
+            label: '账单日（1 ~ 31）',
             initialValue: '${editing?.statementDay ?? 5}',
             keyboardType: TextInputType.number,
             validator: (String v) =>
@@ -186,7 +188,7 @@ Future<void> showAccountEditorSheet(
           ),
           SheetFormSingleLineTextItem(
             key: 'dueDay',
-            label: '还款日（每月几号）',
+            label: '还款日（1 ~ 31）',
             initialValue: '${editing?.dueDay ?? 25}',
             keyboardType: TextInputType.number,
             validator: (String v) => _dayError(v, '还款日'),
@@ -194,7 +196,7 @@ Future<void> showAccountEditorSheet(
           // 关联还款储蓄卡：3.4「到期时软件知道提醒他从哪张卡扣」。
           SheetFormCustomItem(
             key: 'repayTo',
-            label: '用哪张卡还款',
+            label: '还款账户',
             builder: (BuildContext ctx, ValueChanged<Object?> onChanged) =>
                 _AccountPickerField(
               accounts: controller.all
@@ -204,7 +206,7 @@ Future<void> showAccountEditorSheet(
                       !r.archived)
                   .toList(growable: false),
               initialId: editing?.repayAccountId,
-              hint: '先不选也行，之后能补',
+              hint: '可稍后补充',
               onChanged: onChanged,
             ),
           ),
@@ -213,12 +215,12 @@ Future<void> showAccountEditorSheet(
         if (kind == AccountKind.restricted) ...<SheetFormItem>[
           SheetFormToggleItem(
             key: 'isLiquid',
-            label: '算作能自由花的钱',
+            label: '计入可用余额',
             initialValue: editing?.isLiquid ?? false,
           ),
           SheetFormTagsItem(
             key: 'bindings',
-            label: '绑定可支付类型',
+            label: '绑定支出类型',
             options: bindingOptions,
             initialSelected: editing == null
                 ? const <Object>{}
@@ -280,7 +282,7 @@ Future<void> showAccountTransferSheet(
       items: <SheetFormItem>[
         SheetFormCustomItem(
           key: 'from',
-          label: '从哪个账户转出',
+          label: '转出账户',
           builder: (BuildContext ctx, ValueChanged<Object?> onChanged) =>
               _AccountPickerField(
             // 信用卡不能转出（取现是另一类业务，Controller 也会拦）。
@@ -288,24 +290,24 @@ Future<void> showAccountTransferSheet(
                 .where((AccountRecord r) => r.kind != AccountKind.credit)
                 .toList(growable: false),
             initialId: fromId,
-            hint: '选一张有余额的账户',
+            hint: '请选择转出账户',
             onChanged: onChanged,
           ),
         ),
         SheetFormCustomItem(
           key: 'to',
-          label: '转到哪个账户',
+          label: '转入账户',
           builder: (BuildContext ctx, ValueChanged<Object?> onChanged) =>
               _AccountPickerField(
             accounts: active,
             initialId: toId,
-            hint: '转到信用卡就是「还款」',
+            hint: '转入信用卡账户即为还款',
             onChanged: onChanged,
           ),
         ),
         SheetFormSingleLineTextItem(
           key: 'amount',
-          label: '转多少钱',
+          label: '转账金额',
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           validator: (String v) =>
               (double.tryParse(v.trim()) ?? 0) <= 0 ? _kNumberError : null,
@@ -313,7 +315,7 @@ Future<void> showAccountTransferSheet(
         const SheetFormSingleLineTextItem(
           key: 'note',
           label: '备注',
-          hint: '（可选）比如：还信用卡 / 转到微信',
+          hint: '（可选）例如：信用卡还款 / 转入微信零钱',
         ),
         const SheetFormNoteItem(
           key: 'transferTip',
@@ -335,7 +337,7 @@ Future<void> showAccountRepaySheet(
       context,
       controller: controller,
       toId: creditCard.id,
-      title: '还 ${creditCard.name}',
+      title: '${creditCard.name} 还款',
     );
 
 /// ① 余额调整（3.8：必须填原因、留痕）。
@@ -367,12 +369,12 @@ Future<void> showAccountAdjustSheet(
       items: <SheetFormItem>[
         SheetFormNoteItem(
           key: 'current',
-          text: '当前记录：${MoneyFormat.yuan(account.balance)}',
+          text: '当前余额：${MoneyFormat.yuan(account.balance)}',
           align: TextAlign.start,
         ),
         SheetFormSingleLineTextItem(
           key: 'actual',
-          label: '实际有多少',
+          label: '实际余额',
           initialValue: account.balance.toStringAsFixed(0),
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           validator: (String v) =>
@@ -380,13 +382,13 @@ Future<void> showAccountAdjustSheet(
         ),
         SheetFormMultiLineTextItem(
           key: 'reason',
-          label: '为什么调整',
-          hint: '比如：银行扣了一笔年费，账上没记',
+          label: '调整原因',
+          hint: '例如：银行扣收年费，未同步记录',
           minLines: 2,
           maxLines: 2,
           showCounter: false,
           validator: (String v) =>
-              v.trim().isEmpty ? '余额调整必须填原因，方便以后对账' : null,
+              v.trim().isEmpty ? '请填写调整原因，便于后续核对' : null,
         ),
         const SheetFormNoteItem(
           key: 'adjustTip',
@@ -425,7 +427,7 @@ Future<void> showAccountCreditLimitSheet(
       items: <SheetFormItem>[
         SheetFormSingleLineTextItem(
           key: 'limit',
-          label: '这张卡最多能花',
+          label: '信用额度',
           initialValue: account.creditLimit?.toStringAsFixed(0) ?? '',
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           validator: (String v) =>
@@ -433,8 +435,8 @@ Future<void> showAccountCreditLimitSheet(
         ),
         SheetFormNoteItem(
           key: 'used',
-          text: '已经用了 ${MoneyFormat.yuan0(account.balance)}，'
-              '可用额度会跟着重新算。',
+          text: '当前已用 ${MoneyFormat.yuan0(account.balance)}，'
+              '可用额度将自动重新计算。',
           align: TextAlign.start,
         ),
       ],
@@ -456,7 +458,7 @@ Future<void> showAccountBindingsSheet(
   await AppSheetShell.show<SheetFormValues>(
     context,
     header: SheetHeader(
-      title: '能用来付哪些支出',
+      title: '可支付支出类型',
       leading: const SheetCancelAction(),
       trailing: SheetTextAction(
         label: '保存',
@@ -473,7 +475,7 @@ Future<void> showAccountBindingsSheet(
       items: <SheetFormItem>[
         SheetFormTagsItem(
           key: 'bindings',
-          label: '勾选允许从这个账户扣钱的支出类型',
+          label: '请选择允许使用该账户支付的支出类型',
           options: options,
           initialSelected: Set<Object>.from(controller.bindingsOf(account.id!)),
         ),
@@ -501,15 +503,17 @@ Future<void> showAccountArchiveSheet(
         leading: const SheetCancelAction(),
       ),
       child: ConfirmSheetContent(
-        title: archive ? '把「${account.name}」收起来？' : '把「${account.name}」放回来？',
+        title: archive
+            ? '确认归档「${account.name}」？'
+            : '确认恢复「${account.name}」？',
         description: archive
-            ? '归档后不再出现在日常列表，但它记过的每一笔流水都完整保留，随时能恢复。'
-            : '恢复后这个账户会重新出现在账户首页，历史流水不变。',
-        secondaryLabel: '再想想',
+            ? '归档后该账户不再显示于日常列表，历史流水完整保留，可随时恢复。'
+            : '恢复后该账户将重新显示于账户页，历史流水保持不变。',
+        secondaryLabel: '取消',
         primaryLabel: archive ? '确认归档' : '确认恢复',
         icon: archive ? AppIcons.archive : AppIcons.unarchive,
         intent: SheetIntent.warning,
-        footnote: '这个操作随时可以反悔。',
+        footnote: '该操作可随时撤销。',
         onPrimaryAsync: () =>
             controller.setArchived(account.id!, archive),
       ),
@@ -532,13 +536,13 @@ Future<void> showAccountDeleteSheet(
     ),
     child: ConfirmSheetContent(
       title: '删除「${account.name}」？',
-      description: '这个账户下还有 $entries 笔记录。删除后这些记录仍会保留，'
-          '但不再关联账户。',
-      secondaryLabel: '再想想',
+      description: '该账户下共有 $entries 笔记录。删除后记录仍将保留，'
+          '但不再关联该账户。',
+      secondaryLabel: '取消',
       primaryLabel: '确认删除',
       icon: AppIcons.trash,
       intent: SheetIntent.danger,
-      footnote: '会进回收站，30 天内可以恢复。',
+      footnote: '删除后将进入回收站，30 天内可恢复。',
       onPrimaryAsync: () => controller.delete(account.id!),
     ),
   );
@@ -557,8 +561,9 @@ Future<void> _saveAccount({
   required AccountRecord? editing,
   required SheetFormValues values,
 }) async {
-  final AccountType type =
-      values.raw('type') as AccountType? ?? editing?.type ?? _defaultType(kind);
+  final AccountType type = values.raw('type') as AccountType? ??
+      editing?.type ??
+      AccountType.defaultTypeFor(kind);
   final double initial =
       double.tryParse(values.text('initial').trim()) ?? 0;
   final double? limit = double.tryParse(values.text('limit').trim());
@@ -610,7 +615,7 @@ Future<void> _transfer({
   final int? from = values.raw('from') as int? ?? fallbackFrom;
   final int? to = values.raw('to') as int? ?? fallbackTo;
   if (from == null || to == null) {
-    throw StateError('要先选好转出和转入账户');
+    throw StateError('请选择转出账户与转入账户');
   }
   final double amount =
       double.tryParse(values.text('amount').trim()) ?? 0;
@@ -622,16 +627,10 @@ Future<void> _transfer({
   );
 }
 
-AccountType _defaultType(AccountKind kind) => switch (kind) {
-      AccountKind.credit => AccountType.creditCard,
-      AccountKind.restricted => AccountType.other,
-      AccountKind.liquid => AccountType.bank,
-    };
-
 String? _dayError(String raw, String label) {
   final int? day = int.tryParse(raw.trim());
   if (day == null || day < 1 || day > 31) {
-    return '$label 要填 1 ~ 31 之间的数字';
+    return '请输入有效的$label（1 ~ 31）';
   }
   return null;
 }
@@ -640,19 +639,22 @@ String? _dayError(String raw, String label) {
 // 表单里的私有字段（只服务本文件，样式全走全局令牌）
 // ══════════════════════════════════════════════════════════════════
 
-/// 具体类型下拉。
+/// 具体类型下拉：按账户类别分组，候选来自 [AccountType.allowedTypesFor]。
 /// 【局部状态工作逻辑】选中值由本组件持有，点选后 `onChanged` 上抛给
-/// FormSheetContent 统一收集；外层表单不额外持有 controller。信用卡类型
-/// 固定不可改（3.4），下拉直接禁用并显示当前值。
+/// FormSheetContent 统一收集；外层表单不额外持有 controller。
+/// 【历史数据兜底，为什么要有这段】v4 曾允许任意形态与类别组合，旧记录
+/// 可能出现「类别是流动资金、形态是公积金」这类错配。这里把原值补到
+/// 候选首位，保证 DropdownButton.value 一定命中 items（否则 assert 崩）；
+/// 用户不改就原样保存，改了则由 Controller.save 的 supports(kind) 校验。
 class _TypeField extends StatefulWidget {
   const _TypeField({
+    required this.kind,
     required this.initial,
-    required this.fixed,
     required this.onChanged,
   });
 
+  final AccountKind kind;
   final AccountType initial;
-  final bool fixed;
   final ValueChanged<Object?> onChanged;
 
   @override
@@ -668,6 +670,13 @@ class _TypeFieldState extends State<_TypeField> {
     _value = widget.initial;
   }
 
+  List<AccountType> get _items {
+    final List<AccountType> allowed = AccountType.allowedTypesFor(widget.kind);
+    return allowed.contains(widget.initial)
+        ? allowed
+        : <AccountType>[widget.initial, ...allowed];
+  }
+
   @override
   Widget build(BuildContext context) => Container(
         decoration: AppDecorations.field(context),
@@ -678,19 +687,17 @@ class _TypeFieldState extends State<_TypeField> {
           underline: const SizedBox.shrink(),
           style: context.appText.body,
           items: <DropdownMenuItem<AccountType>>[
-            for (final AccountType t in AccountType.values)
+            for (final AccountType t in _items)
               DropdownMenuItem<AccountType>(
                 value: t,
                 child: Text(t.label),
               ),
           ],
-          onChanged: widget.fixed
-              ? null
-              : (AccountType? v) {
-                  if (v == null) return;
-                  setState(() => _value = v);
-                  widget.onChanged(v);
-                },
+          onChanged: (AccountType? v) {
+            if (v == null) return;
+            setState(() => _value = v);
+            widget.onChanged(v);
+          },
         ),
       );
 }

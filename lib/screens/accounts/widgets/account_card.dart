@@ -22,6 +22,10 @@ IconData accountTypeIcon(AccountType type) => switch (type) {
       AccountType.wechat => AppIcons.accountWechat,
       AccountType.alipay => AppIcons.accountAlipay,
       AccountType.creditCard => AppIcons.accountCreditCard,
+      // 花呗 / 借呗暂复用现有矢量图标，不新增图标资产；
+      // 两者都是信用类形态，等负债模块联动再考虑专属图标。
+      AccountType.huabei => AppIcons.accountAlipay,
+      AccountType.jiebei => AppIcons.accountCreditCard,
       AccountType.socialSecurity => AppIcons.accountSocial,
       AccountType.housingFund => AppIcons.accountHousing,
       AccountType.giftCard => AppIcons.accountGiftCard,
@@ -120,7 +124,7 @@ class AccountCard extends StatelessWidget {
                   children: <Widget>[
                     Text(
                       credit
-                          ? '可用 ${MoneyFormat.orDash(account.availableCredit)}'
+                          ? '可用额度 ${MoneyFormat.orDash(account.availableCredit)}'
                           : MoneyFormat.yuan0(account.balance),
                       style: context.appText.menuTitle.copyWith(
                         color: credit ? tokens.warning : null,
@@ -140,7 +144,7 @@ class AccountCard extends StatelessWidget {
                           borderRadius: BorderRadius.circular(_kBadgeRadius),
                         ),
                         child: Text(
-                          '还款日${account.dueDay}号',
+                          '还款日每月 ${account.dueDay} 日',
                           style: context.appText.caption
                               .copyWith(color: tokens.warning),
                         ),

@@ -19,11 +19,12 @@ import 'widgets/account_card.dart';
 import 'widgets/account_sheets.dart';
 
 // ── 页面私有内容 ─────────────────────────────────────────────────
-const String _kNotFoundTitle = '找不到这个账户';
-const String _kNotFoundBody = '它可能已经被归档或删除了。';
-const String _kLoading = '正在翻这本流水账…';
+const String _kNotFoundTitle = '账户不存在';
+const String _kNotFoundBody = '该账户可能已被归档或删除。';
+const String _kLoading = '正在加载流水记录…';
 const String _kLedgerTitle = '出入流水';
-const String _kNoEntry = '还没有流水。记一笔、转账或调整余额后，这里就会一条条列出来。';
+const String _kNoEntry =
+    '暂无流水记录。记账、转账或余额调整后将在此显示。';
 
 /// 账户明细页：二级功能页，用 [AppPageScaffold]（**有标题、有返回**），
 /// 与首页 [AccountsScreen] 的 [AppHomePage]（无标题无返回）明确分开。
@@ -205,8 +206,8 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
         value: '${MoneyFormat.yuan0(account.balance)} / '
             '${MoneyFormat.orDash(account.creditLimit)}',
         caption: '可用 ${MoneyFormat.orDash(account.availableCredit)} · '
-            '账单日每月${account.statementDay ?? "—"}号 · '
-            '还款日每月${account.dueDay ?? "—"}号',
+            '账单日每月 ${account.statementDay ?? "—"} 日 · '
+            '还款日每月 ${account.dueDay ?? "—"} 日',
         progress: limit > 0 ? (account.balance / limit).clamp(0.0, 1.0) : 0,
         accent: context.tokens.warning,
         secondary: <AppInfoItem>[
@@ -225,11 +226,11 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
       label: '当前余额',
       value: MoneyFormat.yuan(account.balance),
       caption: account.kind == AccountKind.restricted
-          ? '这笔钱有特定用途，不能随便花；记账时下拉会自动按绑定用途过滤。'
-          : '这是你卡里现在能用的钱。每一笔进出都在下面留了痕迹。',
+          ? '该账户资金有特定用途，记账时将按绑定用途过滤可选账户。'
+          : '这是账户当前可用余额，每一笔变动均在下方留痕。',
       secondary: <AppInfoItem>[
         AppInfoItem(
-          label: '开户时',
+          label: '初始余额',
           value: MoneyFormat.yuan0(account.initialBalance),
         ),
         AppInfoItem(
@@ -255,17 +256,17 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
         value: '${account.kind.label} · ${account.type.label}',
       ),
       AppInfoItem(
-        label: '算进「真正属于你的钱」',
+        label: '计入资产合计',
         value: account.includeInNetWorth ? '是' : '否',
       ),
       AppInfoItem(
-        label: account.kind == AccountKind.credit ? '用哪张卡还款' : '备注',
+        label: account.kind == AccountKind.credit ? '还款账户' : '备注',
         value: account.kind == AccountKind.credit
-            ? (repayTo?.name ?? '还没选')
-            : (account.note.isEmpty ? '没填' : account.note),
+            ? (repayTo?.name ?? '未设置')
+            : (account.note.isEmpty ? '未填写' : account.note),
       ),
       AppInfoItem(
-        label: '能自由花',
+        label: '计入可用余额',
         value: account.isLiquid ? '是' : '否',
       ),
     ];
@@ -282,7 +283,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
             AppLedgerRowData(
               title: e.note.isEmpty ? e.entryType.label : e.note,
               subtitle: e.reason.isEmpty
-                  ? '${e.entryType.label} · 之后 ${MoneyFormat.yuan0(e.balanceAfter)}'
+                  ? '${e.entryType.label} · 变动后余额 ${MoneyFormat.yuan0(e.balanceAfter)}'
                   : '${e.entryType.label} · ${e.reason}',
               amountText: MoneyFormat.signed(e.direction, e.amount),
               icon: _entryIcon(e.entryType),
@@ -344,7 +345,7 @@ class _AccountActions extends StatelessWidget {
               _action(
                 context,
                 icon: AppIcons.transfer,
-                label: '转账',
+                label: '账户转账',
                 onTap: () => showAccountTransferSheet(
                   context,
                   controller: controller,
@@ -355,7 +356,7 @@ class _AccountActions extends StatelessWidget {
               _action(
                 context,
                 icon: AppIcons.repay,
-                label: '立即还款',
+                label: '还款',
                 emphasized: true,
                 onTap: () => showAccountRepaySheet(
                   context,
@@ -366,7 +367,7 @@ class _AccountActions extends StatelessWidget {
               _action(
                 context,
                 icon: AppIcons.creditLimit,
-                label: '调整额度',
+                label: '额度调整',
                 onTap: () => showAccountCreditLimitSheet(
                   context,
                   controller: controller,
@@ -378,7 +379,7 @@ class _AccountActions extends StatelessWidget {
               _action(
                 context,
                 icon: AppIcons.binding,
-                label: '修改绑定用途',
+                label: '绑定用途',
                 onTap: () => showAccountBindingsSheet(
                   context,
                   controller: controller,

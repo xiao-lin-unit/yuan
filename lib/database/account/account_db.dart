@@ -72,7 +72,8 @@ import 'account_record.dart';
 /// ══════════════════════════════════════════════════════════════════
 /// 约束与准确性（10.9 / 附录 A、D、E）
 /// ══════════════════════════════════════════════════════════════════
-/// · CHECK 锁死所有枚举取值与「信用卡专属列只能出现在信用卡行」；
+/// · CHECK 锁死类别取值与「信用卡专属列只能出现在信用卡行」；
+///   type 的具体形态由 Dart 枚举校验，DDL 不再写死（见 accountsDdlFor 注释）；
 /// · amount > 0（10.6 只填正数，方向单独一列）；
 /// · **balance 允许为负**：4.7 明确「余额不足时保存成功但给橙色提示，
 ///   不拦着」，所以 balance / balance_after 不加 `>= 0` 约束；
@@ -85,6 +86,109 @@ class AccountDb implements DbModule {
   static const String bindingsTable = 'account_category_bindings';
   static const String entriesTable = 'account_entries';
 
+  /// v4 → v5 重建表时按列名拷贝，**禁止 SELECT \***（列顺序不能靠猜）。
+  /// 顺序与 [accountsDdlFor] 的 CREATE TABLE 一致。
+  static const List<String> accountColumns = <String>[
+    'id', 'book_id', 'kind', 'type', 'name', 'balance',
+    'initial_balance', 'credit_limit', 'statement_day', 'due_day',
+    'repay_account_id', 'min_payment_rate', 'note', 'is_liquid',
+    'include_in_net_worth', 'sort_order', 'archived', 'deleted_at',
+    'delete_reason', 'created_at', 'updated_at', 'revision',
+  ];
+
+  /// 账户主表的**唯一 DDL 真源**：全新安装与 v4→v5 重建共用同一份，
+  /// 避免两处 SQL 各自演化成不同结构。
+  ///
+  /// 【为什么 DDL 不再写 CHECK (type IN (...))】
+  /// v4 把 10 个形态写死在 CHECK 里，还锁了
+  /// `kind='credit' → type='credit_card'`：加「花呗 / 借呗」会被数据库
+  /// 直接拒写，而 SQLite 不支持 ALTER TABLE … MODIFY CHECK，只能重建表。
+  /// 现在只约束 type 非空，取值合法性交给 Dart 枚举
+  /// [AccountType.supports] 与 AccountController.save 兜底校验。
+  /// 于是「以后再加形态 = 加一个枚举值 + 指定 ownerKind」，不动表、
+  /// 不升版本，满足「没有业务变化就不二次修改表结构」。
+  /// 社保 / 公积金的 is_liquid 强制为 0 是业务规则，保留在 CHECK 里；
+  /// 新增形态不会触碰这条，因此不会造成版本升级。
+  static String accountsDdlFor(String table) => '''
+    CREATE TABLE IF NOT EXISTS $table (
+      id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+      book_id               TEXT    NOT NULL DEFAULT 'default',
+      kind                  TEXT    NOT NULL
+                            CHECK (kind IN ('liquid','credit','restricted')),
+      type                  TEXT    NOT NULL,
+      name                  TEXT    NOT NULL,
+      balance               REAL    NOT NULL DEFAULT 0,
+      initial_balance       REAL    NOT NULL DEFAULT 0
+                            CHECK (initial_balance >= 0),
+      credit_limit          REAL    CHECK (credit_limit IS NULL OR
+                              (kind = 'credit' AND credit_limit > 0)),
+      statement_day         INTEGER CHECK (statement_day IS NULL OR
+                              (kind = 'credit' AND statement_day BETWEEN 1 AND 31)),
+      due_day               INTEGER CHECK (due_day IS NULL OR
+                              (kind = 'credit' AND due_day BETWEEN 1 AND 31)),
+      repay_account_id      INTEGER CHECK (repay_account_id IS NULL OR
+                              kind = 'credit'),
+      min_payment_rate      REAL    NOT NULL DEFAULT 0.1
+                            CHECK (min_payment_rate >= 0 AND min_payment_rate <= 1),
+      note                  TEXT    NOT NULL DEFAULT '',
+      is_liquid             INTEGER NOT NULL DEFAULT 1 CHECK (is_liquid IN (0,1)),
+      include_in_net_worth  INTEGER NOT NULL DEFAULT 1
+                            CHECK (include_in_net_worth IN (0,1)),
+      sort_order            INTEGER NOT NULL DEFAULT 0,
+      archived              INTEGER NOT NULL DEFAULT 0 CHECK (archived IN (0,1)),
+      deleted_at            INTEGER,
+      delete_reason         TEXT,
+      created_at            INTEGER NOT NULL,
+      updated_at            INTEGER NOT NULL,
+      revision              INTEGER NOT NULL DEFAULT 1,
+
+      -- 3.3：流动资金账户「默认为是能自由花的，用户改不了」
+      CHECK (kind <> 'liquid' OR is_liquid = 1),
+      -- 信用卡的已用额度是欠款，绝不混进「能花的钱」统计（3.2 / 3.6）。
+      CHECK (kind <> 'credit' OR (is_liquid = 0 AND include_in_net_worth = 0)),
+      -- 3.5：社保 / 公积金强制不可花（按形态锁，不按类别锁）。
+      CHECK (type NOT IN ('social_security','housing_fund') OR is_liquid = 0)
+    )
+  ''';
+
+  /// 主表上的两个索引，建表与重建表共用（DROP TABLE 会连带删掉旧索引）。
+  static Future<void> createIndexes(DatabaseExecutor db, String table) async {
+    await db.execute('''
+      CREATE UNIQUE INDEX IF NOT EXISTS uq_accounts_active_name
+        ON $table (book_id, name) WHERE deleted_at IS NULL
+    ''');
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_accounts_list
+        ON $table (book_id, deleted_at, archived, kind, sort_order, id)
+    ''');
+  }
+
+  /// v4 → v5：重建 accounts 主表，去掉写死 type 取值的 CHECK。
+  ///
+  /// 【工作逻辑，4 步】
+  ///   1. 用 [accountsDdlFor] 建临时表 `accounts_v5`（结构与全新安装一致）；
+  ///   2. 按 [accountColumns] 全列 `INSERT … SELECT` 拷贝（不用 SELECT *，
+  ///      避免列顺序依赖）；
+  ///   3. DROP 旧表 → ALTER TABLE … RENAME 把临时表改回 `accounts`；
+  ///   4. 重建两个索引。
+  /// 绑定表 / 流水表一行不动：它们按 account_id 引用，重建后 id 原样保留。
+  ///
+  /// 【事务边界】sqflite 的 openDatabase.onUpgrade 回调本身就在一个事务里
+  /// 执行，所以本方法**不自己开 transaction**；任一步抛异常，整个升级
+  /// 回滚、旧表保持原样（与 onCreate 不自建事务是同一条规矩）。
+  /// 【触发条件】只有 oldV == 4 时调用；oldV < 4 的用户由 onCreate 直接
+  /// 建成 v5 结构，不需要重建。见 database_shell.dart 的 _onUpgrade。
+  static Future<void> migrateV4ToV5(DatabaseExecutor db) async {
+    const String tmp = 'accounts_v5';
+    await db.execute('DROP TABLE IF EXISTS $tmp');
+    await db.execute(accountsDdlFor(tmp));
+    final String cols = accountColumns.join(', ');
+    await db.execute('INSERT INTO $tmp ($cols) SELECT $cols FROM $accountsTable');
+    await db.execute('DROP TABLE $accountsTable');
+    await db.execute('ALTER TABLE $tmp RENAME TO $accountsTable');
+    await createIndexes(db, accountsTable);
+  }
+
   @override
   String get name => 'account';
 
@@ -94,60 +198,9 @@ class AccountDb implements DbModule {
   @override
   Future<void> onCreate(DatabaseExecutor db) async {
     // ── ① 账户主表：一张表装三类账户 ────────────────────────────────
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS $accountsTable (
-        id                    INTEGER PRIMARY KEY AUTOINCREMENT,
-        book_id               TEXT    NOT NULL DEFAULT 'default',
-        kind                  TEXT    NOT NULL
-                              CHECK (kind IN ('liquid','credit','restricted')),
-        type                  TEXT    NOT NULL
-                              CHECK (type IN ('bank','cash','wechat','alipay',
-                                'credit_card','social_security','housing_fund',
-                                'gift_card','frozen','other')),
-        name                  TEXT    NOT NULL,
-        balance               REAL    NOT NULL DEFAULT 0,
-        initial_balance       REAL    NOT NULL DEFAULT 0
-                              CHECK (initial_balance >= 0),
-        credit_limit          REAL    CHECK (credit_limit IS NULL OR
-                                (kind = 'credit' AND credit_limit > 0)),
-        statement_day         INTEGER CHECK (statement_day IS NULL OR
-                                (kind = 'credit' AND statement_day BETWEEN 1 AND 31)),
-        due_day               INTEGER CHECK (due_day IS NULL OR
-                                (kind = 'credit' AND due_day BETWEEN 1 AND 31)),
-        repay_account_id      INTEGER CHECK (repay_account_id IS NULL OR
-                                kind = 'credit'),
-        min_payment_rate      REAL    NOT NULL DEFAULT 0.1
-                              CHECK (min_payment_rate >= 0 AND min_payment_rate <= 1),
-        note                  TEXT    NOT NULL DEFAULT '',
-        is_liquid             INTEGER NOT NULL DEFAULT 1 CHECK (is_liquid IN (0,1)),
-        include_in_net_worth  INTEGER NOT NULL DEFAULT 1
-                              CHECK (include_in_net_worth IN (0,1)),
-        sort_order            INTEGER NOT NULL DEFAULT 0,
-        archived              INTEGER NOT NULL DEFAULT 0 CHECK (archived IN (0,1)),
-        deleted_at            INTEGER,
-        delete_reason         TEXT,
-        created_at            INTEGER NOT NULL,
-        updated_at            INTEGER NOT NULL,
-        revision              INTEGER NOT NULL DEFAULT 1,
+    await db.execute(accountsDdlFor(accountsTable));
 
-        -- 3.3：流动资金账户「默认为是能自由花的，用户改不了」
-        CHECK (kind <> 'liquid' OR is_liquid = 1),
-        -- 信用卡的已用额度是欠款，绝不混进「能花的钱」统计（3.2 / 3.6）。
-        CHECK (kind <> 'credit' OR (is_liquid = 0 AND include_in_net_worth = 0)),
-        -- 3.4：信用卡类型固定；3.5：社保 / 公积金强制不可花。
-        CHECK (kind <> 'credit' OR type = 'credit_card'),
-        CHECK (type NOT IN ('social_security','housing_fund') OR is_liquid = 0)
-      )
-    ''');
-
-    await db.execute('''
-      CREATE UNIQUE INDEX IF NOT EXISTS uq_accounts_active_name
-        ON $accountsTable (book_id, name) WHERE deleted_at IS NULL
-    ''');
-    await db.execute('''
-      CREATE INDEX IF NOT EXISTS idx_accounts_list
-        ON $accountsTable (book_id, deleted_at, archived, kind, sort_order, id)
-    ''');
+    await createIndexes(db, accountsTable);
 
     // ── ② 受限账户 ↔ 支出分类绑定（3.5 多对多，软约束）────────────────
     await db.execute('''

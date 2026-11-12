@@ -17,16 +17,16 @@ import 'widgets/account_card.dart';
 import 'widgets/account_sheets.dart';
 
 // ── 页面私有文案（样式一律走全局层）─────────────────────────────
-const String _kHeroLabel = '流动资金';
-const String _kHeroCaption = '你当前可支配金额。';
-const String _kEmptyTitle = '还没有添加账户';
+const String _kHeroLabel = '可用余额';
+const String _kHeroCaption = '当前可自由支配的资金合计。';
+const String _kEmptyTitle = '暂无账户';
 const String _kEmptyDescription =
-    '把银行卡、现金、微信零钱放进来，随时看清现在能花多少钱。';
-const String _kGroupEmpty = '这里还没有账户，点右上角 ＋ 加一个。';
+    '添加储蓄卡、现金或第三方支付账户，便于查看可用余额。';
+const String _kGroupEmpty = '暂无账户，可点击右上角新增。';
 const String _kArchivedSection = '已归档账户';
 const String _kFootNote =
-    '「真正属于你的钱」会把所有账户加起来、再减去欠银行的钱。'
-    '以后记进资产和借款后，这个数字会更完整。';
+    '「真正属于你的钱」为全部账户合计减去信用类欠款。'
+    '后续录入资产与借款后，该数值将更完整。';
 
 /// 【账户】= 底导直接打开的 5 个 Home 页之一。
 ///
@@ -67,7 +67,7 @@ class AccountsScreen extends StatelessWidget {
       actions: <Widget>[
         IconButton(
           icon: const Icon(AppIcons.accountAdd),
-          tooltip: '添加账户',
+          tooltip: '新增账户',
           onPressed: () => unawaited(_addAccount(context, controller)),
         ),
       ],
@@ -87,11 +87,11 @@ class AccountsScreen extends StatelessWidget {
           caption: _kHeroCaption,
           secondary: <AppInfoItem>[
             AppInfoItem(
-              label: '欠银行的钱',
+              label: '信用类欠款',
               value: MoneyFormat.yuan0(stats.owedToBank),
             ),
             AppInfoItem(
-              label: '一共',
+              label: '账户总数',
               value: '${stats.accountCount} 个账户',
             ),
           ],
@@ -123,7 +123,8 @@ class AccountsScreen extends StatelessWidget {
               ),
               child: Text(
                 '$_kFootNote\n'
-                '目前按账户算：${MoneyFormat.yuan0(controller.netWorthSoFar)}',
+                '当前按账户口径统计：'
+                '${MoneyFormat.yuan0(controller.netWorthSoFar)}',
                 style: context.appText.caption,
               ),
             ),

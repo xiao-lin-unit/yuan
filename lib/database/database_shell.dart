@@ -18,7 +18,9 @@ class DatabaseService {
   // v3: 新增 categories（收支分类，一张表 + 41 条预设种子）；
   // v4: 新增 accounts（三类账户共用一张主表）+ account_category_bindings
   //     （受限账户绑定用途）+ account_entries（账户出入流水）。
-  static const _dbVersion = 4;
+  // v5: accounts 主表重建：DDL 不再把具体形态写死在 CHECK 里，
+  //     形态合法性交给 Dart 枚举（以后加「花呗 / 借呗」这类形态不升版本）。
+  static const _dbVersion = 5;
   Database? _db;
 
   final List<DbModule> _modules = <DbModule>[
@@ -70,10 +72,21 @@ class DatabaseService {
       // （IF NOT EXISTS / INSERT OR IGNORE），全新安装与 v2→v3 升级共用。
       await CategoryDb().onCreate(db);
     }
+    // 【分支工作逻辑，为什么是 if / else if 而不是两个独立 if】
+    //   · oldV < 4（全新安装或 v1~v3）：accounts 还不存在，onCreate 用
+    //     v5 的 DDL 一次性建好三张表，不需要重建；
+    //   · oldV == 4：accounts 已按 v4 的旧 CHECK 建好，CREATE TABLE
+    //     IF NOT EXISTS 不会改结构，必须走重建迁移；
+    // 若写成两个独立 if，老用户在同一次升级里会「刚建好又重建」一遍。
+    // openDatabase 的 onUpgrade 整体已在一个事务内，迁移方法不自建事务。
     if (oldV < 4) {
       // accounts / 绑定 / 流水三张表 + 索引。AccountDb.onCreate 幂等，
-      // 全新安装与 v3→v4 升级共用；不插演示账户，用户账本保持干净。
+      // 全新安装与 v1~v3 升级共用；不插演示账户，用户账本保持干净。
       await AccountDb().onCreate(db);
+    } else if (oldV == 4) {
+      // v4 → v5：按列名全量拷贝 → DROP → RENAME → 重建索引。
+      // 绑定表与流水表不动，id 原样保留。
+      await AccountDb.migrateV4ToV5(db);
     }
   }
 

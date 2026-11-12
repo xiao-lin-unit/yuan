@@ -7,9 +7,9 @@ import 'package:flutter/foundation.dart';
 /// 「信用卡已用额度」本质是同一个量纲——都是**由流水驱动、只增不手填**
 /// 的累计值，只是统计口径相反。
 enum AccountKind {
-  liquid('liquid', '流动资金账户', '能自由花的钱'),
-  credit('credit', '信用卡账户', '先用后还的钱'),
-  restricted('restricted', '其他资金账户', '有特定用途的钱');
+  liquid('liquid', '流动资金账户', '可自由支配'),
+  credit('credit', '信用卡账户', '先消费后还款'),
+  restricted('restricted', '其他资金账户', '限定用途');
 
   const AccountKind(this.dbValue, this.label, this.hint);
 
@@ -31,34 +31,75 @@ enum AccountKind {
       };
 }
 
-/// 账户形态（3.3 / 3.4 / 3.5 里出现过的全部具体类型）。
+/// 账户形态（3.3 / 3.4 / 3.5 里的全部具体类型，按三大类分组）。
 ///
-/// [socialSecurity] 与 [housingFund] 按 3.5「强制为否且不可改」，
-/// 在 DDL 的 CHECK 与页面开关里都锁死 isLiquid = 0。
-/// 新增形态只需在此加一个枚举值 + account_db.dart 的 CHECK，
-/// 不需要 ALTER TABLE（CHECK 用 `type IN (...)` 列出全部取值）。
+/// ══════════════════════════════════════════════════════════════════
+/// 【这些形态算不算「能自由花的钱」】——任务里的判断题，结论落在代码
+/// ══════════════════════════════════════════════════════════════════
+/// 问题其实混了两个口径，分开才说得清：
+///   · 口径 A「能不能拿去花」：
+///       储蓄卡 / 现金 / 微信零钱 / 支付宝   → 能；
+///       信用卡 / 花呗 / 借呗              → 能，但花的是银行或平台的钱，要还；
+///       公积金 / 社保 / 礼品卡 / 冻结存款   → 不能，或受法定、约定用途限制。
+///   · 口径 B「算不算自己现在能用的钱」（3.6 看板、is_liquid 取这个）：
+///       只有流动资金账户       → 计入「可用余额」；
+///       信用类                 → 是欠款，单列为减项，绝不计入；
+///       公积金 / 社保等受限账户 → 属于你的资产，只进「资产合计」，
+///                                 不进「可用余额」。
+/// 所以：公积金、社保、礼品卡、冻结存款**都不算**能自由花的钱。
+/// 设计文档 3.4 那句「信用卡流动资金默认为是」讲的是口径 A（额度可以
+/// 自由支配地去刷），与本表 is_liquid 取口径 B 不矛盾——不是同一件事。
+///
+/// 代码上的落点（DDL CHECK + AccountController.save 双保险）：
+///   · liquid      → is_liquid 恒 1；
+///   · credit      → is_liquid 恒 0、include_in_net_worth 恒 0；
+///   · restricted  → 由用户决定；社保 / 公积金 [liquidLocked] 强制为 0。
+/// 冻结存款归 restricted，默认不计入可用余额，但允许手动改（3.5「其他
+/// 类型用户可手动改」）；社保 / 公积金连开关都锁死。
+///
+/// 【借呗单独说明】花呗是场景化信用赊销（类似虚拟信用卡，在支付时动用
+/// 额度）；借呗是现金贷，放款直接进银行卡，本质是「流动资金账户入账 +
+/// 负债增加」两笔联动，不能只记一笔消费，否则 3.8 恒等式对不上。
+/// 本轮只把借呗登记为信用类形态，不开放「借呗直接消费」入口，等负债
+/// 模块（7.5）一起做。
+///
+/// 【为什么按类别分组】[ownerKind] 是唯一真源：新增账户时下拉只显示
+/// 该类别的形态，避免「流动资金账户里冒出公积金」这种错配；null 表示
+/// 通用形态（其他），任何类别都可选。以后新增形态 = 加一个枚举值 +
+/// 指定 ownerKind，**不改表结构、不升 DB 版本**（DDL 不锁 type 取值，
+/// 合法性由 [supports] 与 AccountController.save 校验）。
 enum AccountType {
-  bank('bank', '储蓄卡'),
-  cash('cash', '现金'),
-  wechat('wechat', '微信零钱'),
-  alipay('alipay', '支付宝'),
-  creditCard('credit_card', '信用卡'),
-  socialSecurity('social_security', '社保'),
-  housingFund('housing_fund', '公积金'),
-  giftCard('gift_card', '礼品卡'),
-  frozen('frozen', '已冻结存款'),
-  other('other', '其他');
+  bank('bank', '储蓄卡', AccountKind.liquid),
+  cash('cash', '现金', AccountKind.liquid),
+  wechat('wechat', '微信零钱', AccountKind.liquid),
+  alipay('alipay', '支付宝', AccountKind.liquid),
 
-  const AccountType(this.dbValue, this.label);
+  creditCard('credit_card', '信用卡', AccountKind.credit),
+  huabei('huabei', '花呗', AccountKind.credit),
+  jiebei('jiebei', '借呗', AccountKind.credit),
+
+  socialSecurity('social_security', '社保', AccountKind.restricted),
+  housingFund('housing_fund', '公积金', AccountKind.restricted),
+  giftCard('gift_card', '礼品卡', AccountKind.restricted),
+  frozen('frozen', '冻结存款', AccountKind.restricted),
+
+  other('other', '其他', null);
+
+  const AccountType(this.dbValue, this.label, this.ownerKind);
 
   final String dbValue;
   final String label;
+
+  /// 该形态归属的类别；null = 通用形态（任何类别都可选）。
+  final AccountKind? ownerKind;
 
   static AccountType fromDb(String? value) => switch (value) {
         'cash' => cash,
         'wechat' => wechat,
         'alipay' => alipay,
         'credit_card' => creditCard,
+        'huabei' => huabei,
+        'jiebei' => jiebei,
         'social_security' => socialSecurity,
         'housing_fund' => housingFund,
         'gift_card' => giftCard,
@@ -70,15 +111,23 @@ enum AccountType {
   /// 3.5：社保 / 公积金「流动资金」强制为否且不可改。
   bool get liquidLocked => this == socialSecurity || this == housingFund;
 
-  /// 该形态默认属于哪一类（新增账户时选定类型后自动带出，可改）。
-  AccountKind get defaultKind => switch (this) {
-        creditCard => AccountKind.credit,
-        socialSecurity ||
-        housingFund ||
-        giftCard ||
-        frozen =>
-          AccountKind.restricted,
-        _ => AccountKind.liquid,
+  /// 该形态能否用于指定类别。DDL 不再锁 type 取值，合法性全部走这里。
+  /// 工作逻辑：通用形态（ownerKind == null）任何类别都通过；否则必须相等。
+  bool supports(AccountKind kind) => ownerKind == null || ownerKind == kind;
+
+  /// 新增 / 编辑账户时该类别的下拉候选（唯一真源，表单与校验共用）。
+  /// 工作逻辑：遍历 values，保留 supports(kind) 为 true 的形态，顺序即
+  /// 枚举声明顺序（储蓄卡 / 信用卡 / 社保 … 在各自类别里排在前面）。
+  static List<AccountType> allowedTypesFor(AccountKind kind) => <AccountType>[
+        for (final AccountType t in values) if (t.supports(kind)) t,
+      ];
+
+  /// 该类别的默认形态（表单未改动类型时的兜底值）。显式 switch 而非
+  /// 取列表首项：restricted 的首项是社保，作为新账户默认值并不合适。
+  static AccountType defaultTypeFor(AccountKind kind) => switch (kind) {
+        AccountKind.liquid => AccountType.bank,
+        AccountKind.credit => AccountType.creditCard,
+        AccountKind.restricted => AccountType.other,
       };
 }
 
@@ -110,7 +159,7 @@ enum AccountDirection {
 /// 资金变动的业务种类。一次变动只产生一条流水，转账产生两条（见
 /// [AccountEntryRecord.transferGroupId]）。
 enum AccountEntryType {
-  opening('opening', '开户初始余额'),
+  opening('opening', '初始余额'),
   expense('expense', '支出'),
   income('income', '收入'),
   transferOut('transfer_out', '转出'),
@@ -226,7 +275,7 @@ class AccountRecord {
         AccountKind.credit =>
           '总额度 ${creditLimit?.toStringAsFixed(0) ?? "—"} · 已用 ${balance.toStringAsFixed(0)}',
         AccountKind.restricted =>
-          note.isEmpty ? '仅限绑定的用途使用' : note,
+          note.isEmpty ? '仅限绑定用途使用' : note,
         AccountKind.liquid => note.isEmpty ? type.label : note,
       };
 
