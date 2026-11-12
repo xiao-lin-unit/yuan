@@ -183,6 +183,31 @@ abstract final class AppIcons {
   static IconData categoryIcon(String key) => categoryIcons[key] ?? other;
 
   // ── 品牌（保留 FontAwesome，品牌 logo 不参与线宽统一）────────
+  // ── 账户（账户首页 / 明细页 / 账户操作）───────────────────────────
+  // 同样只存语义，不存 emoji / 颜色；原型里的 💬💵🏦💳🏥🏠 全部换成
+  // 同一套 Material outlined 线宽，切主题与明暗自动取色。
+  static const IconData accountBank = Icons.account_balance_outlined;
+  static const IconData accountCash = Icons.money_outlined;
+  static const IconData accountWechat = Icons.chat_bubble_outline;
+  static const IconData accountAlipay = Icons.wallet_outlined;
+  static const IconData accountCreditCard = Icons.credit_card_outlined;
+  static const IconData accountSocial = Icons.health_and_safety_outlined;
+  static const IconData accountHousing = Icons.home_work_outlined;
+  static const IconData accountGiftCard = Icons.redeem_outlined;
+  static const IconData accountFrozen = Icons.ac_unit_outlined;
+  static const IconData accountOther = Icons.savings_outlined;
+
+  static const IconData transfer = Icons.compare_arrows_outlined;
+  static const IconData balanceAdjust = Icons.balance_outlined;
+  static const IconData archive = Icons.archive_outlined;
+  static const IconData unarchive = Icons.unarchive_outlined;
+  static const IconData repay = Icons.payments_outlined;
+  static const IconData creditLimit = Icons.credit_score_outlined;
+  static const IconData locked = Icons.lock_outline;
+  static const IconData binding = Icons.link_outlined;
+  static const IconData accountNote = Icons.sticky_note_2_outlined;
+  static const IconData accountAdd = Icons.add_card_outlined;
+
   static const IconData github = FaBrandsIcons.icn_github;
   static const IconData apple = FaBrandsIcons.icn_apple;
 }

@@ -1,6 +1,9 @@
 import 'package:provider/provider.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:yuan/database/account/account_dao.dart';
+import 'package:yuan/database/account/account_entry_dao.dart';
 import 'package:yuan/database/category/category_dao.dart';
+import 'package:yuan/service/account_controller.dart';
 import 'package:yuan/service/category_controller.dart';
 import 'package:yuan/service/user_controller.dart';
 
@@ -29,12 +32,23 @@ class Services {
     final categoryController = CategoryController(db, categoryDao);
     await categoryController.load();
 
+    // 账户：启动时把账户、绑定用途读进内存快照；流水不预加载
+    // （按账户点开明细时再读，避免几十万条流水常驻内存）。
+    final accountDao = AccountDao();
+    final accountEntryDao = AccountEntryDao();
+    final accountController =
+        AccountController(db, accountDao, accountEntryDao);
+    await accountController.load();
+
     Components.components.putIfAbsent("user", () => userDao);
     Components.components.putIfAbsent("category", () => categoryDao);
+    Components.components.putIfAbsent("account", () => accountDao);
+    Components.components.putIfAbsent("account_entry", () => accountEntryDao);
 
     return <ChangeNotifierProvider>[
       ChangeNotifierProvider<UserController>.value(value: userController),
       ChangeNotifierProvider<CategoryController>.value(value: categoryController),
+      ChangeNotifierProvider<AccountController>.value(value: accountController),
     ];
   }
 }

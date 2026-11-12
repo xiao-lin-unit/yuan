@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../screens/commons/icons/app_icons.dart';
 import '../screens/entry/entry_screen.dart';
 import '../screens/ledger/ledger_screen.dart';
+import '../screens/accounts/account_detail_screen.dart';
 import '../screens/accounts/accounts_screen.dart';
 import '../screens/analysis/analysis_screen.dart';
 import '../screens/category/category_management_screen.dart';
@@ -240,6 +241,17 @@ final appRouter = GoRouter(
         GoRoute(
           path: '/profile/category',
           builder: (context, state) => const CategoryManagementScreen(),
+        ),
+        // 账户明细：挂在 ShellRoute **内部**，因此仍由 AppShell 那唯一一个
+        // Scaffold 覆盖 —— resizeToAvoidBottomInset: true 的键盘避让对
+        // 明细页里的转账 / 余额调整 Sheet 照样生效。
+        // AppShell 的前缀高亮规则（location.startsWith('/accounts/')）
+        // 会自动让底导/rail 继续高亮「账户」，无需额外改动。
+        GoRoute(
+          path: '/accounts/detail/:id',
+          builder: (context, state) => AccountDetailScreen(
+            accountId: int.tryParse(state.pathParameters['id'] ?? '') ?? -1,
+          ),
         ),
       ],
     ),

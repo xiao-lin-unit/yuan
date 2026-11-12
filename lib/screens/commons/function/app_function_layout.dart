@@ -344,3 +344,252 @@ class AppSegmentTabs<T> extends StatelessWidget {
         ),
       );
 }
+
+// ══════════════════════════════════════════════════════════════════
+// 明细页通用结构件（本轮账户明细页首次使用）
+//
+// 【为什么上提到通用层】原型里「资产明细 / 负债明细 / 账单明细」用的都是
+// 同一套：大数字摘要卡 → 2 列信息网格 → 按日期分组的流水列表。
+// 它们会被 ≥2 个页面复用，按「通用 / 私有分开」的规矩放这里；
+// 文案与数值由业务层构造期传入，本文件不认识「账户」「负债」这些概念。
+// 全部纯静态，无状态、无回调注册。
+// ══════════════════════════════════════════════════════════════════
+
+const double _kHeroValueSize = 36;
+const double _kHeroMinHeight = 132;
+const double _kProgressHeight = 6;
+const double _kLedgerRowHeight = AppLayout.listItemMinHeight;
+
+/// 信息网格的一格（纯数据）。
+@immutable
+class AppInfoItem {
+  const AppInfoItem({required this.label, required this.value});
+
+  final String label;
+  final String value;
+}
+
+/// 明细页顶部的大数字摘要卡（原型 `.detail-hero`）。
+///
+/// [value] 是业务层用 MoneyFormat 格式化好的字符串；[caption] 是
+/// 设计原则第一条要求的「大白话解释」，每个数字旁边都要说清代表什么。
+/// [progress] 0..1 时显示一条已用比例（信用卡额度条），不传就不画。
+/// [accent] 由调用方从 `context.tokens` 取语义色，本组件不定义颜色。
+class AppSummaryHero extends StatelessWidget {
+  const AppSummaryHero({
+    super.key,
+    required this.label,
+    required this.value,
+    required this.caption,
+    this.trailing,
+    this.secondary = const <AppInfoItem>[],
+    this.progress,
+    this.accent,
+  });
+
+  final String label;
+  final String value;
+  final String caption;
+  final Widget? trailing;
+  final List<AppInfoItem> secondary;
+
+  /// 0..1；null = 不画进度条。
+  final double? progress;
+  final Color? accent;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final Color tone = accent ?? cs.primary;
+    return Container(
+      decoration: AppDecorations.card(context),
+      padding: const EdgeInsets.all(AppSpacing.md),
+      constraints: const BoxConstraints(minHeight: _kHeroMinHeight),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: Text(label, style: context.appText.caption),
+              ),
+              if (trailing != null) trailing!,
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            value,
+            style: context.appText.pageTitle.copyWith(
+              fontSize: _kHeroValueSize,
+              color: tone,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xxs),
+          Text(caption, style: context.appText.caption),
+          if (progress != null) ...<Widget>[
+            const SizedBox(height: AppSpacing.sm),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(AppRadius.small),
+              child: LinearProgressIndicator(
+                value: progress!.clamp(0.0, 1.0).toDouble(),
+                minHeight: _kProgressHeight,
+                backgroundColor: cs.surfaceContainerHighest,
+                color: tone,
+              ),
+            ),
+          ],
+          if (secondary.isNotEmpty) ...<Widget>[
+            const SizedBox(height: AppSpacing.sm),
+            Row(
+              children: <Widget>[
+                for (var i = 0; i < secondary.length; i++) ...<Widget>[
+                  if (i > 0)
+                    const SizedBox(width: AppSpacing.lg),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      Text(secondary[i].label,
+                          style: context.appText.caption),
+                      Text(secondary[i].value,
+                          style: context.appText.menuTitle),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// 2 列信息网格（原型 `.detail-info-grid`）。
+/// 用 Wrap 而不是 GridView：格子高度随内容自适应，也不会和外层
+/// SingleChildScrollView 抢滚动手势。
+class AppInfoGrid extends StatelessWidget {
+  const AppInfoGrid({super.key, required this.items});
+
+  final List<AppInfoItem> items;
+
+  @override
+  Widget build(BuildContext context) {
+    final double cellWidth =
+        (MediaQuery.sizeOf(context).width - AppSpacing.md * 2 - AppSpacing.xs) / 2;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 0),
+      child: Wrap(
+        spacing: AppSpacing.xs,
+        runSpacing: AppSpacing.xs,
+        children: <Widget>[
+          for (final AppInfoItem item in items)
+            SizedBox(
+              width: cellWidth.clamp(120.0, 320.0).toDouble(),
+              child: Container(
+                decoration: AppDecorations.item(context),
+                padding: const EdgeInsets.all(AppSpacing.sm),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    Text(item.label, style: context.appText.caption),
+                    const SizedBox(height: AppSpacing.xxs),
+                    Text(item.value, style: context.appText.menuTitle),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 流水的一行（纯数据，金额已由业务层用 MoneyFormat 格式化）。
+@immutable
+class AppLedgerRowData {
+  const AppLedgerRowData({
+    required this.title,
+    required this.subtitle,
+    required this.amountText,
+    required this.icon,
+    required this.positive,
+  });
+
+  final String title;
+  final String subtitle;
+  final String amountText;
+
+  /// 图标语义 key 解析后的 IconData，由业务层从 AppIcons 取。
+  final IconData icon;
+
+  /// true = 入账（取 income 语义色），false = 出账（取 expense 语义色）。
+  final bool positive;
+}
+
+/// 按交易日期分组的一组流水（附录 C：以交易时间归属，不是录入时间）。
+@immutable
+class AppLedgerGroupData {
+  const AppLedgerGroupData({required this.dateLabel, required this.rows});
+
+  final String dateLabel;
+  final List<AppLedgerRowData> rows;
+}
+
+/// 明细页的流水列表。分组标题 + 行，行高走 AppLayout.listItemMinHeight。
+/// 颜色只取 `context.tokens` 的 income / expense 语义色，换主题自动跟随。
+class AppLedgerList extends StatelessWidget {
+  const AppLedgerList({super.key, required this.groups});
+
+  final List<AppLedgerGroupData> groups;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.tokens;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        for (final AppLedgerGroupData group in groups) ...<Widget>[
+          Padding(
+            padding: const EdgeInsets.only(
+              top: AppSpacing.sm,
+              bottom: AppSpacing.xxs,
+            ),
+            child: Text(group.dateLabel, style: context.appText.caption),
+          ),
+          for (final AppLedgerRowData row in group.rows)
+            SizedBox(
+              height: _kLedgerRowHeight,
+              child: Row(
+                children: <Widget>[
+                  Icon(row.icon,
+                      size: AppIconSize.medium,
+                      color: row.positive ? tokens.income : tokens.expense),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(row.title, style: context.appText.body),
+                        Text(row.subtitle, style: context.appText.caption),
+                      ],
+                    ),
+                  ),
+                  Text(
+                    row.amountText,
+                    style: context.appText.menuTitle.copyWith(
+                      color: row.positive ? tokens.income : tokens.expense,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ],
+    );
+  }
+}
