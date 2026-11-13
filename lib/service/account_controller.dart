@@ -93,13 +93,26 @@ class AccountController extends ChangeNotifier {
 
   /// 首页看板（3.6 大白话数字）。信用卡余额是欠款，只进「欠银行的钱」，
   /// 绝不混进「能花的钱」——DDL 的 CHECK 也从数据层锁死了这条口径。
-  AccountStats get stats {
+  ///
+  /// 【动态逻辑说明】按传入的账户集合算，而不是只读全量：账户页的类型
+  /// 快筛会把「当前那一类」传进来，于是顶部数字与下方列表天然同源，
+  /// 不会出现上下对不上。工作逻辑：
+  ///   ① 调用方先按筛选条件准备好 rows（**不含搜索词过滤**，避免一输入
+  ///      关键词总额就缩水、被误读成钱少了）；
+  ///   ② 这里逐行按 kind 累加：liquid→可用余额、credit→已用额度、
+  ///      restricted→计入资产的受限余额；
+  ///   ③ 返回不可变 AccountStats，页面只显示，不自己算数字。
+  /// 边界：已删除 / 已归档的行跳过（与 byKind 口径一致）。
+  /// [stats] 是全量版本，供其它页面沿用。
+  AccountStats statsFor(Iterable<AccountRecord> rows) {
     double spendable = 0;
     double owed = 0;
     double restricted = 0;
     int creditCount = 0;
-    for (final AccountRecord r in _all) {
+    int count = 0;
+    for (final AccountRecord r in rows) {
       if (r.isDeleted || r.archived) continue;
+      count += 1;
       switch (r.kind) {
         case AccountKind.liquid:
           if (r.isLiquid) spendable += r.balance;
@@ -114,12 +127,13 @@ class AccountController extends ChangeNotifier {
       spendable: spendable,
       owedToBank: owed,
       restrictedTotal: restricted,
-      accountCount: _all
-          .where((AccountRecord r) => !r.isDeleted && !r.archived)
-          .length,
+      accountCount: count,
       creditCount: creditCount,
     );
   }
+
+  /// 全量看板（3.6）。账户页按类型筛选时改用 [statsFor]。
+  AccountStats get stats => statsFor(_all);
 
   /// 「真正属于你的钱」当前只算账户口径（3.6 完整公式还要加资产估值、
   /// 借出/借入，那些模块在第二阶段）。页面显示时附带一句说明，

@@ -47,6 +47,9 @@ abstract final class AppIcons {
   // ── 表单 / 交互 ─────────────────────────────────────────────
   static const IconData edit = Icons.settings_outlined;
   static const IconData clear = Icons.close;
+  /// 搜索输入框与可折叠分组头的通用矢量语义（原型 🔍 / › 的等价物）。
+  static const IconData search = Icons.search_outlined;
+  static const IconData expandMore = Icons.expand_more;
   static const IconData check = Icons.check;
   static const IconData chevronLeft = Icons.chevron_left;
   static const IconData chevronRight = Icons.chevron_right;
