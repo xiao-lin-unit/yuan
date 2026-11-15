@@ -63,6 +63,20 @@ class AppPageScaffold extends StatelessWidget {
   /// 与内容同样走 [AppLayout.contentMaxWidthFor] 限宽，宽屏不拉成两米长。
   final Widget? bottom;
 
+  /// 固定头槽位（详情页的 `AppDetailHeader` 之类）。
+  /// 放在 Column 里、`Expanded(滚动区)` **之前** → 头永远不随内容滚动。
+  /// 这是布局决定位置：本组件不认识头里是返回键还是标题，只提供位置。
+  /// 与 [title] 二选一：传了 header 就别传 title，否则会出现两行顶栏。
+  /// 顶栏按 M3 习惯全宽，不参与内容列限宽；主体与底部才限宽。
+  final Widget? header;
+
+  /// 右下角悬浮层（`AppFloatingActions` 之类）。
+  /// 由本组件的 Stack + Positioned(right/bottom) 定位，组件自己不定位。
+  /// 位置在 SafeArea 之内，键盘弹出时随唯一 Scaffold 的 view 缩小一起
+  /// 上移到键盘上沿，**不再额外扣一遍 viewInsets**（前几轮双重避让的坑）。
+  /// 与 [bottom] 不要同时传：两者都贴在底部，会重叠。
+  final Widget? floating;
+
   const AppPageScaffold({
     super.key,
     this.title,
@@ -73,6 +87,8 @@ class AppPageScaffold extends StatelessWidget {
     this.padding,
     this.leading,
     this.bottom,
+    this.header,
+    this.floating,
   });
 
   @override
@@ -99,38 +115,57 @@ class AppPageScaffold extends StatelessWidget {
       ),
     );
 
+    // Stack 只为了把 [floating] 叠到右下角；页面主体用
+    // Positioned.fill 拿 tight 约束，Column 里的 Expanded 才有确定高度。
+    // 不传 floating 时，Stack 里只有一个 Positioned.fill(Column)，
+    // 与改造前的布局逐像素一致，其它页面零影响。
     return ColoredBox(
       // 独立预览（runApp 里直接挂本组件、外层没有 Scaffold）时
       // 仍需一个底色；在 AppShell 下与 Scaffold 背景同色，无副作用。
       color: Theme.of(context).colorScheme.surface,
       child: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+        child: Stack(
           children: <Widget>[
-            if (showAppBar && title != null)
-              // AppBar 原来挂在 Scaffold.appBar 槽位，Scaffold 会用
-              // PreferredSize 给它一个 tight 高度。现在它在 Column 里，
-              // Column 给非 flex 子节点的是无界高度约束，必须自己补一层
-              // PreferredSize，否则顶栏高度不确定 / 被裁。
-              PreferredSize(
-                preferredSize: const Size.fromHeight(kToolbarHeight),
-                child: AppBar(
-                  title: Text(title!),
-                  actions: actions,
-                  leading: leading,
-                  automaticallyImplyLeading: leading == null,
-                  // SafeArea 已处理状态栏，AppBar 不要再自己加一段。
-                  primary: false,
-                ),
+            Positioned.fill(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  if (showAppBar && title != null)
+                    // AppBar 原来挂在 Scaffold.appBar 槽位，Scaffold 会用
+                    // PreferredSize 给它一个 tight 高度。现在它在 Column 里，
+                    // Column 给非 flex 子节点的是无界高度约束，必须自己补
+                    // 一层 PreferredSize，否则顶栏高度不确定 / 被裁。
+                    PreferredSize(
+                      preferredSize: const Size.fromHeight(kToolbarHeight),
+                      child: AppBar(
+                        title: Text(title!),
+                        actions: actions,
+                        leading: leading,
+                        automaticallyImplyLeading: leading == null,
+                        // SafeArea 已处理状态栏，AppBar 不要再自己加一段。
+                        primary: false,
+                      ),
+                    ),
+                  // 固定头：在 Expanded(滚动区) 之前，所以不随内容滚动。
+                  if (header != null) header!,
+                  Expanded(child: content),
+                  if (bottom != null)
+                    Align(
+                      alignment: Alignment.bottomCenter,
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(maxWidth: maxWidth),
+                        child: bottom!,
+                      ),
+                    ),
+                ],
               ),
-            Expanded(child: content),
-            if (bottom != null)
-              Align(
-                alignment: Alignment.bottomCenter,
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(maxWidth: maxWidth),
-                  child: bottom!,
-                ),
+            ),
+            // 右下角悬浮层：只定位一次，不读 viewInsets、不做第二层避让。
+            if (floating != null)
+              Positioned(
+                right: AppSpacing.md,
+                bottom: AppSpacing.md,
+                child: floating!,
               ),
           ],
         ),

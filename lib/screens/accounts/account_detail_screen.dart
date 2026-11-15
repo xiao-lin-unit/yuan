@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:material_ui/material_ui.dart';
-import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
@@ -11,9 +10,10 @@ import '../../styles/app_typography.dart';
 import '../../styles/theme_tokens.dart';
 import '../../utils/money_format.dart';
 import '../commons/empty/app_empty_state.dart';
+import '../commons/function/app_detail_page.dart';
+import '../commons/function/app_floating_actions.dart';
 import '../commons/function/app_function_layout.dart';
 import '../commons/icons/app_icons.dart';
-import '../commons/scaffold/app_page_scaffold.dart';
 import '../commons/state/app_loading_state.dart';
 import 'widgets/account_sheets.dart';
 
@@ -25,17 +25,21 @@ const String _kLedgerTitle = '出入流水';
 const String _kNoEntry =
     '暂无流水记录。记账、转账或余额调整后将在此显示。';
 
-/// 账户明细页：二级功能页，用 [AppPageScaffold]（**有标题、有返回**），
+/// 账户明细页：二级功能页，用公共 [AppDetailPage]（**有标题、有返回**），
 /// 与首页 [AccountsScreen] 的 [AppHomePage]（无标题无返回）明确分开。
+/// 资产 / 负债详情页以后复用同一个 [AppDetailPage]，不再各写一套外壳。
 ///
 /// ── 结构嵌套 ────────────────────────────────────────────────────
 /// ```
 /// AppShell（唯一 Scaffold）
-///  └ AppPageScaffold（标题/返回/编辑/删除 / 滚动内容 / 固定底部操作区）
-///     ├ AppSummaryHero   余额 或 已用额度（通用结构件）
-///     ├ AppInfoGrid      账户类型 / 计入总资产 / 关联还款 / 备注
-///     ├ AppFunctionSection → AppStatBar（入账/出账/净变动）+ AppLedgerList
-///     └ bottom: _AccountActions  ← ★ 任务 4：三个操作下移到这里
+///  └ AppDetailPage  ← 公共外部框架：头 / 主体 / 右下角悬浮三处位置
+///     └ AppPageScaffold（骨架：固定头 → 滚动主体 → 悬浮层）
+///        ├ header: AppDetailHeader  返回 / 标题 / 编辑·删除（固定）
+///        ├ child:  Column           ← 主体，本页自己填
+///        │   ├ AppSummaryHero       余额 或 已用额度
+///        │   ├ AppInfoGrid          账户类型 / 计入总资产 / 关联还款 / 备注
+///        │   └ AppFunctionSection → AppStatBar + AppLedgerList
+///        └ floating: AppFloatingActions  ← ★ 操作下移到对应账户明细页
 /// ```
 ///
 /// 【动态状态，工作逻辑写清楚】
@@ -78,9 +82,10 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     final AccountRecord? account = controller.byId(widget.accountId);
 
     if (account == null) {
-      return AppPageScaffold(
+      // 这里用「参数控制」形态：只传 title，公共框架自动补默认返回按钮。
+      // 下面的正常分支用「内容控制」形态：直接传 AppDetailHeader 组件。
+      return AppDetailPage(
         title: _kNotFoundTitle,
-        leading: _back(context),
         child: const AppEmptyState(
           icon: AppIcons.warning,
           title: _kNotFoundTitle,
@@ -89,42 +94,48 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
       );
     }
 
-    return AppPageScaffold(
-      title: account.name,
-      leading: _back(context),
-      actions: <Widget>[
-        IconButton(
-          icon: const Icon(AppIcons.edit),
-          tooltip: '编辑账户',
-          onPressed: () => unawaited(
-            showAccountEditorSheet(
-              context,
-              controller: controller,
-              kind: account.kind,
-              account: account,
+    return AppDetailPage(
+      // 头作为组件直接传入；返回按钮用 AppDetailHeader 的默认值。
+      header: AppDetailHeader(
+        title: account.name,
+        actions: <Widget>[
+          IconButton(
+            icon: const Icon(AppIcons.edit),
+            tooltip: '编辑账户',
+            onPressed: () => unawaited(
+              showAccountEditorSheet(
+                context,
+                controller: controller,
+                kind: account.kind,
+                account: account,
+              ),
             ),
           ),
-        ),
-        IconButton(
-          icon: const Icon(AppIcons.trash),
-          tooltip: '删除账户',
-          onPressed: () => unawaited(
-            showAccountDeleteSheet(
-              context,
-              controller: controller,
-              account: account,
+          IconButton(
+            icon: const Icon(AppIcons.trash),
+            tooltip: '删除账户',
+            onPressed: () => unawaited(
+              showAccountDeleteSheet(
+                context,
+                controller: controller,
+                account: account,
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
+      // 底部多留一个 FAB 的高度：右下角悬浮层不参与滚动区，
+      // 不留白会把最后一条流水压在按钮下面。
       padding: const EdgeInsets.fromLTRB(
         0,
         AppLayout.pageTop,
         0,
-        AppLayout.pageBottom,
+        AppLayout.pageBottom + AppComponentSize.fabSize,
       ),
-      // ★ 固定底部：三个（或更多）操作按账户类型下移到「对应账户下」。
-      bottom: _AccountActions(account: account, controller: controller),
+      // ★ 操作仍按账户类型下移到「对应账户下」，改由公共悬浮组渲染。
+      floating: AppFloatingActions(
+        actions: _floatingActions(context, controller, account),
+      ),
       child: controller.detailLoading ||
               controller.detailAccountId != widget.accountId
           ? const AppLoadingState(message: _kLoading)
@@ -314,128 +325,90 @@ IconData _entryIcon(AccountEntryType type) => switch (type) {
       AccountEntryType.creditRepay => AppIcons.repay,
     };
 
-Widget _back(BuildContext context) => IconButton(
-      icon: const Icon(AppIcons.chevronLeft),
-      tooltip: '返回',
-      onPressed: () => context.pop(),
-    );
-
-/// ★ 任务 4：操作下移到「对应类型的账户下」。
+/// ★ 操作配置：仍按账户类型下移到「对应账户下」，只是从底部固定区
+/// 改到右下角悬浮组。
 ///
-/// 首页那三个通用工具（转账 / 余额调整 / 归档）不再单独列一栏，
-/// 而是在每张卡的明细页底部给出；并按类型补上原型里各自专属的入口：
-///   · 流动资金 → 转账 / 余额调整 / 归档
-///   · 信用卡   → 还款 / 调整额度 / 余额调整 / 归档（原型 floating-actions）
-///   · 受限     → 修改绑定用途 / 余额调整 / 归档（原型公积金明细）
-/// 纯静态：按钮组合由构造期传入的 account.kind 决定，组件不持状态。
-class _AccountActions extends StatelessWidget {
-  const _AccountActions({required this.account, required this.controller});
-
-  final AccountRecord account;
-  final AccountController controller;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.md,
-          AppSpacing.xs,
-          AppSpacing.md,
-          AppSpacing.sm,
-        ),
-        child: Wrap(
-          spacing: AppSpacing.xs,
-          runSpacing: AppSpacing.xs,
-          children: <Widget>[
-            if (account.kind == AccountKind.liquid)
-              _action(
-                context,
-                icon: AppIcons.transfer,
-                label: '账户转账',
-                onTap: () => showAccountTransferSheet(
-                  context,
-                  controller: controller,
-                  fromId: account.id,
-                ),
-              ),
-            if (account.kind == AccountKind.credit) ...<Widget>[
-              _action(
-                context,
-                icon: AppIcons.repay,
-                label: '还款',
-                emphasized: true,
-                onTap: () => showAccountRepaySheet(
-                  context,
-                  controller: controller,
-                  creditCard: account,
-                ),
-              ),
-              _action(
-                context,
-                icon: AppIcons.creditLimit,
-                label: '额度调整',
-                onTap: () => showAccountCreditLimitSheet(
-                  context,
-                  controller: controller,
-                  account: account,
-                ),
-              ),
-            ],
-            if (account.kind == AccountKind.restricted)
-              _action(
-                context,
-                icon: AppIcons.binding,
-                label: '绑定用途',
-                onTap: () => showAccountBindingsSheet(
-                  context,
-                  controller: controller,
-                  account: account,
-                ),
-              ),
-            _action(
+/// 纯数据：业务只声明「名称 / 图标 / 点击」，按钮样式、单按钮 / 多按钮
+/// 形态、展开收起、名称提示全部交给公共 [AppFloatingActions]。
+/// 列表顺序 = 展开后从上到下的顺序，最后一项最靠近主按钮。
+/// 异步动作由调用方自己 `unawaited`（工程开了 unawaited_futures）。
+List<AppFloatingAction> _floatingActions(
+  BuildContext context,
+  AccountController controller,
+  AccountRecord account,
+) =>
+    <AppFloatingAction>[
+      if (account.kind == AccountKind.liquid)
+        AppFloatingAction(
+          label: '账户转账',
+          icon: AppIcons.transfer,
+          onPressed: () => unawaited(
+            showAccountTransferSheet(
               context,
-              icon: AppIcons.balanceAdjust,
-              label: '余额调整',
-              onTap: () => showAccountAdjustSheet(
-                context,
-                controller: controller,
-                account: account,
-              ),
+              controller: controller,
+              fromId: account.id,
             ),
-            // 已归档的账户显示「恢复账户」，保证 3.7 / 10.7 可逆。
-            _action(
-              context,
-              icon: account.archived ? AppIcons.unarchive : AppIcons.archive,
-              label: account.archived ? '恢复账户' : '归档账户',
-              onTap: () => showAccountArchiveSheet(
-                context,
-                controller: controller,
-                account: account,
-                archive: !account.archived,
-              ),
-            ),
-          ],
+          ),
         ),
-      );
-
-  Widget _action(
-    BuildContext context, {
-    required IconData icon,
-    required String label,
-    required Future<void> Function() onTap,
-    bool emphasized = false,
-  }) =>
-      SizedBox(
-        height: AppComponentSize.chipHeight + AppSpacing.sm,
-        child: emphasized
-            ? FilledButton.icon(
-                onPressed: () => unawaited(onTap()),
-                icon: Icon(icon, size: AppIconSize.small),
-                label: Text(label),
-              )
-            : OutlinedButton.icon(
-                onPressed: () => unawaited(onTap()),
-                icon: Icon(icon, size: AppIconSize.small),
-                label: Text(label),
-              ),
-      );
-}
+      if (account.kind == AccountKind.credit) ...<AppFloatingAction>[
+        AppFloatingAction(
+          label: '还款',
+          icon: AppIcons.repay,
+          emphasized: true,
+          onPressed: () => unawaited(
+            showAccountRepaySheet(
+              context,
+              controller: controller,
+              creditCard: account,
+            ),
+          ),
+        ),
+        AppFloatingAction(
+          label: '额度调整',
+          icon: AppIcons.creditLimit,
+          onPressed: () => unawaited(
+            showAccountCreditLimitSheet(
+              context,
+              controller: controller,
+              account: account,
+            ),
+          ),
+        ),
+      ],
+      if (account.kind == AccountKind.restricted)
+        AppFloatingAction(
+          label: '绑定用途',
+          icon: AppIcons.binding,
+          onPressed: () => unawaited(
+            showAccountBindingsSheet(
+              context,
+              controller: controller,
+              account: account,
+            ),
+          ),
+        ),
+      AppFloatingAction(
+        label: '余额调整',
+        icon: AppIcons.balanceAdjust,
+        onPressed: () => unawaited(
+          showAccountAdjustSheet(
+            context,
+            controller: controller,
+            account: account,
+          ),
+        ),
+      ),
+      // 已归档的账户显示「恢复账户」，保证 3.7 / 10.7 可逆。
+      AppFloatingAction(
+        label: account.archived ? '恢复账户' : '归档账户',
+        icon: account.archived ? AppIcons.unarchive : AppIcons.archive,
+        onPressed: () => unawaited(
+          showAccountArchiveSheet(
+            context,
+            controller: controller,
+            account: account,
+            archive: !account.archived,
+          ),
+        ),
+      ),
+    ];
