@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
 
 import '../../../database/account/account_record.dart';
@@ -99,6 +99,7 @@ Future<void> showAccountEditorSheet(
     context,
     header: SheetHeader(
       title: editing == null ? '新增${kind.label}' : '编辑账户',
+      centered: true,
       leading: const SheetCancelAction(),
       trailing: SheetTextAction(
         label: '保存',

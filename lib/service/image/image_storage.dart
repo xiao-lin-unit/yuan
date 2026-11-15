@@ -155,7 +155,9 @@ class ImageStorage {
         b[4] == 0x66 &&
         b[5] == 0x74 &&
         b[6] == 0x79 &&
-        b[7] == 0x70) return '.heic';
+        b[7] == 0x70) {
+      return '.heic';
+    }
     return '.jpg';
   }
 }

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../../styles/theme_tokens.dart';
 
@@ -91,7 +91,7 @@ class AppHomePage extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
-        if (hero != null) hero!,
+        ?hero,
         child,
       ],
     );

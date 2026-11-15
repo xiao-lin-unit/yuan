@@ -1,7 +1,7 @@
 import 'dart:ui' show PlatformDispatcher;
 
 import 'package:flutter/foundation.dart' show kDebugMode;
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'app_locale.dart';
 import 'screens/commons/icons/app_icons.dart';

@@ -1,5 +1,5 @@
 import 'package:go_router/go_router.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../screens/commons/icons/app_icons.dart';
 import '../screens/entry/entry_screen.dart';

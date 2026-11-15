@@ -66,10 +66,26 @@ class AccountController extends ChangeNotifier {
 
   /// 明细页快照：一次读齐流水 + 汇总。页面 initState 调用，
   /// build 用 `context.watch` 按 [detailLoading] 显示三态骨架。
+  ///
+  /// 【为什么同步段不调 notifyListeners —— 必读，删掉那行不是漏写】
+  /// initState 在**第一帧 build 之前**执行；async 方法会一路同步执行到
+  /// 第一个 await，所以下面两步赋值在 build 开始前就已完成：
+  ///   ① `_detailLoading = true`；
+  ///   ② `_detailAccountId = accountId`；
+  ///   ③ 之后才 `await` 读数据库。
+  /// 于是第一次 build 用 `context.watch` 读到的就是 loading=true，直接
+  /// 显示 AppLoadingState —— 开头那次通知本来就是冗余的。
+  /// 更关键的是：在 initState 的调用栈里 notifyListeners() 会让 Provider 的
+  /// _InheritedProviderScope 在 build 阶段 markNeedsBuild，Flutter 直接抛
+  /// 「setState() or markNeedsBuild() called during build」（点任意账户必现）。
+  /// 因此只保留 finally 里那一次：它发生在 await 之后，已离开 build 阶段。
+  ///
+  /// 其它调用点（save / adjustBalance / 转账后刷新）都在用户交互的异步
+  /// 回调里，同样不在 build 阶段；中间那一小段窗口沿用上一帧快照，不闪
+  /// loading，等 finally 通知后一次性刷新成新数据。
   Future<void> loadDetail(int accountId) async {
     _detailLoading = true;
     _detailAccountId = accountId;
-    notifyListeners();
     try {
       _detailEntries = await entryDao.listForAccount(db, accountId);
       _detailSummary = await entryDao.summaryFor(db, accountId);

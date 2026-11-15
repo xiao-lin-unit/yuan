@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
 import 'package:yuan/screens/profile/widgets/user/user_avatar.dart';
 import 'package:yuan/styles/app_decorations.dart';

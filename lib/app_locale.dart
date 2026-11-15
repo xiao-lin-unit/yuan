@@ -1,5 +1,4 @@
-import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// 全软件**唯一**的本地化配置。
 ///
@@ -48,10 +47,5 @@ abstract final class AppLocale {
 
   /// Material / Widgets / Cupertino 三套框架委托。
   /// 顺序固定，三个都是 const 单例，不随主题或路由变化。
-  static const List<LocalizationsDelegate<dynamic>> delegates =
-      <LocalizationsDelegate<dynamic>>[
-    GlobalMaterialLocalizations.delegate,
-    GlobalWidgetsLocalizations.delegate,
-    GlobalCupertinoLocalizations.delegate,
-  ];
+  static const List<LocalizationsDelegate<dynamic>> delegates = GlobalMaterialLocalizations.delegates;
 }

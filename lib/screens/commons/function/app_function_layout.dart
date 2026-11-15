@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../../styles/app_decorations.dart';
 import '../../../styles/app_typography.dart';
@@ -414,7 +414,7 @@ class AppSummaryHero extends StatelessWidget {
               Expanded(
                 child: Text(label, style: context.appText.caption),
               ),
-              if (trailing != null) trailing!,
+              ?trailing,
             ],
           ),
           const SizedBox(height: AppSpacing.xs),

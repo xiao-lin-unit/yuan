@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../../database/category/category_record.dart';
 import '../../../styles/app_decorations.dart';

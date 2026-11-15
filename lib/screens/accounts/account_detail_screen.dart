@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -15,7 +15,6 @@ import '../commons/function/app_function_layout.dart';
 import '../commons/icons/app_icons.dart';
 import '../commons/scaffold/app_page_scaffold.dart';
 import '../commons/state/app_loading_state.dart';
-import 'widgets/account_card.dart';
 import 'widgets/account_sheets.dart';
 
 // ── 页面私有内容 ─────────────────────────────────────────────────
@@ -40,7 +39,8 @@ const String _kNoEntry =
 /// ```
 ///
 /// 【动态状态，工作逻辑写清楚】
-///   1. initState 调 `controller.loadDetail(id)` 读流水 + 汇总；
+///   1. initState 调 `controller.loadDetail(id)`：同步段在第一次 build
+///      之前就把 loading 标记置好，异步读完后由 Controller 通知重建；
 ///   2. Controller 里的 `_detailLoading / _detailEntries / _detailSummary`
 ///      是唯一真源，本页用 `context.watch` 按它切三态
 ///      （加载→AppLoadingState，空→AppEmptyState，有数据→列表）；
@@ -63,7 +63,12 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
   @override
   void initState() {
     super.initState();
-    // 加载明细快照；Controller 会 notify，build 里按 detailLoading 切三态。
+    // 【为什么可以直接在这里调，不需要 addPostFrameCallback / microtask】
+    // loadDetail 的同步段（置 _detailLoading / _detailAccountId）跑在第一次
+    // build 之前，build 用 context.watch 读到的就是「加载中」；Controller
+    // 不在同步段 notifyListeners，所以不会触发「build 阶段 markNeedsBuild」。
+    // 加载完成那次通知在 await 之后，已离开 build 阶段。完整工作逻辑见
+    // AccountController.loadDetail 的注释。
     unawaited(context.read<AccountController>().loadDetail(widget.accountId));
   }
 
