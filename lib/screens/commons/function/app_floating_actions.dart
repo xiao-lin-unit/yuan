@@ -7,6 +7,18 @@ import '../icons/app_icons.dart';
 const String _kMoreLabel = '更多操作';
 const String _kCollapseLabel = '收起';
 
+/// 悬浮按钮统一用**正圆**。
+///
+/// 为什么要在组件里显式写、而不是改全局主题：
+///   · `settings.dart` 的 `floatingActionButtonTheme.shape` 是
+///     `RoundedRectangleBorder(16dp)`（M3 圆角方形），那是给全软件所有
+///     FAB 定的通用形状；本组件要求的「圆形」只属于这一处悬浮组。
+///   · widget 的 `shape:` 参数优先于 ThemeData，显式传值即可局部覆盖，
+///     **不动全局主题**，以后记账页若要用 extended / 圆角方形 FAB 不受影响。
+///   · `CircleBorder` 与本项目其它圆形部件同源，均来自 material_ui。
+/// 正圆在 56dp 主按钮与 40dp 小按钮上都是圆形，展开列与主按钮形状一致。
+const ShapeBorder _kCircleShape = CircleBorder();
+
 /// 悬浮按钮的一项配置（**纯数据契约**，不含任何样式）。
 ///
 /// [label] 不会画在按钮上：按钮与展开列表**只展示图标**，名称走
@@ -35,8 +47,9 @@ class AppFloatingAction {
 ///
 /// ── 形态（构造期由 actions.length 一次判定）────────────────────
 ///   · 0 项 → 不渲染（SizedBox.shrink）；
-///   · 1 项 → 直接显示这一项的圆形按钮，没有「更多」；
-///   · ≥2 项 → 显示一个「更多」主按钮，点击展开一列小圆形按钮。
+///   · 1 项 → 直接显示这一项的正圆按钮，没有「更多」；
+///   · ≥2 项 → 显示一个正圆的「更多」主按钮，点击展开一列小正圆按钮。
+/// 三种形态的形状统一来自 [_kCircleShape]，不随全局 FAB 主题的圆角方形走。
 ///
 /// ── 唯一一处动态逻辑：`_expanded`，工作逻辑写清楚 ──────────────
 /// 为什么动态：展开与否是用户点击后才有的状态，构造期定不死。
@@ -127,6 +140,7 @@ class _AppFloatingActionsState extends State<AppFloatingActions> {
 
   Widget _mainMore() => FloatingActionButton(
         heroTag: null,
+        shape: _kCircleShape,
         tooltip: _expanded ? widget.collapseLabel : widget.moreLabel,
         onPressed: () => setState(() => _expanded = !_expanded),
         child: Icon(
@@ -151,6 +165,7 @@ class _AppFloatingActionsState extends State<AppFloatingActions> {
     if (small) {
       return FloatingActionButton.small(
         heroTag: null,
+        shape: _kCircleShape,
         tooltip: a.label,
         backgroundColor: background,
         foregroundColor: foreground,
@@ -160,6 +175,7 @@ class _AppFloatingActionsState extends State<AppFloatingActions> {
     }
     return FloatingActionButton(
       heroTag: null,
+      shape: _kCircleShape,
       tooltip: a.label,
       backgroundColor: background,
       foregroundColor: foreground,
