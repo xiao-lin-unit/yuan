@@ -73,8 +73,8 @@ enum AccountKind {
 ///   · 信用卡账户：信用卡 / 花呗 / 借呗 —— **不含通用「其他」**；
 ///   · 其他资金账户：社保 / 公积金 / 礼品卡 / 冻结存款 / 其他 ——
 ///     **完全不含任何信用卡形态**。
-/// 以后新增形态 = 加一个枚举值 + 往对应清单加一项，不改表结构、
-/// 不升 DB 版本（DDL 不锁 type 取值，合法性全在 Dart 侧）。
+/// 以后新增形态 = 加一个枚举值 + 往对应清单加一项，无需重建主表
+/// （DDL 不锁 type 取值，合法性全在 Dart 侧）。
 enum AccountType {
   bank('bank', '储蓄卡'),
   cash('cash', '现金'),
@@ -449,11 +449,14 @@ class AccountRecord {
 
 /// 账户出入流水的一行（10.3「每张卡都要有一本流水账」）。
 ///
-/// 【职责边界】本表只记「账户那个累计值怎么变的」：方向、正数金额、
-/// 变动后余额、时间、对手账户。支出/收入的完整业务单据（商家、小票、
-/// 报销、标签、报税、预算…）属于「记支出 / 记收入」模块，将来用
-/// `ref_type + ref_id` 挂到各自的业务表，**不往本表加列**——这是
-/// 「业务没变就不二次改表结构」的关键：新增业务 = 新增关联表。
+/// 【职责边界】本表记「账户那个累计值怎么变的」以及**逐笔时点快照**：
+/// 方向、正数金额、变动后余额、变动后的总额度（信用卡）、时间、
+/// 对手账户。支出/收入的完整业务单据（商家、小票、报销、标签、报税、
+/// 预算…）属于「记支出 / 记收入」模块，用 `ref_type + ref_id` 挂到
+/// 各自的业务表，不塞成流水表的几十个可空列。
+/// 但时点快照类字段属于本表自身职责：功能需要时就直接加列（如
+/// [AccountEntryRecord.creditLimitAfter]），不因「少一次 ALTER」而留下
+/// 只能用当前值近似的历史展示。
 @immutable
 class AccountEntryRecord {
   const AccountEntryRecord({
@@ -475,6 +478,7 @@ class AccountEntryRecord {
     this.imageRef,
     this.refType,
     this.refId,
+    this.creditLimitAfter,
     required this.createdAt,
     this.revision = 1,
   });
@@ -490,6 +494,19 @@ class AccountEntryRecord {
   /// 变动**之后**的账户累计值，直接显示在流水行右侧（10.3）。
   /// 也是 10.9 恒等式逐笔可审计的依据：逐行 rollback 能还原任一时点。
   final double balanceAfter;
+
+  /// 这笔发生**之后**该卡的总额度（信用卡才有，储蓄类为 null）。
+  ///
+  /// 【为什么要有它】`balanceAfter` 记的是已用额度，可用额度 =
+  /// `creditLimitAfter - balanceAfter`。总额度会被「调整额度」改动，
+  /// 若用当前额度去减历史余额，调额前的流水就会显示一个当时根本不存在
+  /// 的可用金额。把额度作为**逐笔时点快照**存下，历史就永久可精确回放。
+  ///
+  /// 【写入位置】与 [balanceAfter] 一样，由 `AccountEntryDao.append` 在
+  /// 同一个事务里读账户当前值后覆盖写入；构造时不用传（默认 null），
+  /// 因此两个业务 Controller 的 8 处流水构造点都不必改动，也不会出现
+  /// 「调用方传了过期额度」的并发问题。
+  final double? creditLimitAfter;
 
   final AccountEntryType entryType;
 
@@ -535,6 +552,8 @@ class AccountEntryRecord {
         direction: AccountDirection.fromDb(m['direction'] as String?),
         amount: (m['amount'] as num?)?.toDouble() ?? 0,
         balanceAfter: (m['balance_after'] as num?)?.toDouble() ?? 0,
+        creditLimitAfter:
+            (m['credit_limit_after'] as num?)?.toDouble(),
         entryType: AccountEntryType.fromDb(m['entry_type'] as String?),
         occurredAt: _date(m['occurred_at']),
         counterpartyAccountId: m['counterparty_account_id'] as int?,
@@ -557,6 +576,7 @@ class AccountEntryRecord {
         'direction': direction.dbValue,
         'amount': amount,
         'balance_after': balanceAfter,
+        'credit_limit_after': creditLimitAfter,
         'entry_type': entryType.dbValue,
         'occurred_at': occurredAt.millisecondsSinceEpoch,
         'counterparty_account_id': counterpartyAccountId,

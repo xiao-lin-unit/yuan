@@ -32,8 +32,10 @@ import 'account_record.dart';
 /// 真正**不能**塞进主表的是两类东西，各用一张附属表，而不是拆主表：
 ///   · 受限账户绑定用途（3.5 多对多）→ `account_category_bindings`；
 ///   · 每笔资金变动（10.3 每账户一本流水）→ `account_entries`。
-/// 「新增关联表」属于新增业务表，**不是修改主表结构**，因此满足任务要求
-/// 「不要出现没有业务变化的情况下二次修改表结构」。
+/// 「新增关联表」属于新增业务表，不是把主表改成垃圾桶。
+/// 【表结构演进的原则】业务没变化、又非必要时，不为无关改动重建整表
+/// 造成大面积迁移；但只要**完整功能确实需要**，该加的列、该升的版就加，
+/// 不拿「不改表结构」当借口留下半截功能（见 credit_limit_after）。
 ///
 /// ══════════════════════════════════════════════════════════════════
 /// 字段出处（每条都对应《软件设计想法》，不是随手预留）
@@ -50,6 +52,7 @@ import 'account_record.dart';
 /// | book_id | 十一章「多个账本」 |
 /// | created_at / updated_at / revision | 10.2 公共字段、10.9 变更留痕 |
 /// | account_entries.amount / direction / balance_after / occurred_at | 10.3、10.6、10.9、附录 C/D |
+/// | account_entries.credit_limit_after | 10.3 逐笔时点快照：精确还原每笔当时的总额度 / 可用额度 |
 /// | account_entries.reason | 3.8 余额调整必须填原因 |
 /// | account_entries.non_binding | 3.5 软约束「非绑定用途」 |
 /// | account_entries.transfer_group_id / counterparty_account_id | 3.7 账户间转账 |
@@ -104,8 +107,9 @@ class AccountDb implements DbModule {
   /// 直接拒写，而 SQLite 不支持 ALTER TABLE … MODIFY CHECK，只能重建表。
   /// 现在只约束 type 非空，取值合法性交给 Dart 枚举
   /// [AccountType.supports] 与两个业务 Controller 的 save 兜底校验。
-  /// 于是「以后再加形态 = 加一个枚举值 + 往该类别清单加一项」，不动表、
-  /// 不升版本，满足「没有业务变化就不二次修改表结构」。
+  /// 于是「以后再加形态 = 加一个枚举值 + 往该类别清单加一项」，不必
+  /// 重建整张主表。这是**这一处**的设计结果，不是一条全局禁令：
+  /// 别处因业务需要加列时照常加（见 v6→v7）。
   /// 社保 / 公积金的 is_liquid 强制为 0 是业务规则，保留在 CHECK 里；
   /// 新增形态不会触碰这条，因此不会造成版本升级。
   static String accountsDdlFor(String table) => '''
@@ -216,6 +220,56 @@ class AccountDb implements DbModule {
     ''');
   }
 
+  /// v6 → v7：流水表新增 `credit_limit_after`，精确还原每笔当时的额度。
+  ///
+  /// 【为什么必须加列】此前详情页用「**当前**总额度 − balance_after」换算
+  /// 历史流水的可用额度。额度调整后，旧流水会被新额度算出一个当年根本
+  /// 不存在的数字（例：当时额度 1 万、消费 200，后来调额到 2 万，回看
+  /// 那笔会显示可用 1.98 万，实际当时只有 0.98 万）。信息已经丢失，
+  /// 只能在写入时连同时点一起存，事后无法反推。
+  ///
+  /// 【工作逻辑，3 步】
+  ///   1. `PRAGMA table_info` 判列是否存在：oldV < 4 的升级路径走
+  ///      [onCreate] 建表时已含该列，跳过 ALTER（否则会「duplicate column」）；
+  ///      全新安装同理。这一步让本方法对任何起点都幂等。
+  ///   2. 只在缺失时 `ALTER TABLE … ADD COLUMN`（可空 REAL，不加 NOT NULL
+  ///      默认值，SQLite 的 ADD COLUMN 限制）；
+  ///   3. 逐张信用卡把它**当前**的 credit_limit 回填给历史流水（只填
+  ///      `credit_limit_after IS NULL` 的行，重复执行不覆盖）；储蓄类流水
+  ///      保持 NULL —— 它们没有额度概念，页面显示「变动后余额」。
+  ///
+  /// 【历史精度边界，如实写清】v7 之前如果调过额度，历次调额轨迹从未
+  /// 被记录，无法反推，回填值只是当时的最近一次额度，属兜底；
+  /// **从 v7 起，每一笔新流水都由 append 记下当时额度，完全精确**，
+  /// 包括「调额前最后一笔」与「调额后第一笔」各是各的值。
+  /// 【事务边界】openDatabase.onUpgrade 已在事务内，本方法不自建事务。
+  static Future<void> migrateV6ToV7(DatabaseExecutor db) async {
+    final List<Map<String, Object?>> columns =
+        await db.rawQuery('PRAGMA table_info($entriesTable)');
+    final bool hasColumn = columns.any(
+      (Map<String, Object?> c) => c['name'] == 'credit_limit_after',
+    );
+    if (!hasColumn) {
+      await db.execute(
+        'ALTER TABLE $entriesTable ADD COLUMN credit_limit_after REAL',
+      );
+    }
+    final List<Map<String, Object?>> cards = await db.query(
+      accountsTable,
+      columns: <String>['id', 'credit_limit'],
+      where: "kind = 'credit'",
+    );
+    for (final Map<String, Object?> card in cards) {
+      final double? limit = (card['credit_limit'] as num?)?.toDouble();
+      if (limit == null) continue;
+      await db.rawUpdate(
+        'UPDATE $entriesTable SET credit_limit_after = ? '
+        'WHERE account_id = ? AND credit_limit_after IS NULL',
+        <Object?>[limit, card['id']],
+      );
+    }
+  }
+
   @override
   String get name => 'account';
 
@@ -251,6 +305,12 @@ class AccountDb implements DbModule {
         direction                TEXT    NOT NULL CHECK (direction IN ('in','out')),
         amount                   REAL    NOT NULL CHECK (amount > 0),
         balance_after            REAL    NOT NULL,
+        -- 逐笔时点快照：这笔发生**之后**该卡的总额度。
+        -- 可用额度 = credit_limit_after - balance_after，与 balance_after
+        -- 在同一个事务里由 AccountEntryDao.append 写下，因此调额后回看
+        -- 旧流水仍精确（不依赖「当前额度」）。储蓄类恒为 NULL。
+        credit_limit_after       REAL    CHECK (credit_limit_after IS NULL OR
+                                  credit_limit_after > 0),
         entry_type               TEXT    NOT NULL
                                  CHECK (entry_type IN ('opening','expense','income',
                                    'transfer_out','transfer_in','adjustment',

@@ -34,11 +34,15 @@ class AccountEntryDao implements BaseDao {
   /// 追加一条流水并同步账户累计值。
   ///
   /// 工作逻辑（4 步，全部在调用方给的事务执行器 [txn] 内）：
-  ///   1. 在事务内读该账户**当前**累计值（不读内存快照，避免并发/过期数据）；
+  ///   1. 在事务内读该账户**当前**累计值与总额度（不读内存快照，
+  ///      避免并发/过期数据）；
   ///   2. `after = before + rule.delta(direction, amount)`。金额恒正，
   ///      符号由 direction 与 [rule] 共同决定：储蓄类入账加、信用卡
   ///      出账加（见 [AccountBalanceRule]）；**不再有「三类同一条公式」**；
-  ///   3. insert 流水（带 balance_after）；
+  ///   3. insert 流水（带 balance_after；信用卡同时写
+  ///      credit_limit_after = 该笔之后的总额度，储蓄类为 null）。
+  ///      两者都是**逐笔时点快照**，与累计值在同一事务里锁定，
+  ///      所以日后调额也不会改变旧流水能还原出的可用额度；
   ///   4. `UPDATE accounts SET balance = after, revision = revision + 1`
   ///      并检查受影响行数，0 行则整条事务回滚。
   /// 返回变动后的累计值，供 Controller 做后续提示 / 校验。
@@ -52,7 +56,7 @@ class AccountEntryDao implements BaseDao {
   }) async {
     final rows = await txn.query(
       accountsTable,
-      columns: <String>['balance'],
+      columns: <String>['balance', 'credit_limit'],
       where: 'id = ? AND deleted_at IS NULL',
       whereArgs: <Object?>[entry.accountId],
       limit: 1,
@@ -62,9 +66,15 @@ class AccountEntryDao implements BaseDao {
     }
     final double before = (rows.first['balance'] as num?)?.toDouble() ?? 0;
     final double after = before + rule.delta(entry.direction, entry.amount);
+    // 只有信用卡规则写额度快照；储蓄类留 null。用 rule 而不是读账户
+    // kind 判断，保持「DAO 不解释账户类别、规则由调用方显式给」的约定。
+    final double? limitAfter = rule == AccountBalanceRule.credit
+        ? (rows.first['credit_limit'] as num?)?.toDouble()
+        : null;
 
     final Map<String, dynamic> values = entry.toMap()
-      ..['balance_after'] = after;
+      ..['balance_after'] = after
+      ..['credit_limit_after'] = limitAfter;
     final int id = await txn.insert(table, values);
     if (id <= 0) throw StateError('流水写入未生效');
 

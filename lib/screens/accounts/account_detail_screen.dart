@@ -350,26 +350,32 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
   /// 入账 +、出账 −。信用卡消费出账 −¥200.00、还款入账 +¥200.00，
   /// 储蓄类同理；`positive` 只用于取方向色（入账绿 / 出账红，国际标准）。
   ///
-  /// 【信用卡的「变动后」文案也换成可用额度】DB 里的 balance_after 是
-  /// 该卡的**已用额度**累计值（AccountBalanceRule.credit），而视觉锚点
-  /// 是剩余可用金额，所以这里用 `总额度 − balance_after` 换算展示。
-  /// 边界（写清楚免得以后误读）：额度调整过的历史记录是按**当前**额度
-  /// 换算，只作展示参考；要精确还原每一笔当时的可用额度，需要新增
-  /// credit_limit_after 列，按「无业务变化不改表结构」本轮不加。
-  /// 未填总额度时显示「—」，不伪装成 0。
+  /// 【信用卡的「变动后」文案用可用额度】DB 的 balance_after 是
+  /// 该卡的**已用额度**累计值（AccountBalanceRule.credit），视觉锚点
+  /// 是剩余可用金额，所以显示 `creditLimitAfter − balanceAfter`。
+  ///
+  /// 【为什么不用当前额度】额度会被「调整额度」改动；若用
+  /// `account.creditLimit − balanceAfter`，调额前的旧流水会算出一个
+  /// 当年根本不存在的数字。v7 起每笔流水自带时点快照
+  /// `creditLimitAfter`（与 balanceAfter 同一事务写入），因此**精确还原
+  /// 每一笔当时的可用额度**，与之后是否调过额度无关。
+  /// 边界：v7 之前的历史流水迁移时按当时最近一次额度回填兜底；
+  /// 额度为空 / 快照缺失时显示「—」，不伪装成 0（MoneyFormat.orDash）。
   List<AppLedgerGroupData> _groups(
     AccountRecord account,
     List<AccountEntryRecord> entries,
   ) {
     final bool credit = account.kind == AccountKind.credit;
-    final double? limit = account.creditLimit;
     final Map<String, List<AppLedgerRowData>> grouped =
         <String, List<AppLedgerRowData>>{};
     for (final AccountEntryRecord e in entries) {
       final String label = _dayFormat.format(e.occurredAt);
       final String balanceLabel = credit ? '变动后可用额度' : '变动后余额';
+      final double? limitAfter = e.creditLimitAfter;
       final String balanceValue = credit
-          ? (limit == null ? '—' : MoneyFormat.yuan0(limit - e.balanceAfter))
+          ? MoneyFormat.orDash(
+              limitAfter == null ? null : limitAfter - e.balanceAfter,
+            )
           : MoneyFormat.yuan0(e.balanceAfter);
       grouped.putIfAbsent(label, () => <AppLedgerRowData>[]).add(
             AppLedgerRowData(
