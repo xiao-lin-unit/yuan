@@ -23,16 +23,21 @@ abstract final class MoneyFormat {
       ? '${_wan.format(value / 10000)} 万'
       : yuan0(value);
 
-  /// 储蓄类流水行：入账 +¥8,000.00 / 出账 −¥186.00。
+  /// 全软件唯一的流水金额符号口径，视觉锚点是**剩余可用金额**：
+  ///   入账 → 可动用的钱变多 → +¥8,000.00
+  ///   出账 → 可动用的钱变少 → −¥186.00
   /// 用真正的减号 U+2212 而非连字符，宽度与加号对齐。
+  ///
+  /// 【信用卡为什么不再用「已用额度」口径】已用额度在消费时 +、还款时 −，
+  /// 与「钱变少 / 变多」的直觉正好相反；用户关心的应是「还剩多少能用」。
+  /// 于是信用卡消费 200 元出账显示 −¥200.00、还款 200 元入账显示
+  /// +¥200.00，和储蓄类完全同一条规则：不按卡类型乘系数、不需要第二个
+  /// 方法、公共列表组件也不必新增任何参数。
+  ///
+  /// 【两套口径别混】详情页顶部三格是「已用额度构成」的统计，用 [yuan0]
+  /// 输出不带符号的金额；本方法只管**逐笔流水行**的符号。两者互不复用。
   static String signed(AccountDirection direction, num value) =>
       '${direction == AccountDirection.inbound ? '+' : '−'}${yuan(value)}';
-
-  /// 信用卡流水行：显示的是**已用额度**的变化，不是卡内余额。
-  /// 消费出账 = 已用额度 +（欠款变多），还款入账 = 已用额度 −。
-  /// 与 [signed] 刻意分成两个方法：两套口径不共用一段格式化逻辑。
-  static String signedUsed(AccountDirection direction, num value) =>
-      '${direction == AccountDirection.outbound ? '+' : '−'}${yuan(value)}';
 
   /// 差额：+¥70 / −¥70（余额调整确认里用）。
   static String delta(num value) =>

@@ -82,15 +82,25 @@ class AccountEntryDao implements BaseDao {
   }
 
   /// 某账户的流水（按交易时间倒序，附录 C）。
+  ///
+  /// 【真分页】[limit] + [offset] 直接下推到 SQLite，不把几万条流水读进
+  /// 内存后再截断。[direction] 给「全部 / 出账 / 入账」标签用，null = 不过滤。
+  /// 排序固定 `occurred_at DESC, id DESC`，所以第 1 页就是最近 10 条。
   Future<List<AccountEntryRecord>> listForAccount(
     Database db,
     int accountId, {
     int? limit,
+    int? offset,
+    AccountDirection? direction,
     DateTime? from,
     DateTime? to,
   }) async {
     final List<String> where = <String>['account_id = ?'];
     final List<Object?> args = <Object?>[accountId];
+    if (direction != null) {
+      where.add('direction = ?');
+      args.add(direction.dbValue);
+    }
     if (from != null) {
       where.add('occurred_at >= ?');
       args.add(from.millisecondsSinceEpoch);
@@ -105,8 +115,39 @@ class AccountEntryDao implements BaseDao {
       whereArgs: args,
       orderBy: 'occurred_at DESC, id DESC',
       limit: limit,
+      offset: offset,
     );
     return rows.map(AccountEntryRecord.fromMap).toList(growable: false);
+  }
+
+  /// 满足条件的流水总条数，用于算总页数 / 标签条数。
+  /// 与 [listForAccount] 共用同一套 where 条件，两者永远同源。
+  Future<int> countForAccount(
+    Database db,
+    int accountId, {
+    AccountDirection? direction,
+    DateTime? from,
+    DateTime? to,
+  }) async {
+    final List<String> where = <String>['account_id = ?'];
+    final List<Object?> args = <Object?>[accountId];
+    if (direction != null) {
+      where.add('direction = ?');
+      args.add(direction.dbValue);
+    }
+    if (from != null) {
+      where.add('occurred_at >= ?');
+      args.add(from.millisecondsSinceEpoch);
+    }
+    if (to != null) {
+      where.add('occurred_at < ?');
+      args.add(to.millisecondsSinceEpoch);
+    }
+    final rows = await db.rawQuery(
+      'SELECT COUNT(*) AS c FROM $table WHERE ${where.join(' AND ')}',
+      args,
+    );
+    return (rows.first['c'] as num?)?.toInt() ?? 0;
   }
 
   /// 明细页顶部「总入账 / 总出账 / 净变动 / 当前余额」。

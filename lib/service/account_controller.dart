@@ -45,20 +45,45 @@ class AccountController extends ChangeNotifier {
   List<AccountRecord> _all = <AccountRecord>[];
   final Map<int, Set<int>> _bindings = <int, Set<int>>{};
 
-  // 明细页的一次性快照（由 loadDetail 填，随 load() 一起清空重建）。
+  // 明细页的**当前页**快照（真分页：内存里永远只有 pageSize 条）。
   List<AccountEntryRecord> _detailEntries = <AccountEntryRecord>[];
   AccountEntrySummary? _detailSummary;
   int? _detailAccountId;
   bool _detailLoading = false;
+
+  // ── 分页状态（唯一真源在共享账本，页面不持有副本）──────────────
+  static const int _detailPageSize = 10; // 每页 10 条
+  int _detailPage = 1;                   // 1-based
+  int _detailTotal = 0;                  // 当前筛选的总条数
+  int _detailPageCount = 0;              // 总页数，0 = 无记录
+  AccountDirection? _detailDirection;    // null = 全部 / 出账 / 入账
+  int _detailTotalAll = 0;
+  int _detailTotalInbound = 0;
+  int _detailTotalOutbound = 0;
+  int _detailRequest = 0;                // 竞态保护，见 loadDetail 注释
 
   /// 内存快照（只读）。页面不要修改它。
   List<AccountRecord> get all => List<AccountRecord>.unmodifiable(_all);
 
   bool get detailLoading => _detailLoading;
   int? get detailAccountId => _detailAccountId;
+
+  /// **当前页**的流水（最多 10 条），不是该账户的全部流水。
   List<AccountEntryRecord> get detailEntries =>
       List<AccountEntryRecord>.unmodifiable(_detailEntries);
+
+  /// 三格统计仍是**全量汇总**：不随分页、也不随方向标签变化。
+  /// 统计跟着标签缩水容易被误读成「钱变少了」，这条口径写死在这里。
   AccountEntrySummary? get detailSummary => _detailSummary;
+
+  int get detailPage => _detailPage;
+  int get detailPageSize => _detailPageSize;
+  int get detailTotal => _detailTotal;
+  int get detailPageCount => _detailPageCount;
+  AccountDirection? get detailDirection => _detailDirection;
+  int get detailTotalAll => _detailTotalAll;
+  int get detailTotalInbound => _detailTotalInbound;
+  int get detailTotalOutbound => _detailTotalOutbound;
 
   Future<void> load() async {
     // 必须把归档账户也读进来：3.7「想恢复随时恢复」、10.7「所有操作
@@ -76,34 +101,111 @@ class AccountController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 明细页快照：一次读齐流水 + 汇总。页面 initState 调用，
-  /// build 用 `context.watch` 按 [detailLoading] 显示三态骨架。
+  /// 明细页**按页**加载：COUNT 算总页数 → LIMIT/OFFSET 只取当前 10 条。
+  /// 页面 initState / 换账户时调用；翻页与切标签走 [goToDetailPage] /
+  /// [setDetailDirection]，它们复用本方法。
   ///
   /// 【为什么同步段不调 notifyListeners —— 必读，删掉那行不是漏写】
   /// initState 在**第一帧 build 之前**执行；async 方法会一路同步执行到
-  /// 第一个 await，所以下面两步赋值在 build 开始前就已完成：
-  ///   ① `_detailLoading = true`；
-  ///   ② `_detailAccountId = accountId`；
-  ///   ③ 之后才 `await` 读数据库。
-  /// 于是第一次 build 用 `context.watch` 读到的就是 loading=true，直接
-  /// 显示 AppLoadingState —— 开头那次通知本来就是冗余的。
+  /// 第一个 await，所以 loading 标记与 accountId 在 build 开始前就已设好：
+  /// 第一次 build 用 `context.watch` 读到的就是 loading=true，直接显示
+  /// AppLoadingState —— 开头那次通知本来就是冗余的。
   /// 更关键的是：在 initState 的调用栈里 notifyListeners() 会让 Provider 的
   /// _InheritedProviderScope 在 build 阶段 markNeedsBuild，Flutter 直接抛
   /// 「setState() or markNeedsBuild() called during build」（点任意账户必现）。
   /// 因此只保留 finally 里那一次：它发生在 await 之后，已离开 build 阶段。
   ///
-  /// 其它调用点（业务处理器写完后的 refresh）都在用户交互的异步回调里，
-  /// 同样不在 build 阶段；中间那一小段窗口沿用上一帧快照，不闪 loading。
-  Future<void> loadDetail(int accountId) async {
-    _detailLoading = true;
+  /// 【翻页 / 切标签为什么传 showLoading: false】那两次是用户点击触发，
+  /// 已不在 build 阶段；不置 loading 就不会把整页（含统计卡）闪成骨架，
+  /// 而是沿用上一页数据直到新页到达，手感更顺。
+  ///
+  /// 【竞态保护，4 步】连续快点「下一页」或翻页中切账户时：
+  ///   ① 每次调用先 `++_detailRequest` 拿到自己的序号；
+  ///   ② 读库回来后若序号已不是最新，直接丢弃结果、也不通知；
+  ///   ③ 只有最新一次请求才写状态并 notifyListeners()；
+  ///   ④ 于是不会出现「第 2 页的旧响应盖掉第 3 页」。
+  ///
+  /// 【边界】page 超出总页数（例如删除流水后）会夹到最后一页；无记录时
+  /// 总页数为 0、当前页记 1，页面显示空态。`summaryFor` 始终查全量。
+  Future<void> loadDetail(
+    int accountId, {
+    int page = 1,
+    AccountDirection? direction,
+    bool showLoading = true,
+  }) async {
+    final int req = ++_detailRequest;
+    if (showLoading) _detailLoading = true;
     _detailAccountId = accountId;
+    _detailDirection = direction;
     try {
-      _detailEntries = await entryDao.listForAccount(db, accountId);
-      _detailSummary = await entryDao.summaryFor(db, accountId);
+      final int total = await entryDao.countForAccount(
+        db,
+        accountId,
+        direction: direction,
+      );
+      final int pages =
+          total == 0 ? 0 : (total + _detailPageSize - 1) ~/ _detailPageSize;
+      // 不用 num.clamp：它的静态返回类型是 num，赋给 int 需要 toInt()，
+      // 显式三段判断最直接，也避免依赖 SDK 版本对 clamp 的窄化。
+      final int safePage = pages == 0
+          ? 1
+          : (page < 1 ? 1 : (page > pages ? pages : page));
+      final List<AccountEntryRecord> rows = await entryDao.listForAccount(
+        db,
+        accountId,
+        limit: _detailPageSize,
+        offset: (safePage - 1) * _detailPageSize,
+        direction: direction,
+      );
+      // 三个标签条数：本地 SQLite 的 COUNT 成本可忽略，每次都查，
+      // 换来「不做缓存失效」——写操作后 refresh 自然同步，不会脏。
+      final int all = await entryDao.countForAccount(db, accountId);
+      final int inbound = await entryDao.countForAccount(
+        db,
+        accountId,
+        direction: AccountDirection.inbound,
+      );
+      final AccountEntrySummary summary =
+          await entryDao.summaryFor(db, accountId);
+      if (req != _detailRequest) return; // 旧请求：丢弃，finally 也不通知
+      _detailEntries = rows;
+      _detailSummary = summary;
+      _detailPage = safePage;
+      _detailTotal = total;
+      _detailPageCount = pages;
+      _detailTotalAll = all;
+      _detailTotalInbound = inbound;
+      _detailTotalOutbound = all - inbound;
     } finally {
-      _detailLoading = false;
-      notifyListeners();
+      if (req == _detailRequest) {
+        _detailLoading = false;
+        notifyListeners();
+      }
     }
+  }
+
+  /// 翻页 / 跳页。由分页条的按钮点击调用，不在 build 阶段。
+  Future<void> goToDetailPage(int page) {
+    final int? id = _detailAccountId;
+    if (id == null) return Future<void>.value();
+    return loadDetail(
+      id,
+      page: page,
+      direction: _detailDirection,
+      showLoading: false,
+    );
+  }
+
+  /// 切「全部 / 出账 / 入账」标签：总数与总页数按新条件重算，回到第 1 页。
+  Future<void> setDetailDirection(AccountDirection? direction) {
+    final int? id = _detailAccountId;
+    if (id == null) return Future<void>.value();
+    return loadDetail(
+      id,
+      page: 1,
+      direction: direction,
+      showLoading: false,
+    );
   }
 
   /// 业务处理器写库成功后**统一**调用。
@@ -111,7 +213,9 @@ class AccountController extends ChangeNotifier {
   /// 【工作逻辑，3 步】
   ///   1. `load()` 重读账户快照与绑定，并通知所有 watch 页面；
   ///   2. 若当前正好打开了某个账户的明细页，且它在本次受影响的账户里
-  ///      （转账 / 还款会一次影响两个账户），再 `loadDetail` 刷流水；
+  ///      （转账 / 还款会一次影响两个账户），再按**第 1 页**重新分页加载；
+  ///      新流水按交易时间排在最前，回到第 1 页才能立刻看到它；
+  ///      方向标签保留，不打断用户正在看的筛选；
   ///   3. 两次通知都发生在 await 之后，不在 build 阶段。
   /// 边界：[touched] 为空时只刷新列表，不动明细；刷新失败会向上抛，
   /// 让业务处理器的调用链能感知（表单据此保持打开并显示错误）。
@@ -119,7 +223,12 @@ class AccountController extends ChangeNotifier {
     await load();
     final int? openId = _detailAccountId;
     if (openId != null && touched.contains(openId)) {
-      await loadDetail(openId);
+      await loadDetail(
+        openId,
+        page: 1,
+        direction: _detailDirection,
+        showLoading: false,
+      );
     }
   }
 

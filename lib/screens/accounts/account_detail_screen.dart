@@ -15,6 +15,7 @@ import '../commons/empty/app_empty_state.dart';
 import '../commons/function/app_detail_page.dart';
 import '../commons/function/app_floating_actions.dart';
 import '../commons/function/app_function_layout.dart';
+import '../commons/function/app_paginator.dart';
 import '../commons/icons/app_icons.dart';
 import '../commons/state/app_loading_state.dart';
 import 'widgets/account_sheets.dart';
@@ -26,6 +27,30 @@ const String _kLoading = '正在加载流水记录…';
 const String _kLedgerTitle = '出入流水';
 const String _kNoEntry =
     '暂无流水记录。记账、转账、还款或额度校准后将在此显示。';
+const String _kFilterEmpty = '该筛选下暂无流水记录，切回「全部」查看其它记录。';
+const double _kChipGap = AppSpacing.xs;
+
+/// 流水方向标签：只按 [AccountDirection] 过滤，不涉及账户类别、
+/// 不涉及金额计算。形态与账户首页的类型快筛一致。
+enum _EntryFilter { all, outbound, inbound }
+
+String _entryFilterLabel(_EntryFilter f) => switch (f) {
+      _EntryFilter.all => '全部',
+      _EntryFilter.outbound => '出账',
+      _EntryFilter.inbound => '入账',
+    };
+
+IconData _entryFilterIcon(_EntryFilter f) => switch (f) {
+      _EntryFilter.all => AppIcons.ledger,
+      _EntryFilter.outbound => AppIcons.category,
+      _EntryFilter.inbound => AppIcons.salary,
+    };
+
+AccountDirection? _directionOf(_EntryFilter f) => switch (f) {
+      _EntryFilter.all => null,
+      _EntryFilter.outbound => AccountDirection.outbound,
+      _EntryFilter.inbound => AccountDirection.inbound,
+    };
 
 /// 账户明细页：二级功能页，用公共 [AppDetailPage]（**有标题、有返回**），
 /// 与首页 [AccountsScreen] 的 [AppHomePage]（无标题无返回）明确分开。
@@ -47,15 +72,21 @@ const String _kNoEntry =
 /// 【动态状态，工作逻辑写清楚】
 ///   1. initState 调 `catalog.loadDetail(id)`：同步段在第一次 build
 ///      之前就把 loading 标记置好，异步读完后由共享账本通知重建；
-///   2. `_detailLoading / _detailEntries / _detailSummary` 是唯一真源，
-///      本页用 `context.watch` 按它切三态；
+///   2. **分页 / 方向标签 / 总条数 / 总页数的唯一真源在
+///      `AccountController`**，本页用 `context.watch` 读，不持有副本；
 ///   3. 写操作由两个业务处理器落库后调 `catalog.refresh()`，本页自动
-///      重建，页面本身**不持有**列表副本、不手动 setState；
+///      重建（刷新后回到第 1 页，新流水排在最前）；
 ///   4. 流水按**交易时间**（不是录入时间）分组，见附录 C。
 ///
-/// 【本轮两类账户的分开处理】悬浮按钮、统计口径、流水金额显示都按
-/// `account.kind` 分成两条路径：储蓄类走 SavingsAccountController，
-/// 信用卡走 CreditCardAccountController，不复用对方的逻辑。
+/// 【真分页】DAO 层 LIMIT/OFFSET 只取当前 10 条，内存里永远不会有
+/// 几万条记录对象，也不会为它们建 widget；总条数用 COUNT 查。
+/// 页面只负责把 `AppPaginator` 的点击转给 Controller。
+///
+/// 【两类账户的分开处理】悬浮按钮、统计口径按 `account.kind` 分成
+/// 两条路径：储蓄类走 SavingsAccountController，信用卡走
+/// CreditCardAccountController，不复用对方的逻辑。
+/// **逐笔流水行的金额符号不按卡类型分**：视觉锚点统一是「剩余可用金额」，
+/// 见 MoneyFormat.signed 注释。
 class AccountDetailScreen extends StatefulWidget {
   const AccountDetailScreen({super.key, required this.accountId});
 
@@ -67,6 +98,18 @@ class AccountDetailScreen extends StatefulWidget {
 
 class _AccountDetailScreenState extends State<AccountDetailScreen> {
   final DateFormat _dayFormat = DateFormat('M月d日 · E', 'zh_CN');
+
+  /// 【为什么需要这个方法】从 A 账户明细直接跳到 B 账户时，GoRoute
+  /// 可能复用同一个 State 实例。共享账本的分页状态是全局的，不重置
+  /// 会把上一个账户的页码 / 方向标签带过来。只在 id 真变化时重新加载
+  /// （loadDetail 默认回到第 1 页 / 全部标签），同步段不通知，安全。
+  @override
+  void didUpdateWidget(AccountDetailScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.accountId != widget.accountId) {
+      unawaited(context.read<AccountController>().loadDetail(widget.accountId));
+    }
+  }
 
   @override
   void initState() {
@@ -157,7 +200,6 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     AccountRecord account,
   ) {
     final AccountEntrySummary? summary = catalog.detailSummary;
-    final List<AccountEntryRecord> entries = catalog.detailEntries;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
@@ -182,20 +224,12 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
               children: <Widget>[
                 // 统计按类别分开：储蓄类说「余额」，信用卡说「已用额度」。
                 // 两套标签与两套算式各自成段，不共用同一个 net 解释。
+                // 三格统计始终全量，不随分页 / 方向标签变化。
                 AppStatBar(items: _statItems(account, summary)),
                 const SizedBox(height: AppSpacing.sm),
-                entries.isEmpty
-                    ? Padding(
-                        padding: const EdgeInsets.symmetric(
-                          vertical: AppSpacing.lg,
-                        ),
-                        child: Text(
-                          _kNoEntry,
-                          style: context.appText.caption,
-                          textAlign: TextAlign.center,
-                        ),
-                      )
-                    : AppLedgerList(groups: _groups(account.kind, entries)),
+                _entryFilterChips(catalog),
+                const SizedBox(height: AppSpacing.sm),
+                ..._entryList(catalog, account),
               ],
             ),
           ),
@@ -215,8 +249,10 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
       return <AppStatItem>[
         AppStatItem(label: '消费出账', value: MoneyFormat.yuan0(outbound)),
         AppStatItem(label: '还款入账', value: MoneyFormat.yuan0(inbound)),
+        // 数值是「已用额度净增」，同一数字也就是「可用额度净减」；
+        // 按本轮口径用后者作标签，与逐笔行「可用金额 +/−」保持一致。
         AppStatItem(
-          label: '已用净增',
+          label: '可用额度净减',
           value: MoneyFormat.yuan0(outbound - inbound),
         ),
       ];
@@ -307,32 +343,41 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     ];
   }
 
-  /// 按交易日期分组（附录 C）。entries 已由 DAO 按 occurred_at DESC 排好，
+  /// 按交易日期分组（附录 C）。当前页已由 DAO 按 occurred_at DESC 排好，
   /// LinkedHashMap 保持插入顺序，所以分组天然是从新到旧。
   ///
-  /// 【金额显示按类别分开】储蓄类显示余额增减，信用卡显示已用额度增减；
-  /// 后者用 [MoneyFormat.signedUsed]，出账显示 +（欠款变多）。
-  /// `positive` 两类都用「入账为正向」：信用卡入账是还款，欠款减少。
+  /// 【逐笔金额符号全软件统一，不按卡类型分】一律 [MoneyFormat.signed]：
+  /// 入账 +、出账 −。信用卡消费出账 −¥200.00、还款入账 +¥200.00，
+  /// 储蓄类同理；`positive` 只用于取方向色（入账绿 / 出账红，国际标准）。
+  ///
+  /// 【信用卡的「变动后」文案也换成可用额度】DB 里的 balance_after 是
+  /// 该卡的**已用额度**累计值（AccountBalanceRule.credit），而视觉锚点
+  /// 是剩余可用金额，所以这里用 `总额度 − balance_after` 换算展示。
+  /// 边界（写清楚免得以后误读）：额度调整过的历史记录是按**当前**额度
+  /// 换算，只作展示参考；要精确还原每一笔当时的可用额度，需要新增
+  /// credit_limit_after 列，按「无业务变化不改表结构」本轮不加。
+  /// 未填总额度时显示「—」，不伪装成 0。
   List<AppLedgerGroupData> _groups(
-    AccountKind kind,
+    AccountRecord account,
     List<AccountEntryRecord> entries,
   ) {
-    final bool credit = kind == AccountKind.credit;
+    final bool credit = account.kind == AccountKind.credit;
+    final double? limit = account.creditLimit;
     final Map<String, List<AppLedgerRowData>> grouped =
         <String, List<AppLedgerRowData>>{};
     for (final AccountEntryRecord e in entries) {
       final String label = _dayFormat.format(e.occurredAt);
-      final String balanceLabel = credit ? '变动后已用额度' : '变动后余额';
+      final String balanceLabel = credit ? '变动后可用额度' : '变动后余额';
+      final String balanceValue = credit
+          ? (limit == null ? '—' : MoneyFormat.yuan0(limit - e.balanceAfter))
+          : MoneyFormat.yuan0(e.balanceAfter);
       grouped.putIfAbsent(label, () => <AppLedgerRowData>[]).add(
             AppLedgerRowData(
               title: e.note.isEmpty ? e.entryType.label : e.note,
               subtitle: e.reason.isEmpty
-                  ? '${e.entryType.label} · $balanceLabel '
-                      '${MoneyFormat.yuan0(e.balanceAfter)}'
+                  ? '${e.entryType.label} · $balanceLabel $balanceValue'
                   : '${e.entryType.label} · ${e.reason}',
-              amountText: credit
-                  ? MoneyFormat.signedUsed(e.direction, e.amount)
-                  : MoneyFormat.signed(e.direction, e.amount),
+              amountText: MoneyFormat.signed(e.direction, e.amount),
               icon: _entryIcon(e.entryType),
               positive: e.direction == AccountDirection.inbound,
             ),
@@ -341,6 +386,91 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     return <AppLedgerGroupData>[
       for (final MapEntry<String, List<AppLedgerRowData>> e in grouped.entries)
         AppLedgerGroupData(dateLabel: e.key, rows: e.value),
+    ];
+  }
+
+  /// 方向标签：与账户首页同一套 ChoiceChip + 全局 ChipThemeData，
+  /// 数量与标签合成一个文本，本页不写任何颜色 / 圆角。
+  /// 条数取共享账本的 COUNT 结果，不是当前页的 10 条。
+  Widget _entryFilterChips(AccountController catalog) =>
+      SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            for (var i = 0; i < _EntryFilter.values.length; i++) ...<Widget>[
+              if (i > 0) const SizedBox(width: _kChipGap),
+              _entryChip(
+                catalog,
+                _EntryFilter.values[i],
+                _countOf(catalog, _EntryFilter.values[i]),
+              ),
+            ],
+          ],
+        ),
+      );
+
+  Widget _entryChip(AccountController catalog, _EntryFilter f, int count) =>
+      ChoiceChip(
+        avatar: Icon(_entryFilterIcon(f), size: AppIconSize.small),
+        label: Text('${_entryFilterLabel(f)} $count'),
+        selected: catalog.detailDirection == _directionOf(f),
+        showCheckmark: false,
+        onSelected: (bool _) => _selectEntryFilter(catalog, f),
+      );
+
+  static int _countOf(AccountController catalog, _EntryFilter f) =>
+      switch (f) {
+        _EntryFilter.all => catalog.detailTotalAll,
+        _EntryFilter.outbound => catalog.detailTotalOutbound,
+        _EntryFilter.inbound => catalog.detailTotalInbound,
+      };
+
+  /// 切标签交给 Controller：它会在 SQL 层按方向重算总条数 / 总页数，
+  /// 并回到第 1 页。页面不 setState、不持有筛选状态。
+  void _selectEntryFilter(AccountController catalog, _EntryFilter f) {
+    unawaited(catalog.setDetailDirection(_directionOf(f)));
+  }
+
+  /// 当前页列表 + 分页条。数据在 DAO 层就已经是「第 N 页的 10 条」，
+  /// 这里只负责渲染，不做任何截断。
+  List<Widget> _entryList(
+    AccountController catalog,
+    AccountRecord account,
+  ) {
+    final List<AccountEntryRecord> pageRows = catalog.detailEntries;
+    if (catalog.detailTotal == 0) {
+      return <Widget>[
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
+          child: Text(
+            catalog.detailDirection == null ? _kNoEntry : _kFilterEmpty,
+            style: context.appText.caption,
+            textAlign: TextAlign.center,
+          ),
+        ),
+      ];
+    }
+    return <Widget>[
+      if (pageRows.isEmpty)
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
+          child: Text(
+            _kFilterEmpty,
+            style: context.appText.caption,
+            textAlign: TextAlign.center,
+          ),
+        )
+      else
+        AppLedgerList(groups: _groups(account, pageRows)),
+      const SizedBox(height: AppSpacing.sm),
+      AppPaginator(
+        page: catalog.detailPage,
+        pageCount: catalog.detailPageCount,
+        total: catalog.detailTotal,
+        pageSize: catalog.detailPageSize,
+        onPageChanged: (int p) => unawaited(catalog.goToDetailPage(p)),
+      ),
     ];
   }
 }
