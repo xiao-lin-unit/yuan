@@ -345,6 +345,21 @@ class AccountController extends ChangeNotifier {
     await load();
   }
 
+  /// 常用账户 / 上次使用账户的**只读**查询（详见
+  /// [AccountEntryDao.usageByAccount]）。故意不是内存字段、不进
+  /// notifyListeners：它是对历史流水的即时聚合，调用方按需 await 一次
+  /// 即可；做成缓存反而要处理「何时失效」。
+  ///
+  /// 【当前状态，按静态优先约定写清】本项目还没有支出单据，
+  /// `refType: 'expense'` 暂时查不到数据；本方法只是把数据能力备好，
+  /// **账户首页不接「常用」UI**，等展示规则确定后再取用。
+  /// 结果第一项即「上次使用账户」，不必再加第二个方法。
+  Future<List<AccountUsage>> frequentlyUsedAccounts({
+    int limit = 5,
+    String? refType,
+  }) =>
+      entryDao.usageByAccount(db, limit: limit, refType: refType);
+
   /// 删除 = 进回收站（10.7）。先数流水给页面提示（3.8），
   /// 记录本身永不物理删除。
   Future<int> countEntries(int id) => dao.countEntries(db, id);

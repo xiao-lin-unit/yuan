@@ -40,6 +40,7 @@ const String _kFilterEmptyDescription = '点右上角 ＋ 新增，或切回「�
 const String _kFootNote =
     '「真正属于你的钱」会把所有账户加起来、再减去欠银行的钱。'
     '以后记进资产和借款后，这个数字会更完整。';
+const String _kDragTip = '拖动账户左侧手柄可调整顺序；搜索结果不参与排序。';
 
 /// 类型快筛标签。**只按账户类型分**，不含原型的「常用」：
 /// 本轮需求只覆盖类型快筛，「常用」的排序规则（手动置顶 or 按使用频率）
@@ -84,13 +85,14 @@ IconData _filterIcon(_AccountFilter f) => switch (f) {
 ///  └ AppHomePage（★ Home 页专用：无标题、无返回、右上角只有 ＋）
 ///     ├ hero   → AppSummaryHero（通用件；数字随筛选标签切换）
 ///     └ child  → 搜索栏 → 类型快筛 chips → 可折叠分组 → 底部说明
-///                  └ 每段：_AccountGroupHeader + AccountCard 列表
+///                  └ 每段：_AccountGroupHeader + ReorderableListView
+///                          （shrinkWrap，滚动交给页壳一处）
 /// ```
 /// 首屏第一块直接是数字；搜索栏、chips、分组头**全部在滚动 Column 里**，
 /// 没有任何「提升 / pin / 注册到固定槽位」的机制——固定还是滚动，
 /// 只看 Column 的 children 顺序，读构造函数就能看全。
 ///
-/// ── 本页的动态逻辑（4 处，按项目约定分步写清）───────────────────
+/// ── 本页的动态逻辑（4 处状态 + 1 处写操作，按项目约定分步写清）────
 /// 为什么需要动态：折叠、搜索、类型筛选都随用户操作变化，构造期定不死。
 /// 全部是本 State 里最朴素的字段 + setState，没有 Notifier、
 /// InheritedWidget 提升、跨帧回调，也没有第二种渲染模式。
@@ -107,6 +109,12 @@ IconData _filterIcon(_AccountFilter f) => switch (f) {
 /// ④ 折叠：点分组头 → `_toggleGroup` 把段键加入 / 移出 `_collapsed`；
 ///    build 里 `collapsed = 段键在集合里` 决定是否渲染卡片列表。
 ///    折叠状态只在内存，退出页面即重置，不写库（原型也是这个行为）。
+/// ⑤ 拖拽提交（唯一一处写操作，不新增任何 State 字段）：
+///    ReorderableListView 给出 oldIndex/newIndex → 把**这一段**的 ids
+///    按新顺序排好 → `AccountController.reorder(ids)` → DAO 在一个事务
+///    里批量写 sort_order → Controller load() 重读并 notify → 页面重建。
+///    Controller 会把「不在这批 ids 里」的记录留在原槽位，所以按类型
+///    筛选或只拖一段时，其它类别 / 归档项不会被挤到末尾。
 ///
 /// ── 边界行为 ────────────────────────────────────────────────────
 /// · 统计**不受搜索词影响**：只按类型筛选后的全量算，否则一输入关键词
@@ -119,10 +127,16 @@ IconData _filterIcon(_AccountFilter f) => switch (f) {
 /// · 原型是三张横滑统计卡 + 小圆点；本项目已有通用 `AppSummaryHero`，
 ///   按「通用组件复用」改成「一张卡 + 点 chip 切换统计口径」，比横滑
 ///   更直接（点哪类就显示哪类），也不引入 PageView 下标这类运行时状态。
-/// · 原型还有「排序方式」菜单与「常用账户」chip：本轮按你点名的三项
-///   （折叠 / 搜索 / 类型标签）实现，排序沿用 DAO 的 sort_order 自定义
-///   顺序，「常用」缺数据字段暂不做。要补排序只需在 State 里加一个
-///   枚举 + 一个按钮，不需要改结构层。
+/// · 原型还有「排序方式」菜单与「常用账户」chip：
+///   - 自定义排序**已接上**：沿用 DAO 的 sort_order + 现成的
+///     AccountController.reorder，拖柄照抄分类页 CategoryListTile，
+///     没有新增字段、没有新增表、没有第二种排序模式；
+///   - 「常用账户」仍不接 UI：规则（手动置顶 or 按使用频率）没定，
+///     不做半截功能。数据层已备好按流水聚合的只读查询
+///     （AccountController.frequentlyUsedAccounts），等「记支出」模块
+///     确定口径后直接取用；「上次使用账户」就是该结果的第一项。
+///   - 「排序方式」菜单不做：目前只有 sort_order 一种顺序，加菜单
+///     等于加一个没有第二种选项的开关。
 class AccountsScreen extends StatefulWidget {
   const AccountsScreen({super.key});
 
@@ -249,7 +263,22 @@ class _AccountsScreenState extends State<AccountsScreen> {
               ),
             )
           else ...<Widget>[
-            ..._groups(context, visible, visibleArchived, searching),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.md,
+                AppSpacing.xs,
+                AppSpacing.md,
+                0,
+              ),
+              child: Text(_kDragTip, style: context.appText.caption),
+            ),
+            ..._groups(
+              context,
+              controller,
+              visible,
+              visibleArchived,
+              searching,
+            ),
             const SizedBox(height: AppSpacing.sm),
             Padding(
               padding: const EdgeInsets.symmetric(
@@ -430,6 +459,7 @@ class _AccountsScreenState extends State<AccountsScreen> {
   /// 选中某类只出一段；归档段永远排最后。
   List<Widget> _groups(
     BuildContext context,
+    AccountController controller,
     List<AccountRecord> visible,
     List<AccountRecord> archived,
     bool searching,
@@ -437,34 +467,57 @@ class _AccountsScreenState extends State<AccountsScreen> {
     final List<Widget> out = <Widget>[];
     if (searching) {
       out.add(
-        _group(context, _AccountGroup.search, _kSearchGroup, visible,
-            forceExpanded: true),
+        _group(
+          context,
+          controller,
+          _AccountGroup.search,
+          _kSearchGroup,
+          visible,
+          forceExpanded: true,
+          draggable: false,
+        ),
       );
     } else if (_filter == _AccountFilter.all) {
       for (final AccountKind kind in AccountKind.values) {
         out.add(
           _group(
             context,
+            controller,
             _groupOf(kind),
             kind.label,
             visible
                 .where((AccountRecord r) => r.kind == kind)
                 .toList(growable: false),
             forceExpanded: false,
+            draggable: true,
           ),
         );
       }
     } else {
       final AccountKind kind = _kindOf(_filter)!;
       out.add(
-        _group(context, _groupOf(kind), kind.label, visible,
-            forceExpanded: false),
+        _group(
+          context,
+          controller,
+          _groupOf(kind),
+          kind.label,
+          visible,
+          forceExpanded: false,
+          draggable: true,
+        ),
       );
     }
     if (archived.isNotEmpty) {
       out.add(
-        _group(context, _AccountGroup.archived, _kArchivedSection, archived,
-            forceExpanded: searching),
+        _group(
+          context,
+          controller,
+          _AccountGroup.archived,
+          _kArchivedSection,
+          archived,
+          forceExpanded: searching,
+          draggable: !searching,
+        ),
       );
     }
     return out;
@@ -475,10 +528,12 @@ class _AccountsScreenState extends State<AccountsScreen> {
   /// **已用额度合计**（两者在模型里是同一列，口径见 AccountRecord.balance）。
   Widget _group(
     BuildContext context,
+    AccountController controller,
     _AccountGroup key,
     String label,
     List<AccountRecord> rows, {
     required bool forceExpanded,
+    required bool draggable,
   }) {
     if (rows.isEmpty) return const SizedBox.shrink();
     final bool collapsed = !forceExpanded && _collapsed.contains(key);
@@ -500,19 +555,48 @@ class _AccountsScreenState extends State<AccountsScreen> {
         if (!collapsed)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                for (var i = 0; i < rows.length; i++)
-                  AccountCard(
-                    key: ValueKey<int>(rows[i].id ?? i),
-                    account: rows[i],
-                    index: i,
-                    onTap: () => unawaited(
-                      context.push('/accounts/detail/${rows[i].id}'),
-                    ),
-                  ),
-              ],
+            // 与分类页 _buildList 同一套写法：页壳 AppHomePage 已经有
+            // SingleChildScrollView，这里 shrinkWrap + 禁止自身滚动，
+            // 把滚动手势交给外层唯一一处；拖柄用显式 index 绑定，
+            // 不用默认长按整卡（会和卡片的点击进详情抢手势）。
+            //
+            // 【下标与提交，工作逻辑 4 步】
+            //   ① itemBuilder 的 i 是**这一段内**的下标，ReorderableListView
+            //      只认识自己的 itemCount，所以 dragIndex 传 i；
+            //   ② 回调的 newIndex 是「插入位置」，向下拖时要减 1 才是
+            //      目标下标（与分类页 onReorderItem 完全一致）；
+            //   ③ ids 只收这一段的账户，按新顺序排好后交给
+            //      AccountController.reorder；它把其它账户留在原槽位；
+            //   ④ reorder 落库 → load() → notifyListeners → 本页重建。
+            // 【边界】draggable=false（搜索结果 / 搜索时的归档段）只是
+            // 不渲染拖柄，列表仍走同一条渲染路径，没有隐藏的第二种模式；
+            // 跨类别的临时搜索结果本来也没有稳定的排序语义。
+            child: ReorderableListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              buildDefaultDragHandles: false,
+              itemCount: rows.length,
+              onReorderItem: (int oldIndex, int newIndex) async {
+                final List<int> ids = rows
+                    .map((AccountRecord r) => r.id)
+                    .whereType<int>()
+                    .toList();
+                int target = newIndex;
+                if (target > oldIndex) target -= 1;
+                final int moved = ids.removeAt(oldIndex);
+                ids.insert(target, moved);
+                await controller.reorder(ids);
+              },
+              itemBuilder: (BuildContext context, int i) => AccountCard(
+                // ReorderableListView 要求每个 child 有稳定 key。
+                key: ValueKey<int>(rows[i].id ?? i),
+                account: rows[i],
+                index: i,
+                dragIndex: draggable ? i : null,
+                onTap: () => unawaited(
+                  context.push('/accounts/detail/${rows[i].id}'),
+                ),
+              ),
             ),
           ),
       ],

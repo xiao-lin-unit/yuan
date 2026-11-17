@@ -193,6 +193,56 @@ class AccountEntryDao implements BaseDao {
     );
   }
 
+  /// 账户使用频次 / 最近使用（只读聚合，供「常用账户」「记支出时预选
+  /// 上次使用账户」备用）。**当前不接 UI**：常用的展示规则还没定，
+  /// 先把数据能力备好，等「记支出」模块确定口径后直接取用。
+  ///
+  /// 【工作逻辑，3 步】
+  ///   1. 可选按 [refType] 过滤：传 `'expense'` 只统计真实支出单据，
+  ///      不传则按该账户的全部流水统计（含开户 / 转账 / 还款 / 校准）；
+  ///   2. `GROUP BY account_id` 聚合出 `COUNT(*)` 与 `MAX(occurred_at)`；
+  ///   3. 按最后使用时间倒序、次数倒序取前 [limit] 条。
+  ///
+  /// 【边界，如实写明】目前「记支出 / 记收入」模块尚未开发，流水里的
+  /// `ref_type` 全是 NULL，所以传 `refType: 'expense'` 会返回空列表；
+  /// 不传过滤则能拿到账户内部操作的活跃顺序，可作为开发期调试用，
+  /// 但它**不是**最终意义上的「记账常用」。等支出单据写入后再启用
+  /// 过滤参数，无需改表、无需迁移。
+  /// 无数据时返回空列表，不抛异常。
+  Future<List<AccountUsage>> usageByAccount(
+    Database db, {
+    int limit = 5,
+    String? refType,
+  }) async {
+    final List<String> where = <String>[];
+    final List<Object?> args = <Object?>[];
+    if (refType != null) {
+      where.add('ref_type = ?');
+      args.add(refType);
+    }
+    final String clause =
+        where.isEmpty ? '' : 'WHERE ${where.join(' AND ')}';
+    final List<Map<String, Object?>> rows = await db.rawQuery(
+      'SELECT account_id AS account_id, COUNT(*) AS use_count, '
+      ' MAX(occurred_at) AS last_used_at '
+      ' FROM $table $clause '
+      ' GROUP BY account_id '
+      ' ORDER BY last_used_at DESC, use_count DESC '
+      ' LIMIT ?',
+      <Object?>[...args, limit],
+    );
+    return <AccountUsage>[
+      for (final Map<String, Object?> r in rows)
+        AccountUsage(
+          accountId: (r['account_id'] as num?)?.toInt() ?? 0,
+          useCount: (r['use_count'] as num?)?.toInt() ?? 0,
+          lastUsedAt: DateTime.fromMillisecondsSinceEpoch(
+            (r['last_used_at'] as num?)?.toInt() ?? 0,
+          ),
+        ),
+    ];
+  }
+
   /// 恒等式审计（10.9）：返回「按规则算出的应有累计值 − 实际 balance」，
   /// 0 表示账实相符。供「余额对不上」时排查，不参与 UI。
   ///

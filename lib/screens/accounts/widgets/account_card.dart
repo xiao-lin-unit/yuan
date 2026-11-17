@@ -42,17 +42,27 @@ IconData accountTypeIcon(AccountType type) => switch (type) {
 ///   · 受限账户在副标题前显示 🔒 的矢量等价（lock 图标）。
 /// 样式全部走 AppDecorations / context.appText / context.tokens，
 /// 没有硬编码颜色、字号、圆角。
+///
+/// 【拖柄是可选参数，不是第二种渲染模式】[dragIndex] 为 null 时不渲染
+/// 左侧手柄，其余布局逐像素不变；传值时应给**当前列表内的下标**，
+/// 由 [ReorderableDragStartListener] 交给外层 ReorderableListView。
+/// 与分类页 CategoryListTile 的 `dragIndex` 是同一套写法，不新增机制。
+/// 账户首页的搜索结果段不传，因为跨类别的临时结果没有稳定的排序语义。
 class AccountCard extends StatelessWidget {
   const AccountCard({
     super.key,
     required this.account,
     required this.index,
     required this.onTap,
+    this.dragIndex,
   });
 
   final AccountRecord account;
+
+  /// 组内下标，只用于 AppIconBadge 的色相轮换（纯视觉）。
   final int index;
   final VoidCallback onTap;
+  final int? dragIndex;
 
   @override
   Widget build(BuildContext context) {
@@ -76,6 +86,22 @@ class AccountCard extends StatelessWidget {
             ),
             child: Row(
               children: <Widget>[
+                if (dragIndex != null)
+                  ReorderableDragStartListener(
+                    index: dragIndex!,
+                    child: Padding(
+                      padding: const EdgeInsets.only(
+                        right: AppSpacing.xxs,
+                      ),
+                      child: Icon(
+                        AppIcons.dragHandle,
+                        size: AppIconSize.medium,
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurfaceVariant,
+                      ),
+                    ),
+                  ),
                 AppIconBadge(
                   icon: accountTypeIcon(account.type),
                   size: _kIconSize,

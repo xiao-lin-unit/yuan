@@ -631,6 +631,30 @@ class AccountStats {
   final int creditCount;
 }
 
+/// 账户使用频次聚合结果（按流水算，**不存表**）。
+///
+/// 【为什么是查询结果而不是 accounts 表的一列】4.6「最近用过的」与
+/// 「记支出时预选上次使用账户」都可以由 account_entries 直接聚合，
+/// 与 category 模块同一条原则（`last_used_at / use_count` 刻意不入表）：
+/// 冗余一份计数就要处理「转账/还款算不算使用」「删了流水要不要回退」，
+/// 永远可能和真实数据不一致。这里按需查询，结果天然准确。
+///
+/// [lastUsedAt] 取该账户最后一笔流水的 **occurred_at**（交易时间，
+/// 附录 C），不是 createdAt：用户月底补记月初的账，归属应按交易时间。
+/// 结果按 lastUsedAt 倒序，因此**第一项就是「上次使用账户」**。
+@immutable
+class AccountUsage {
+  const AccountUsage({
+    required this.accountId,
+    required this.useCount,
+    required this.lastUsedAt,
+  });
+
+  final int accountId;
+  final int useCount;
+  final DateTime lastUsedAt;
+}
+
 /// 明细页流水汇总。
 ///
 /// [inbound] / [outbound] 是**按 direction 聚合的原始金额**，与账户类别
