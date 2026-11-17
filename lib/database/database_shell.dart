@@ -20,7 +20,9 @@ class DatabaseService {
   //     （受限账户绑定用途）+ account_entries（账户出入流水）。
   // v5: accounts 主表重建：DDL 不再把具体形态写死在 CHECK 里，
   //     形态合法性交给 Dart 枚举（以后加「花呗 / 借呗」这类形态不升版本）。
-  static const _dbVersion = 5;
+  // v6: 信用卡流水 direction 翻转（消费 → 出账、还款 → 入账）。
+  //     DDL 与列结构不变，只做一次幂等 UPDATE；balance_after 原样保留。
+  static const _dbVersion = 6;
   Database? _db;
 
   final List<DbModule> _modules = <DbModule>[
@@ -87,6 +89,15 @@ class DatabaseService {
       // v4 → v5：按列名全量拷贝 → DROP → RENAME → 重建索引。
       // 绑定表与流水表不动，id 原样保留。
       await AccountDb.migrateV4ToV5(db);
+    }
+    // v5 → v6 与上面的建表 / 重建**顺序执行、互不排斥**：
+    //   · oldV == 4 的用户先重建主表，再翻转旧流水方向；
+    //   · oldV == 5 的用户直接翻转；
+    //   · oldV < 4 的用户表是空的，UPDATE 影响 0 行。
+    // 写成独立 if 而不是 else if，是因为它属于「数据口径修正」，
+    // 与「表结构建立 / 重建」是两件事，任何起点都要过这一遍。
+    if (oldV < 6) {
+      await AccountDb.migrateV5ToV6(db);
     }
   }
 

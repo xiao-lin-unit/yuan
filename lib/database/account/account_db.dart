@@ -20,10 +20,9 @@ import 'account_record.dart';
 ///      · 流动资金 / 受限账户 → 当前余额
 ///      · 信用卡              → 已用额度（欠款）
 ///    可用额度 = credit_limit − balance，永远是算出来的，不存第二列。
-///    方向差异也不是列差异：流水 `direction='in'` 表示「本账户累计值 +」，
-///    对储蓄卡是收入、对信用卡是消费；`out` 同理。于是
-///    `balance_after = balance_before ± amount` 对三类账户是同一条公式
-///    （原型信用卡明细「消费入账 +¥156 / 还款出账 −¥1,000」就是这个口径）。
+///    **但运算规则必须按类别分开**：储蓄类「入账 + / 出账 −」，信用卡
+///    「消费出账 + / 还款入账 −」，见 [AccountBalanceRule]。共用一列
+///    不等于共用一条公式；v6 起由流水 DAO 的必传 `rule` 参数区分。
 /// 3. 统计 SQL 因此极简：能花的钱 = SUM(balance WHERE kind='liquid' AND
 ///    is_liquid=1)，欠银行的钱 = SUM(balance WHERE kind='credit')。
 ///    拆表反而要 UNION 两遍。
@@ -104,8 +103,8 @@ class AccountDb implements DbModule {
   /// `kind='credit' → type='credit_card'`：加「花呗 / 借呗」会被数据库
   /// 直接拒写，而 SQLite 不支持 ALTER TABLE … MODIFY CHECK，只能重建表。
   /// 现在只约束 type 非空，取值合法性交给 Dart 枚举
-  /// [AccountType.supports] 与 AccountController.save 兜底校验。
-  /// 于是「以后再加形态 = 加一个枚举值 + 指定 ownerKind」，不动表、
+  /// [AccountType.supports] 与两个业务 Controller 的 save 兜底校验。
+  /// 于是「以后再加形态 = 加一个枚举值 + 往该类别清单加一项」，不动表、
   /// 不升版本，满足「没有业务变化就不二次修改表结构」。
   /// 社保 / 公积金的 is_liquid 强制为 0 是业务规则，保留在 CHECK 里；
   /// 新增形态不会触碰这条，因此不会造成版本升级。
@@ -189,6 +188,34 @@ class AccountDb implements DbModule {
     await createIndexes(db, accountsTable);
   }
 
+  /// v5 → v6：只修正**信用卡流水的方向标签**，DDL 与列结构一字节不改。
+  ///
+  /// 【为什么要翻转】v4/v5 把「消费」记为 in、「还款」记为 out，理由是
+  /// 那时 direction 表示「累计值的增减」。本轮按业务事实改成：direction
+  /// 表示资金往哪走，信用卡消费是**出账**、还款是**入账**，累计值增减
+  /// 交给 [AccountBalanceRule.credit]。于是历史数据要把 in/out 对调，
+  /// 否则升级后旧流水会被新规则算反。
+  ///
+  /// 【工作逻辑，3 步】
+  ///   1. 只挑 `account_id` 属于 `kind='credit'` 账户的流水；
+  ///   2. `CASE` 把 'in' ↔ 'out' 互换；
+  ///   3. `balance_after` **原样保留**：它记的是当时的累计值，本来就对，
+  ///      错的只是方向标签，绝对不能重算（10.9 逐笔可审计）。
+  ///
+  /// 【边界】`entry_type <> 'opening'`：v4/v5 的表单不给信用卡填初始余额，
+  /// 正常数据不存在 credit + opening 组合；留着这个排除条件是为了万一
+  /// 有历史脏数据，也不会撞 DDL 的 `opening → direction='in'` CHECK
+  /// 导致整个升级失败。全新安装表为空，本语句影响 0 行。
+  /// 【事务边界】openDatabase.onUpgrade 已在事务内，本方法不自建事务。
+  static Future<void> migrateV5ToV6(DatabaseExecutor db) async {
+    await db.execute('''
+      UPDATE $entriesTable
+         SET direction = CASE WHEN direction = 'in' THEN 'out' ELSE 'in' END
+       WHERE entry_type <> 'opening'
+         AND account_id IN (SELECT id FROM $accountsTable WHERE kind = 'credit')
+    ''');
+  }
+
   @override
   String get name => 'account';
 
@@ -248,6 +275,8 @@ class AccountDb implements DbModule {
         CHECK (entry_type NOT IN ('transfer_out','transfer_in')
                OR (transfer_group_id IS NOT NULL AND counterparty_account_id IS NOT NULL)),
         -- 开户初始余额是唯一允许「凭空」产生余额的动作，其余必须来自记账。
+        -- 只有储蓄类账户有 opening（信用卡没有「期初已用额度」），
+        -- 而储蓄类规则下 in = 累计值 +，所以这条 CHECK 在新规则下仍成立。
         CHECK (entry_type <> 'opening' OR direction = 'in')
       )
     ''');

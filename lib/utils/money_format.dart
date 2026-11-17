@@ -23,10 +23,16 @@ abstract final class MoneyFormat {
       ? '${_wan.format(value / 10000)} 万'
       : yuan0(value);
 
-  /// 流水行：+¥8,000.00 / −¥186.00。
+  /// 储蓄类流水行：入账 +¥8,000.00 / 出账 −¥186.00。
   /// 用真正的减号 U+2212 而非连字符，宽度与加号对齐。
   static String signed(AccountDirection direction, num value) =>
       '${direction == AccountDirection.inbound ? '+' : '−'}${yuan(value)}';
+
+  /// 信用卡流水行：显示的是**已用额度**的变化，不是卡内余额。
+  /// 消费出账 = 已用额度 +（欠款变多），还款入账 = 已用额度 −。
+  /// 与 [signed] 刻意分成两个方法：两套口径不共用一段格式化逻辑。
+  static String signedUsed(AccountDirection direction, num value) =>
+      '${direction == AccountDirection.outbound ? '+' : '−'}${yuan(value)}';
 
   /// 差额：+¥70 / −¥70（余额调整确认里用）。
   static String delta(num value) =>

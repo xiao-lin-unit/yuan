@@ -5,7 +5,8 @@ import 'account_db.dart';
 import 'account_record.dart';
 
 /// 账户主表 / 绑定表的纯 SQL 层：**不含业务规则**（余额联动在
-/// AccountEntryDao.append，校验与事务编排在 AccountController）。
+/// AccountEntryDao.append，校验与事务编排在两个业务 Controller：
+/// SavingsAccountController / CreditCardAccountController）。
 class AccountDao implements BaseDao {
   static const String table = AccountDb.accountsTable;
   static const String bindingsTable = AccountDb.bindingsTable;
@@ -160,15 +161,15 @@ class AccountDao implements BaseDao {
   ///
   /// 【为什么参数是 DatabaseExecutor，而不是 Database】
   /// sqflite 里 `Database` 和 `Transaction` 都实现 `DatabaseExecutor`。
-  /// `AccountController.save` 在 `db.transaction((txn) ...)` 里调本方法，
+  /// `SavingsAccountController.save` 在 `db.transaction((txn) ...)` 里调本方法，
   /// 回调拿到的是 `Transaction`；参数写成 `Database` 会编译不过，写成
   /// `DatabaseExecutor` 则两种执行器都能传（本文件 insert/update、
   /// AccountEntryDao.append、AccountDb.onCreate 都是这个写法）。
   ///
   /// 【为什么不自己开事务】事务边界由调用方统一持有：`save` 已经把
   /// 「写账户 + 开户流水 + 绑定替换」放进同一个事务，这里再开一层会把
-  /// 回滚范围切碎；独立调用见 `AccountController.setBindings`，它自己
-  /// 包一层 `db.transaction`，两边都只有一层事务。
+  /// 回滚范围切碎；独立调用见 `SavingsAccountController.setBindings`，
+  /// 它自己包一层 `db.transaction`，两边都只有一层事务。
   /// 注意：不要把事务里的 `txn` 改成外层 `db` 来「绕开类型错误」——
   /// 那样绑定写入不属于当前事务，失败时无法和账户一起回滚（10.9）。
   Future<void> replaceBindings(

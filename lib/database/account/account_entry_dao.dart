@@ -18,9 +18,12 @@ import 'account_record.dart';
 /// 「进出后余额变成多少」（10.3），恒等式也能逐行回放审计；纯 SUM
 /// 方案在几万条流水时每次翻页都要全表扫描，且无法还原历史时点。
 ///
-/// [append] 不自己开事务：调用方（AccountController）负责把「一次业务
-/// 动作」包进 `db.transaction`。转账要写两条流水、改两个账户，必须是
-/// 同一个事务，否则会只扣了一头（3.7 / 附录 A「两边状态原子同步」）。
+/// [append] 不自己开事务：调用方（两个业务 Controller）负责把「一次业务
+/// 动作」包进 `db.transaction`。转账 / 还款要写两条流水、改两个账户，
+/// 必须是同一个事务，否则会只扣了一头（3.7 / 附录 A）。
+///
+/// 【规则由调用方显式传，DAO 不读账户类别】见 [AccountBalanceRule] 注释：
+/// 储蓄类与信用卡的累计值方向相反，`rule` 没有默认值，漏传就编译不过。
 class AccountEntryDao implements BaseDao {
   static const String table = AccountDb.entriesTable;
   static const String accountsTable = AccountDb.accountsTable;
@@ -32,8 +35,9 @@ class AccountEntryDao implements BaseDao {
   ///
   /// 工作逻辑（4 步，全部在调用方给的事务执行器 [txn] 内）：
   ///   1. 在事务内读该账户**当前**累计值（不读内存快照，避免并发/过期数据）；
-  ///   2. `after = before + direction.sign * amount`；金额恒正，符号只由
-  ///      方向决定，三类账户同一条公式（见 AccountDirection 注释）；
+  ///   2. `after = before + rule.delta(direction, amount)`。金额恒正，
+  ///      符号由 direction 与 [rule] 共同决定：储蓄类入账加、信用卡
+  ///      出账加（见 [AccountBalanceRule]）；**不再有「三类同一条公式」**；
   ///   3. insert 流水（带 balance_after）；
   ///   4. `UPDATE accounts SET balance = after, revision = revision + 1`
   ///      并检查受影响行数，0 行则整条事务回滚。
@@ -43,8 +47,9 @@ class AccountEntryDao implements BaseDao {
   /// amount <= 0 由 DDL 的 CHECK 挡住，业务层也会提前校验（10.6）。
   Future<double> append(
     DatabaseExecutor txn,
-    AccountEntryRecord entry,
-  ) async {
+    AccountEntryRecord entry, {
+    required AccountBalanceRule rule,
+  }) async {
     final rows = await txn.query(
       accountsTable,
       columns: <String>['balance'],
@@ -56,7 +61,7 @@ class AccountEntryDao implements BaseDao {
       throw StateError('账户不存在或已删除，不能记流水');
     }
     final double before = (rows.first['balance'] as num?)?.toDouble() ?? 0;
-    final double after = before + entry.direction.sign * entry.amount;
+    final double after = before + rule.delta(entry.direction, entry.amount);
 
     final Map<String, dynamic> values = entry.toMap()
       ..['balance_after'] = after;
@@ -137,12 +142,21 @@ class AccountEntryDao implements BaseDao {
     );
   }
 
-  /// 恒等式审计（10.9）：期初 + Σ入 − Σ出 必须等于当前 balance。
-  /// 供「余额对不上」时排查，不参与 UI；返回差值，0 表示账实相符。
+  /// 恒等式审计（10.9）：返回「按规则算出的应有累计值 − 实际 balance」，
+  /// 0 表示账实相符。供「余额对不上」时排查，不参与 UI。
+  ///
+  /// 【为什么这里按 kind 选规则，而 append 要显式传】审计是**读**路径，
+  /// 本来就从 DB 读出了完整账户行，能安全推出规则；append 是**写**路径，
+  /// 必须让处理器在调用点把规则说清楚，二者不矛盾。
+  /// 信用卡没有「期初已用额度」，恒等式是 `Σ出账 − Σ入账`。
   Future<double> auditBalance(Database db, int accountId) async {
     final AccountRecord? account = await AccountDao().byId(db, accountId);
     if (account == null) return 0;
     final AccountEntrySummary summary = await summaryFor(db, accountId);
-    return (account.initialBalance + summary.net) - account.balance;
+    final double expected = AccountBalanceRule.of(account.kind) ==
+            AccountBalanceRule.savings
+        ? account.initialBalance + summary.net
+        : -summary.net;
+    return expected - account.balance;
   }
 }

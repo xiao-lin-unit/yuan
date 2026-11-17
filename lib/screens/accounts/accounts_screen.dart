@@ -6,6 +6,8 @@ import 'package:provider/provider.dart';
 
 import '../../database/account/account_record.dart';
 import '../../service/account_controller.dart';
+import '../../service/credit_card_account_controller.dart';
+import '../../service/savings_account_controller.dart';
 import '../../styles/app_decorations.dart';
 import '../../styles/app_typography.dart';
 import '../../styles/theme_tokens.dart';
@@ -521,6 +523,10 @@ class _AccountsScreenState extends State<AccountsScreen> {
   /// 新增两步：先用 ⑤ CategorySheetContent 选类型，
   /// 再用 ① FormSheetContent 填表。**顺序两个弹层，不是弹窗套弹窗**。
   /// 关闭类型选择（返回 null）就什么都不做。
+  ///
+  /// 【分派说明】共享账本 `controller` 只负责查询与重名校验；真正落库
+  /// 由表单按所选类别交给 SavingsAccountController 或
+  /// CreditCardAccountController，页面不碰资金方向逻辑。
   Future<void> _addAccount(
     BuildContext context,
     AccountController controller,
@@ -529,7 +535,9 @@ class _AccountsScreenState extends State<AccountsScreen> {
     if (kind == null || !context.mounted) return;
     await showAccountEditorSheet(
       context,
-      controller: controller,
+      catalog: controller,
+      savings: context.read<SavingsAccountController>(),
+      credit: context.read<CreditCardAccountController>(),
       kind: kind,
     );
   }

@@ -50,7 +50,7 @@ enum AccountKind {
 /// 设计文档 3.4 那句「信用卡流动资金默认为是」讲的是口径 A（额度可以
 /// 自由支配地去刷），与本表 is_liquid 取口径 B 不矛盾——不是同一件事。
 ///
-/// 代码上的落点（DDL CHECK + AccountController.save 双保险）：
+/// 代码上的落点（DDL CHECK + 两个业务 Controller 的 save 双保险）：
 ///   · liquid      → is_liquid 恒 1；
 ///   · credit      → is_liquid 恒 0、include_in_net_worth 恒 0；
 ///   · restricted  → 由用户决定；社保 / 公积金 [liquidLocked] 强制为 0。
@@ -63,35 +63,39 @@ enum AccountKind {
 /// 本轮只把借呗登记为信用类形态，不开放「借呗直接消费」入口，等负债
 /// 模块（7.5）一起做。
 ///
-/// 【为什么按类别分组】[ownerKind] 是唯一真源：新增账户时下拉只显示
-/// 该类别的形态，避免「流动资金账户里冒出公积金」这种错配；null 表示
-/// 通用形态（其他），任何类别都可选。以后新增形态 = 加一个枚举值 +
-/// 指定 ownerKind，**不改表结构、不升 DB 版本**（DDL 不锁 type 取值，
-/// 合法性由 [supports] 与 AccountController.save 校验）。
+/// 【为什么按类别写死清单】[allowedTypesFor] 是**唯一真源**：下拉候选、
+/// 表单校验、历史脏数据兜底全部读它。原先靠 `ownerKind` 通配（null =
+/// 任何类别都可选），结果「信用卡类别里出现『其他』」「其他资金账户
+/// 编辑旧脏数据时冒出信用卡形态」两类错配都发生过。
+///
+/// 现在三条清单互不相交地表达业务事实：
+///   · 流动资金账户：储蓄卡 / 现金 / 微信零钱 / 支付宝 / 其他；
+///   · 信用卡账户：信用卡 / 花呗 / 借呗 —— **不含通用「其他」**；
+///   · 其他资金账户：社保 / 公积金 / 礼品卡 / 冻结存款 / 其他 ——
+///     **完全不含任何信用卡形态**。
+/// 以后新增形态 = 加一个枚举值 + 往对应清单加一项，不改表结构、
+/// 不升 DB 版本（DDL 不锁 type 取值，合法性全在 Dart 侧）。
 enum AccountType {
-  bank('bank', '储蓄卡', AccountKind.liquid),
-  cash('cash', '现金', AccountKind.liquid),
-  wechat('wechat', '微信零钱', AccountKind.liquid),
-  alipay('alipay', '支付宝', AccountKind.liquid),
+  bank('bank', '储蓄卡'),
+  cash('cash', '现金'),
+  wechat('wechat', '微信零钱'),
+  alipay('alipay', '支付宝'),
 
-  creditCard('credit_card', '信用卡', AccountKind.credit),
-  huabei('huabei', '花呗', AccountKind.credit),
-  jiebei('jiebei', '借呗', AccountKind.credit),
+  creditCard('credit_card', '信用卡'),
+  huabei('huabei', '花呗'),
+  jiebei('jiebei', '借呗'),
 
-  socialSecurity('social_security', '社保', AccountKind.restricted),
-  housingFund('housing_fund', '公积金', AccountKind.restricted),
-  giftCard('gift_card', '礼品卡', AccountKind.restricted),
-  frozen('frozen', '冻结存款', AccountKind.restricted),
+  socialSecurity('social_security', '社保'),
+  housingFund('housing_fund', '公积金'),
+  giftCard('gift_card', '礼品卡'),
+  frozen('frozen', '冻结存款'),
 
-  other('other', '其他', null);
+  other('other', '其他');
 
-  const AccountType(this.dbValue, this.label, this.ownerKind);
+  const AccountType(this.dbValue, this.label);
 
   final String dbValue;
   final String label;
-
-  /// 该形态归属的类别；null = 通用形态（任何类别都可选）。
-  final AccountKind? ownerKind;
 
   static AccountType fromDb(String? value) => switch (value) {
         'cash' => cash,
@@ -111,16 +115,27 @@ enum AccountType {
   /// 3.5：社保 / 公积金「流动资金」强制为否且不可改。
   bool get liquidLocked => this == socialSecurity || this == housingFund;
 
-  /// 该形态能否用于指定类别。DDL 不再锁 type 取值，合法性全部走这里。
-  /// 工作逻辑：通用形态（ownerKind == null）任何类别都通过；否则必须相等。
-  bool supports(AccountKind kind) => ownerKind == null || ownerKind == kind;
+  /// 该形态能否用于指定类别。DDL 不锁 type 取值，合法性全部走这里。
+  /// 工作逻辑：只在 [allowedTypesFor] 的清单里查找，清单是唯一真源。
+  bool supports(AccountKind kind) => allowedTypesFor(kind).contains(this);
 
-  /// 新增 / 编辑账户时该类别的下拉候选（唯一真源，表单与校验共用）。
-  /// 工作逻辑：遍历 values，保留 supports(kind) 为 true 的形态，顺序即
-  /// 枚举声明顺序（储蓄卡 / 信用卡 / 社保 … 在各自类别里排在前面）。
-  static List<AccountType> allowedTypesFor(AccountKind kind) => <AccountType>[
-        for (final AccountType t in values) if (t.supports(kind)) t,
-      ];
+  /// 新增 / 编辑账户时该类别的下拉候选（唯一真源，表单与两个业务
+  /// Controller 的 save 校验共用）。
+  ///
+  /// 【静态清单，不是运行时推导】三张清单写死在这里，读一眼就知道每类
+  /// 有哪些形态。信用卡清单不含通用「其他」，其他资金账户清单不含任何
+  /// 信用形态 —— 这正是本轮要求的「其他类型账户中将信用卡类型删除」。
+  static List<AccountType> allowedTypesFor(AccountKind kind) => switch (kind) {
+        AccountKind.liquid => const <AccountType>[
+          bank, cash, wechat, alipay, other,
+        ],
+        AccountKind.credit => const <AccountType>[
+          creditCard, huabei, jiebei,
+        ],
+        AccountKind.restricted => const <AccountType>[
+          socialSecurity, housingFund, giftCard, frozen, other,
+        ],
+      };
 
   /// 该类别的默认形态（表单未改动类型时的兜底值）。显式 switch 而非
   /// 取列表首项：restricted 的首项是社保，作为新账户默认值并不合适。
@@ -131,15 +146,22 @@ enum AccountType {
       };
 }
 
-/// 流水方向。**一律指「本账户那个累计值的增减」，与业务是收入还是支出无关。**
+/// 流水方向。**方向描述资金往哪走，不描述累计值怎么变。**
 ///
 /// 这是「一张流水表 + 一个标记字段」能成立的关键约定（10.6 金额只填正数、
 /// 用类型区分，不用负数）：
-///   · 流动资金 / 受限账户：in = 钱进来（余额 +），out = 钱出去（余额 −）；
-///   · 信用卡：in = 消费（**已用额度 +**），out = 还款（已用额度 −）。
-/// 于是 `balance_after = balance_before + (in ? amount : −amount)` 对三类
-/// 账户是同一条公式，不需要在 DAO 里按 kind 分叉。原型信用卡明细里的
-/// 「消费入账 +¥156」「还款出账 −¥1,000」正是这个口径。
+///   · 流动资金 / 其他资金账户（储蓄类型卡）：
+///       in = 钱进来（余额 +），out = 钱出去（余额 −）；
+///   · 信用卡：
+///       out = 消费**出账**（钱花出去了，已用额度 / 欠款 +），
+///       in  = 还款**入账**（钱还回来了，已用额度 / 欠款 −）。
+///
+/// 【为什么信用卡反过来】信用卡的 `balance` 记的是「已用额度」，不是
+/// 「卡里有多少钱」。消费时额度被占用，是账户对外付出，方向应为出账；
+/// 还款时额度被释放，是资金回流，方向应为入账。累计值的增减由
+/// [AccountBalanceRule] 按账户类别决定，**不再让三类账户共用一条公式**。
+/// 原型明细里「超市购物 +¥156」「储蓄卡还款 −¥1,000」是「已用额度」
+/// 的显示口径，与本表的 `in/out` 是两个概念，不要混为一谈。
 enum AccountDirection {
   inbound('in', '入账'),
   outbound('out', '出账');
@@ -152,8 +174,37 @@ enum AccountDirection {
   static AccountDirection fromDb(String? value) =>
       value == 'in' ? inbound : outbound;
 
-  /// 余额增量符号。金额恒正，符号只由方向决定。
+  /// 方向自身的符号：**只在储蓄规则下**等于累计值增量。
+  /// 信用卡规则要取反，见 [AccountBalanceRule.delta]。
   double get sign => this == inbound ? 1 : -1;
+}
+
+/// 累计值的运算规则。本轮把原先「三类账户同一条公式」拆成两条。
+///
+/// 【为什么是编译期枚举，而不是 DAO 里读 kind 分叉】
+/// 口径写错不会立刻崩，只会让余额悄悄算反。把规则做成 [AccountEntryDao.append]
+/// 的**必传参数**（没有默认值），漏传就是编译错误，处理器没法悄悄退回
+/// 旧公式；DAO 保持纯 SQL 执行层，不认识账户类别。
+///
+/// 工作逻辑（两条恒等式，金额恒正）：
+///   · [savings]：余额     = 期初余额 + Σ入账 − Σ出账；
+///   · [credit] ：已用额度 = Σ出账 − Σ入账（信用卡没有「期初已用额度」）。
+/// [of] 是类别 → 规则的唯一映射，[delta] 是单笔流水对累计值的增量。
+enum AccountBalanceRule {
+  savings('储蓄类：余额 = 期初 + 入账 − 出账'),
+  credit('信用卡：已用额度 = 出账 − 入账');
+
+  const AccountBalanceRule(this.formula);
+
+  final String formula;
+
+  static AccountBalanceRule of(AccountKind kind) =>
+      kind == AccountKind.credit ? credit : savings;
+
+  double delta(AccountDirection direction, num amount) => switch (this) {
+        AccountBalanceRule.savings => direction.sign * amount,
+        AccountBalanceRule.credit => -direction.sign * amount,
+      };
 }
 
 /// 资金变动的业务种类。一次变动只产生一条流水，转账产生两条（见
@@ -223,7 +274,9 @@ class AccountRecord {
   final String name;
 
   /// 由流水事务推导并物化的当前值，**用户永远不能直接改**（3.8 / 10.9
-  /// 「单写点原则」）。流动资金/受限 = 当前余额；信用卡 = 已用额度。
+  /// 「单写点原则」）。流动资金 / 其他资金账户 = 当前余额；信用卡 =
+  /// 已用额度。两者共用一列，但增减规则相反（[AccountBalanceRule]）：
+  /// 储蓄类入账加、出账减；信用卡出账加、入账减。
   /// 允许为负：4.7「账户余额不足时保存成功但给橙色提示」，用户可能在
   /// 补记昨天的账，硬拦会记不了账。
   final double balance;
@@ -558,7 +611,12 @@ class AccountStats {
   final int creditCount;
 }
 
-/// 明细页流水汇总（原型「总入账 / 总出账 / 净变动」）。
+/// 明细页流水汇总。
+///
+/// [inbound] / [outbound] 是**按 direction 聚合的原始金额**，与账户类别
+/// 无关；[net] 只对储蓄类有意义（余额净变动）。信用卡的「已用额度净增」
+/// 是 `outbound - inbound`，由 CreditCardAccountController 与明细页按
+/// 类别单独解释，不在这里复用 net（避免把两套口径混成一个字段）。
 @immutable
 class AccountEntrySummary {
   const AccountEntrySummary({

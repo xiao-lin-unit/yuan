@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
+import 'package:provider/single_child_widget.dart';
 import 'package:sqflite/sqflite.dart';
 
 import 'app_error_handling.dart';
@@ -15,7 +16,9 @@ import 'theme.dart';
 
 class YuanApp extends StatelessWidget {
   final ThemeController theme;
-  final List<ChangeNotifierProvider> svc;
+  // 列表里既有 ChangeNotifierProvider（共享账本），也有普通 Provider
+  // （两个业务处理器），统一用 SingleChildWidget，不伪装成 ChangeNotifier。
+  final List<SingleChildWidget> svc;
   const YuanApp({super.key, required this.theme, required this.svc});
 
   @override
