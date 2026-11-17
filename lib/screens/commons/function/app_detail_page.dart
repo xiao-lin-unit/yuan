@@ -99,11 +99,11 @@ class AppDetailPage extends StatelessWidget {
       // 关掉 AppPageScaffold 自带的那一套，避免画两行。
       showAppBar: false,
       header: effectiveHeader,
-      child: child,
       floating: floating,
       bottom: bottom,
       padding: padding,
       scrollable: scrollable,
+      child: child,
     );
   }
 }

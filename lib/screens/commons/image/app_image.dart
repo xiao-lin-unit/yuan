@@ -77,7 +77,7 @@ class AppImage extends StatelessWidget {
               // 38px 头像只解码 76px，避免整张大图进内存
               cacheWidth: (size * _kCacheScale).toInt(),
               gaplessPlayback: true,
-              errorBuilder: (_, __, ___) => _fallback(context),
+              errorBuilder: (_, _, _) => _fallback(context),
             );
           }
 

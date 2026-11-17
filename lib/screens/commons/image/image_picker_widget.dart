@@ -180,7 +180,7 @@ class _SingleImagePickerWidgetState extends State<SingleImagePickerWidget> {
               fit: BoxFit.cover,
               cacheWidth: (widget.size * _kCacheScale).toInt(),
               gaplessPlayback: true,
-              errorBuilder: (_, __, ___) => const Icon(AppIcons.brokenImage),
+              errorBuilder: (_, _, _) => const Icon(AppIcons.brokenImage),
             )
           : AppImage(
               ref: widget.initialRef,
@@ -424,7 +424,7 @@ class _MultiImagePickerWidgetState extends State<MultiImagePickerWidget> {
               fit: BoxFit.cover,
               cacheWidth: (widget.size * _kCacheScale).toInt(),
               gaplessPlayback: true,
-              errorBuilder: (_, __, ___) => const Icon(AppIcons.brokenImage),
+              errorBuilder: (_, _, _) => const Icon(AppIcons.brokenImage),
             );
 
       children.add(

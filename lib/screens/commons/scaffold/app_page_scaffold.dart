@@ -147,7 +147,7 @@ class AppPageScaffold extends StatelessWidget {
                       ),
                     ),
                   // 固定头：在 Expanded(滚动区) 之前，所以不随内容滚动。
-                  if (header != null) header!,
+                  ?header,
                   Expanded(child: content),
                   if (bottom != null)
                     Align(
