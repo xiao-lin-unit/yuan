@@ -69,6 +69,14 @@ class SavingsAccountController {
       throw ArgumentError('账户形态与账户类别不匹配');
     }
     if (initialBalance < 0) throw ArgumentError('余额不得为负数');
+    // 3.5「社保账户默认不绑定任何支出类型，且不可编辑绑定」——第一道锁。
+    // 放在事务之前：错配在写库前就抛，表单保持打开、界面可提示。
+    // 公积金**可以**绑定（3.5 的房租例子），只锁社保。
+    if (kind == AccountKind.restricted &&
+        type == AccountType.socialSecurity &&
+        bindingIds.isNotEmpty) {
+      throw ArgumentError('社保账户不能绑定支出类型');
+    }
 
     final AccountRecord? old = id == null ? null : await dao.byId(db, id);
     if (old != null && old.kind == AccountKind.credit) {
@@ -136,7 +144,12 @@ class SavingsAccountController {
         savedId = id;
       }
       if (kind == AccountKind.restricted) {
-        await dao.replaceBindings(txn, savedId, bindingIds);
+        // 第二道锁：哪怕表单误传、或编辑旧脏数据，社保账户落库的绑定
+        // 集合也恒为空。两层校验 + 详情页不显示入口，共三道，见
+        // SavingsAccountController.setBindings 与 account_sheets.dart。
+        final Set<int> effectiveBindings =
+            type == AccountType.socialSecurity ? const <int>{} : bindingIds;
+        await dao.replaceBindings(txn, savedId, effectiveBindings);
       }
     });
     await catalog.refresh(touched: <int>{savedId});
@@ -248,10 +261,18 @@ class SavingsAccountController {
 
   /// 修改其他资金账户的绑定用途（3.5）。空集合 = 不绑定 = 不限制。
   /// DAO 的 replaceBindings 不自建事务，这里独立调用所以自己包一层。
+  /// 【社保不可编辑绑定，共三道锁】① 详情页不显示入口；② 新增/编辑
+  /// 表单提交时按形态清空；③ 本方法与 save 的 Controller 硬校验。
+  /// 三道都在，任何一条路径都不会写出对社保无效的绑定记录。
   Future<void> setBindings(int accountId, Set<int> categoryIds) async {
     final AccountRecord? old = await dao.byId(db, accountId);
     if (old == null || old.kind != AccountKind.restricted) {
       throw StateError('仅其他资金账户支持绑定用途');
+    }
+    // 3.5：社保账户不可编辑绑定。即使有人绕过详情页入口直接调本方法，
+    // 也不会写一个永远不会生效的绑定（公积金不受此限制）。
+    if (old.type == AccountType.socialSecurity) {
+      throw StateError('社保账户不能绑定支出类型');
     }
     await db.transaction((txn) async {
       await dao.replaceBindings(txn, accountId, categoryIds);

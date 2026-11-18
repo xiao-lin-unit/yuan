@@ -39,8 +39,25 @@ const String _kFilterEmptyTitle = '这一类还没有账户';
 const String _kFilterEmptyDescription = '点右上角 ＋ 新增，或切回「全部」查看其它账户。';
 const String _kFootNote =
     '「真正属于你的钱」会把所有账户加起来、再减去欠银行的钱。'
-    '以后记进资产和借款后，这个数字会更完整。';
+    '以后把房子、借进借出的钱也记进来，这个数字会更完整。';
 const String _kDragTip = '拖动账户左侧手柄可调整顺序；搜索结果不参与排序。';
+
+// ── 3.6 看板的 2c 增量（A1 / A2 / A3）────────────────────────────
+// A2（P0）：月末存一次数，之后改价 / 改口径都不改写历史。
+// 清单原话是「改一行文案 + 一个跳转」，但跳转目标 8.1.4 归因还没做；
+// 按 10.9「一个功能只在一个地方出现」，这里只写静态文案，不造第二个
+// 入口、也不画一条还没数据的趋势图。
+const String _kTrendNote =
+    '变化趋势按每个月末存一次数记录：之后改了价、改了口径，都不会改写历史。';
+// A3（3.8 / 13.1 / 13.12）：账本永远是名义金额。
+const String _kNominalNote =
+    '账本里记的都是当时填下的钱数，软件不会自己把它调大或调小。';
+// A1（P1）：两行只读槽位。数据源分别是 4.2 分类标记 + 支出流水、
+// 5.2 / 6.3 两处「每月都有」标记，两个模块都还没做，所以按 10.6
+// 显示「—」并说清原因，绝不拿别的数凑一个看起来像答案的数字。
+const String _kReadOnlyReason =
+    '等你标好「每月必须花的钱」「稳稳每月进来的钱」，这两行会自动算出来。';
+const String _kReminderDisclaimer = '估算，按你填的日利率粗算，以账单为准。';
 
 /// 类型快筛标签。**只按账户类型分**，不含原型的「常用」：
 /// 本轮需求只覆盖类型快筛，「常用」的排序规则（手动置顶 or 按使用频率）
@@ -137,6 +154,17 @@ IconData _filterIcon(_AccountFilter f) => switch (f) {
 ///     确定口径后直接取用；「上次使用账户」就是该结果的第一项。
 ///   - 「排序方式」菜单不做：目前只有 sort_order 一种顺序，加菜单
 ///     等于加一个没有第二种选项的开关。
+///
+/// ── 2c 增量（本轮，全部静态，无新增状态）────────────────────────
+/// · A2（P0）：底部 [_BoardNotes] 写清「变化趋势按月末存一次数」，
+///   不造 8.1.4 归因的第二个入口、不画没数据的趋势图；
+/// · A1（P1）：两行只读槽位显示「—」+ 白话原因，数据源模块没做，
+///   绝不拿别的数凑；等聚合查询就位只换字符串，页面结构不动；
+/// · A3：一句「账本里记的都是当时填下的钱数」说明名义金额口径；
+/// · 3.4 还款提醒：顶部 [_RepaymentReminders]，由共享账本同步算好，
+///   未来 3 天内到期才出现，纯只读、不写库、不提供关闭按钮；
+/// · 附二白话：界面里的「计入资产合计 / 资产合计 / 以后记进资产和借款」
+///   等词全部改成人话（零、二章最高准则）。
 class AccountsScreen extends StatefulWidget {
   const AccountsScreen({super.key});
 
@@ -238,6 +266,12 @@ class _AccountsScreenState extends State<AccountsScreen> {
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
           const SizedBox(height: AppSpacing.sm),
+          // 3.4 还款日临近提示：放在账户页最上面（当前唯一的资金总览
+          // 入口），纯只读、无关闭按钮、不写库。将来做总览首页时可整块
+          // 平移过去，那时这里删掉即可，不会出现两处提醒。
+          _RepaymentReminders(
+            reminders: controller.upcomingRepayments(DateTime.now()),
+          ),
           _searchField(context),
           const SizedBox(height: AppSpacing.xs),
           _filterChips(active),
@@ -280,16 +314,8 @@ class _AccountsScreenState extends State<AccountsScreen> {
               searching,
             ),
             const SizedBox(height: AppSpacing.sm),
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.md,
-                vertical: AppSpacing.sm,
-              ),
-              child: Text(
-                '$_kFootNote\n'
-                '目前按账户算：${MoneyFormat.yuan0(controller.netWorthSoFar)}',
-                style: context.appText.caption,
-              ),
+            _BoardNotes(
+              netWorthText: MoneyFormat.yuan0(controller.netWorthSoFar),
             ),
           ],
         ],
@@ -357,7 +383,7 @@ class _AccountsScreenState extends State<AccountsScreen> {
           accent: tokens.warning,
           secondary: <AppInfoItem>[
             AppInfoItem(label: '账户数', value: '${stats.accountCount} 个'),
-            const AppInfoItem(label: '计入', value: '资产合计'),
+            const AppInfoItem(label: '这笔钱', value: '算进总账'),
           ],
         ),
     };
@@ -691,4 +717,135 @@ class _AccountGroupHeader extends StatelessWidget {
       ),
     );
   }
+}
+
+/// 3.4 还款提醒条（首页醒目位置，纯只读）。
+///
+/// 【纯静态，没有状态、没有 Notifier】要不要显示、显示几张卡，全部由
+/// 调用方用 `AccountController.upcomingRepayments(DateTime.now())` 在
+/// build 里算好后构造期传入；本组件只按列表渲染，自己不读时间、不查库、
+/// 不提供「关闭」按钮（提醒不该被随手关掉后就不见了）。
+///
+/// 【估算口径，必须写清】「下个月大约会多出 X 利息」只在用户填了日
+/// 利率时才出现，公式是（已用 − 最低还款）× 日利率 × 30，界面固定
+/// 附 [_kReminderDisclaimer]；不按 7.7 的六种还款算法精算，因为负债
+/// 模块还没做，提前精算等于拿估算冒充银行账单。
+class _RepaymentReminders extends StatelessWidget {
+  const _RepaymentReminders({required this.reminders});
+
+  final List<RepaymentReminder> reminders;
+
+  @override
+  Widget build(BuildContext context) {
+    if (reminders.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.md,
+        AppSpacing.sm,
+        AppSpacing.md,
+        0,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          for (final RepaymentReminder r in reminders)
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+              child: _card(context, r),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _card(BuildContext context, RepaymentReminder r) {
+    final String when = r.daysLeft == 0 ? '今天' : '还有 ${r.daysLeft} 天';
+    final double? estimate = r.estimatedMonthlyInterest;
+    final String tail = estimate == null
+        ? '全额还清没有利息。'
+        : '只还最低约 ${MoneyFormat.yuan0(r.minimumPayment)}，'
+            '下个月大约会多出 ${MoneyFormat.yuan0(estimate)} 利息。'
+            '$_kReminderDisclaimer';
+    return Container(
+      decoration: AppDecorations.card(context),
+      padding: const EdgeInsets.all(AppSpacing.md),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Icon(
+            AppIcons.schedule,
+            size: AppIconSize.medium,
+            color: context.tokens.warning,
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Text(
+              '你的「${r.cardName}」$when要还 '
+              '${MoneyFormat.yuan0(r.amount)}，'
+              '将从「${r.sourceName}」扣款。$tail',
+              style: context.appText.caption,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 账户页底部「再看看」：A1 的两行只读槽位 + A2 趋势口径 + A3 名义金额
+/// 口径 + 原来的总账说明。
+///
+/// 【为什么是静态槽位而不是算出来的数字】A1 两行的数据源（4.2 分类
+/// 标记 + 支出流水、5.2 / 6.3 两处「每月都有」）都还没开发，按 10.6
+/// 显示「—」并在 [_kReadOnlyReason] 里说清原因。等模块开工，只需把
+/// 这里的 `'—'` 换成从聚合查询取到的字符串，页面结构一行不用改 ——
+/// 这正是「先立静态槽位，不伪装成最终数字」的意思。
+class _BoardNotes extends StatelessWidget {
+  const _BoardNotes({required this.netWorthText});
+
+  final String netWorthText;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.sm,
+        ),
+        child: Container(
+          decoration: AppDecorations.card(context),
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Text('再看看', style: context.appText.sectionHeader),
+              const SizedBox(height: AppSpacing.sm),
+              _row(context, '留够应急金后，还多出来多少', '—'),
+              _row(context, '不上班也能撑住多少', '—'),
+              const SizedBox(height: AppSpacing.xs),
+              Text(_kReadOnlyReason, style: context.appText.caption),
+              const Divider(height: AppSpacing.lg),
+              Text(_kTrendNote, style: context.appText.caption),
+              const SizedBox(height: AppSpacing.xs),
+              Text(_kNominalNote, style: context.appText.caption),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                '$_kFootNote\n目前按账户算：$netWorthText',
+                style: context.appText.caption,
+              ),
+            ],
+          ),
+        ),
+      );
+
+  Widget _row(BuildContext context, String label, String value) => Padding(
+        padding: const EdgeInsets.only(bottom: AppSpacing.xxs),
+        child: Row(
+          children: <Widget>[
+            Expanded(child: Text(label, style: context.appText.caption)),
+            Text(value, style: context.appText.menuTitle),
+          ],
+        ),
+      );
 }

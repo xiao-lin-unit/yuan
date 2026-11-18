@@ -327,7 +327,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
         value: '${account.kind.label} · ${account.type.label}',
       ),
       AppInfoItem(
-        label: '计入资产合计',
+        label: '算进总账',
         value: account.includeInNetWorth ? '是' : '否',
       ),
       AppInfoItem(
@@ -337,7 +337,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
             : (account.note.isEmpty ? '未填写' : account.note),
       ),
       AppInfoItem(
-        label: '计入可用余额',
+        label: '算进能花的钱',
         value: account.isLiquid ? '是' : '否',
       ),
     ];
@@ -502,7 +502,8 @@ IconData _entryIcon(AccountEntryType type) => switch (type) {
 /// 【分派表】
 ///   · 流动资金账户：账户转账 / 余额调整（Savings）；
 ///   · 其他资金账户：绑定用途 / 余额调整（Savings）；
-///   · 信用卡账户　：还款 / 消费出账 / 额度调整 / 已用额度校准（Credit）；
+///   · 信用卡账户　：还款 / 消费出账 / 额度调整 / 已用额度校准 /
+///     卡片章程（Credit，章程只存不算）；
 ///   · 全部　　　　：归档 / 恢复（共享账本，只改标记、不写流水）。
 /// 信用卡**没有**「账户转账」与「余额调整」，这两项与储蓄类不复用。
 List<AppFloatingAction> _floatingActions(
@@ -585,8 +586,27 @@ List<AppFloatingAction> _floatingActions(
             ),
           ),
         ),
+        // 3.4 章程十项（v8 附属表）的唯一入口：开户时不用填，
+        // 看到账单后再补。表单仍是 FormSheetContent，不新建组件。
+        AppFloatingAction(
+          label: '卡片章程',
+          icon: AppIcons.accountNote,
+          onPressed: () => unawaited(
+            showAccountCardRulesSheet(
+              context,
+              catalog: catalog,
+              credit: credit,
+              account: account,
+            ),
+          ),
+        ),
       ],
-      if (account.kind == AccountKind.restricted) ...<AppFloatingAction>[
+      // 3.5「社保账户默认不绑定任何支出类型，且不可编辑绑定」：
+      // 社保不显示「绑定用途」入口（① 三道锁的第一道，其余两道在
+      // 表单提交与 SavingsAccountController.setBindings）。
+      // 公积金**可以**绑定（3.5 的房租例子），只锁社保。
+      if (account.kind == AccountKind.restricted &&
+          account.type != AccountType.socialSecurity)
         AppFloatingAction(
           label: '绑定用途',
           icon: AppIcons.binding,
@@ -599,6 +619,7 @@ List<AppFloatingAction> _floatingActions(
             ),
           ),
         ),
+      if (account.kind == AccountKind.restricted) ...<AppFloatingAction>[
         AppFloatingAction(
           label: '余额调整',
           icon: AppIcons.balanceAdjust,

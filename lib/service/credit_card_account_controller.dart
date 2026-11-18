@@ -3,6 +3,7 @@ import 'package:sqflite/sqflite.dart';
 import '../database/account/account_dao.dart';
 import '../database/account/account_entry_dao.dart';
 import '../database/account/account_record.dart';
+import '../database/account/credit_card_rule.dart';
 import 'account_controller.dart';
 
 /// 信用卡账户的业务处理器（含信用卡 / 花呗 / 借呗等信用形态）。
@@ -23,6 +24,11 @@ import 'account_controller.dart';
 ///   · 两条流水用同一个 group 配对，但类型都是 `creditRepay`，
 ///     **不标** `transfer_out/in`，避免被当成普通转账计入统计；
 ///   · 还款金额不得超过当前已用额度（溢缴款属于另一类业务）。
+///
+/// 【本类还负责两件只属于信用卡的事】
+///   · [repay] 的**本金 / 利息拆分**（3.7 / 7.12）：本金减欠款，利息单独
+///     记成「借钱的成本」支出，两者绝不混成一条流水；
+///   · [rulesFor] / [saveRules]：3.4 的卡章程十项（v8 附属表），只存不算。
 ///
 /// 【动态逻辑说明，按项目约定写清】本类不是 ChangeNotifier：页面只 watch
 /// 共享账本 [AccountController]。每个方法固定 4 步：校验 → 单事务写入
@@ -166,24 +172,53 @@ class CreditCardAccountController {
 
   /// 立即还款：**独立实现，不调用 SavingsAccountController.transfer**。
   ///
+  /// ══════════════════════════════════════════════════════════════
+  /// 【3.7 / 7.12 本金与利息必须分开 —— 这是正确性问题，不是文案】
+  /// ══════════════════════════════════════════════════════════════
+  /// [amount] 是这次从储蓄卡**一共出去的钱**（本息合计），[interest] 是
+  /// 其中的利息 / 手续费。两者不能混成一条流水：
+  ///   · 本金 = amount − interest：只是把现金换成「少欠一点」，
+  ///     现金 −本金、欠款 −本金，正好对冲，**真正属于你的钱不变**；
+  ///   · 利息 = interest：是真花掉的钱，**真正属于你的钱减少 interest**，
+  ///     要单独记一条「借钱的成本」支出（4.4 默认计入「这个月一共花了多少」）。
+  /// 混记会把它全当成还本金：欠款少减、支出少算，两边都错。
+  ///
   /// 【工作逻辑，5 步，全部在一个事务里】
-  ///   1. 校验信用卡、来源账户是流动资金账户、金额 0 < amount ≤ 已用额度；
-  ///   2. 来源账户写一条 `creditRepay` 流水：direction = out，
-  ///      **savings** 规则 → 余额 −amount；
-  ///   3. 信用卡写一条 `creditRepay` 流水：direction = in，
-  ///      **credit** 规则 → 已用额度 −amount；
-  ///   4. 两条用同一个 group / counterparty 配对，便于日后查账；
+  ///   1. 校验：信用卡、来源是流动资金账户、0 ≤ interest < amount、
+  ///      principal = amount − interest ≤ 当前已用额度；
+  ///   2. 来源账户写 `creditRepay` 出账流水，金额 **principal**，
+  ///      savings 规则 → 余额 −principal；
+  ///   3. 信用卡写 `creditRepay` 入账流水，金额 **principal**，
+  ///      credit 规则 → 已用额度 −principal（**只减本金**）；
+  ///   4. interest > 0 时，来源账户再写一条 `expense` 出账流水，
+  ///      savings 规则 → 余额 −interest，并用 `refType = 'debt_cost'`
+  ///      标成「借钱的成本」：将来支出模块按 ref_type 关联到「借钱的成本」
+  ///      分类，**不记第二遍**支出单据。它复用已有的 `expense` 枚举值，
+  ///      DDL 的 entry_type CHECK 不用改、流水表不加列。三条共用同一个
+  ///      group / counterparty 便于按组查账，但这条 `expense` 不是
+  ///      transfer，不参与转账统计；
   ///   5. 成功后刷新两个账户的快照与当前明细页。
-  /// 边界：两条流水方向不同但金额相同；任一步失败整体回滚，
-  /// 不会出现「钱扣了、欠款没少」。
+  ///
+  /// 【边界】interest 默认 0 → 退化为原来的两条流水（amount 全算本金），
+  /// 老调用方零改动；任一步失败整体回滚，不会出现「钱扣了、欠款没少」
+  /// 或「利息记了、本金没减」。
+  /// 【暂不做】7.12 的完整利息计算（全额计息 / 未还部分计息 / 复利 /
+  /// 分期手续费）依赖负债模块与章程表里的规则，本方法只做**拆分入账**，
+  /// 利息金额由用户按账单填写，软件不替银行算、不联网查。
   Future<void> repay({
     required int creditCardId,
     required int fromAccountId,
     required double amount,
+    double interest = 0,
     String note = '',
     DateTime? occurredAt,
   }) async {
     if (amount <= 0) throw ArgumentError('还款金额必须大于 0');
+    if (interest < 0) throw ArgumentError('利息金额不得为负数');
+    if (interest >= amount) {
+      throw ArgumentError('利息金额需小于还款金额（本金必须大于 0）');
+    }
+    final double principal = amount - interest;
     final AccountRecord? card = await dao.byId(db, creditCardId);
     final AccountRecord? from = await dao.byId(db, fromAccountId);
     if (card == null || card.kind != AccountKind.credit) {
@@ -192,20 +227,22 @@ class CreditCardAccountController {
     if (from == null || from.kind != AccountKind.liquid) {
       throw StateError('还款来源需为流动资金账户');
     }
-    if (amount > card.balance + 0.000001) {
-      throw ArgumentError('还款金额不能超过当前已用额度');
+    // 只对「本金」做上限校验：本息合计可以大于已用额度（差额是利息）。
+    if (principal > card.balance + 0.000001) {
+      throw ArgumentError('本金不能超过当前已用额度');
     }
 
     final DateTime at = occurredAt ?? DateTime.now();
     final String group =
         'repay_${at.microsecondsSinceEpoch}_${fromAccountId}_$creditCardId';
     await db.transaction((txn) async {
+      // ① 来源账户：只按本金出账。
       await entryDao.append(
         txn,
         AccountEntryRecord(
           accountId: fromAccountId,
           direction: AccountDirection.outbound,
-          amount: amount,
+          amount: principal,
           balanceAfter: 0,
           entryType: AccountEntryType.creditRepay,
           occurredAt: at,
@@ -216,12 +253,13 @@ class CreditCardAccountController {
         ),
         rule: AccountBalanceRule.savings,
       );
+      // ② 信用卡：只按本金入账（已用额度减少）。
       await entryDao.append(
         txn,
         AccountEntryRecord(
           accountId: creditCardId,
           direction: AccountDirection.inbound,
-          amount: amount,
+          amount: principal,
           balanceAfter: 0,
           entryType: AccountEntryType.creditRepay,
           occurredAt: at,
@@ -232,6 +270,26 @@ class CreditCardAccountController {
         ),
         rule: _rule,
       );
+      // ③ 利息：单独一条「借钱的成本」支出，不再从信用卡额度里扣。
+      if (interest > 0) {
+        await entryDao.append(
+          txn,
+          AccountEntryRecord(
+            accountId: fromAccountId,
+            direction: AccountDirection.outbound,
+            amount: interest,
+            balanceAfter: 0,
+            entryType: AccountEntryType.expense,
+            occurredAt: at,
+            counterpartyAccountId: creditCardId,
+            transferGroupId: group,
+            note: note.isEmpty ? '借钱的成本（还款利息）' : note,
+            refType: 'debt_cost',
+            createdAt: DateTime.now(),
+          ),
+          rule: AccountBalanceRule.savings,
+        );
+      }
     });
     await catalog.refresh(touched: <int>{fromAccountId, creditCardId});
   }
@@ -293,6 +351,39 @@ class CreditCardAccountController {
       ),
     );
     if (affected == 0) throw StateError('额度写入未生效');
+    await catalog.refresh(touched: <int>{accountId});
+  }
+
+  /// 读取某张卡的章程（3.4 十项）。没填过返回 [CreditCardRule.empty]，
+  /// 调用方不用处理 null。页面展示优先读共享账本
+  /// `AccountController.cardRulesOf`（内存快照）；本方法给表单初值与
+  /// 将来的负债模块用，直接查库保证拿到最新值。
+  Future<CreditCardRule> rulesFor(int accountId) async {
+    final CreditCardRule? rule = await CreditCardRuleDao().byId(db, accountId);
+    return rule ?? CreditCardRule.empty(accountId);
+  }
+
+  /// 保存章程。**只存不算**：本方法不生成任何账单、不估算利息、不动余额。
+  ///
+  /// 【工作逻辑，4 步】
+  ///   ① 校验账户存在且是信用卡（章程只对信用卡有意义）；
+  ///   ② 强制 `rule.accountId == accountId`，避免表单传错主键；
+  ///   ③ 在一个事务里 `upsert`（DAO 内部读旧 revision + 1，10.9 留痕）；
+  ///   ④ `catalog.refresh` 重读账户与章程快照，通知页面重建提醒条。
+  /// 【边界】账户软删后章程行保留，不物理删除（3.8 历史保留）；
+  /// 写入失败事务回滚，内存快照不动。7.7 六种还款算法等负债模块开工，
+  /// 现在不拿用户填的规则算「本期应还」，避免伪装成银行账单。
+  Future<void> saveRules(int accountId, CreditCardRule rule) async {
+    final AccountRecord? account = await dao.byId(db, accountId);
+    if (account == null || account.kind != AccountKind.credit) {
+      throw StateError('仅信用卡账户支持填写章程');
+    }
+    if (rule.accountId != accountId) {
+      throw ArgumentError('章程的账户编号与目标账户不一致');
+    }
+    await db.transaction((txn) async {
+      await CreditCardRuleDao().upsert(txn, rule);
+    });
     await catalog.refresh(touched: <int>{accountId});
   }
 }

@@ -38,20 +38,10 @@ class YuanApp extends StatelessWidget {
             themeMode: t.mode,
 
             // ── 框架级国际化 ────────────────────────────────────
-            // 让 DatePicker / table_calendar / Material 内置文案（确定、
-            // 取消、复制…）跟随语言；委托与语言列表收在 AppLocale 一处。
-            // 不设 locale：跟随系统，系统语言不在列表里时回退到 zh_CN。
-            // 业务文案目前仍是硬编码中文，见 app_locale.dart 的边界说明。
             localizationsDelegates: AppLocale.delegates,
             supportedLocales: AppLocale.supportedLocales,
 
             // ── 主题过渡 ────────────────────────────────────────
-            // 纠正之前「硬闪」的说法：MaterialApp 内部本来就有
-            // AnimatedTheme（默认 kThemeAnimationDuration=200ms、线性曲线），
-            // 且 AppThemeTokens 已实现 ThemeExtension.lerp，颜色可插值。
-            // 这里只是把时长收进全局令牌并换成缓动，让 8 个主题色切换
-            // 与明暗切换更顺；**不**在 AppRoot 里再包一层 AnimatedTheme，
-            // 否则两层动画会互相覆盖。
             themeAnimationDuration: AppMotion.long,
             themeAnimationCurve: Curves.easeInOut,
 
@@ -101,8 +91,6 @@ void main() async {
   }
 
   if (db == null) {
-    // 旧版直接把 Flutter 内部的 ErrorWidget 当整页用：那是调试红屏组件，
-    // 没有主题 / 本地化 / Directionality。现在走统一的三态 error 骨架。
     runStartupFailure('本地数据初始化失败，请重启应用后重试。');
     return;
   }

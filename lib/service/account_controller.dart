@@ -4,6 +4,7 @@ import 'package:sqflite/sqflite.dart';
 import '../database/account/account_dao.dart';
 import '../database/account/account_entry_dao.dart';
 import '../database/account/account_record.dart';
+import '../database/account/credit_card_rule.dart';
 
 /// 账户模块的**共享账本**（ChangeNotifier，由 Services.initServices 装配）。
 ///
@@ -44,6 +45,14 @@ class AccountController extends ChangeNotifier {
 
   List<AccountRecord> _all = <AccountRecord>[];
   final Map<int, Set<int>> _bindings = <int, Set<int>>{};
+
+  /// 信用卡章程的内存快照（v8，key = account_id）。
+  /// 【为什么也放进共享账本】它是**只读查询数据**，与账户快照同源、同
+  /// 生命周期：写章程后由 CreditCardAccountController.saveRules 调
+  /// [refresh] → [load] 一起重读，页面 build 里可同步取用，不需要
+  /// FutureBuilder，也不引入第二份状态。没填过章程的卡不在表里，
+  /// [cardRulesOf] 返回 [CreditCardRule.empty]。
+  final Map<int, CreditCardRule> _cardRules = <int, CreditCardRule>{};
 
   // 明细页的**当前页**快照（真分页：内存里永远只有 pageSize 条）。
   List<AccountEntryRecord> _detailEntries = <AccountEntryRecord>[];
@@ -98,6 +107,12 @@ class AccountController extends ChangeNotifier {
           .map((AccountCategoryBinding b) => b.categoryId)
           .toSet();
     }
+    // 章程只有「有卡才有」的几行，一次读全比逐卡查更简单；
+    // CreditCardRuleDao 无状态，直接 new（与 AccountEntryDao.summaryFor
+    // 里 AccountDao().byId(...) 同一套用法），不用改装配参数。
+    _cardRules
+      ..clear()
+      ..addAll(await CreditCardRuleDao().all(db));
     notifyListeners();
   }
 
@@ -244,6 +259,133 @@ class AccountController extends ChangeNotifier {
   Set<int> bindingsOf(int accountId) =>
       Set<int>.unmodifiable(_bindings[accountId] ?? const <int>{});
 
+  /// 某张卡的章程；没填过返回全默认值的空章程（不返回 null）。
+  CreditCardRule cardRulesOf(int accountId) =>
+      _cardRules[accountId] ?? CreditCardRule.empty(accountId);
+
+  // ══════════════════════════════════════════════════════════════════
+  // 3.5 记账时的账户候补（数据能力，当前**不接 UI**）
+  // ══════════════════════════════════════════════════════════════════
+
+  /// 「记一笔支出，选了 [categoryId] 类型，能从哪些账户付」。
+  ///
+  /// 【工作逻辑，4 步，全部基于内存快照，同步返回、不查库】
+  ///   ① 流动资金账户 + 信用卡账户：永远在候补里（3.2「能直接花」、
+  ///      3.4「先用后还」，二者都不受用途绑定限制）；
+  ///   ② 若**全软件一条绑定都没有** → 按 3.5「不绑定也能用」，受限账户
+  ///      全部返回，用户嫌麻烦时不需要先配置；
+  ///   ③ 一旦有人设过绑定，受限账户只返回「绑定了该支出类型」的那些，
+  ///      社保账户恒不返回（3.5「基本无法支取」）；
+  ///   ④ 已软删 / 已归档的账户一律排除。
+  ///
+  /// 【边界，如实写清】[categoryId] 为 null（还没选类型）时，在第 ③ 种
+  /// 情况下不返回任何受限账户，避免提前把「可能被限制的钱」摆出来；
+  /// 选完类型再调一次即可。破例使用受限账户的「非绑定用途」高级选项、
+  /// 以及 `non_binding` 标记，随「记支出」模块开工时一并接，本轮只备
+  /// 数据能力、不接 UI，也不新增任何表字段。
+  List<AccountRecord> payableAccountsFor(int? categoryId) {
+    final bool anyBinding =
+        _bindings.values.any((Set<int> ids) => ids.isNotEmpty);
+    return _all
+        .where((AccountRecord r) {
+          if (r.isDeleted || r.archived) return false;
+          if (r.kind == AccountKind.liquid ||
+              r.kind == AccountKind.credit) {
+            return true;
+          }
+          if (!anyBinding) return true;
+          if (r.type == AccountType.socialSecurity) return false;
+          if (categoryId == null) return false;
+          final int? id = r.id;
+          return id != null &&
+              (_bindings[id]?.contains(categoryId) ?? false);
+        })
+        .toList(growable: false);
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // 3.4 还款提醒（纯只读计算，不写库、不联网、不替银行算）
+  // ══════════════════════════════════════════════════════════════════
+
+  /// 未来 [withinDays] 天内要还款的信用卡（默认提前 3 天，3.4）。
+  ///
+  /// 【工作逻辑，4 步，同步纯函数】
+  ///   ① 只挑未删除 / 未归档 / 已用额度 > 0 / 填了还款日的信用卡；
+  ///   ② [nextDueDate] 求出**下一次**还款日（今天的还款日还没过就算今天，
+  ///      已过就顺延到下月；月份没有 31 号时钳到当月最后一天）；
+  ///   ③ 相差 0..[withinDays] 天就生成一条 [RepaymentReminder]，
+  ///      金额取当前已用额度，来源账户名从 repay_account_id 查；
+  ///   ④ 只有用户**填过日利率**才粗估「只还最低，下月约多 X 利息」，
+  ///      公式 `（已用 − 最低还款）× 日利率 × 30`，界面必须标
+  ///      「估算，按你填的日利率粗算，以账单为准」。
+  ///
+  /// 【边界】日利率没填 → 估算字段为 null，界面不显示那半句；不按章程
+  /// 的计息方式 / 复利 / 容时容差精算（7.7 六种算法属负债模块）。
+  /// 没有符合条件的卡返回空列表，页面直接不渲染提示条。
+  List<RepaymentReminder> upcomingRepayments(
+    DateTime now, {
+    int withinDays = 3,
+  }) {
+    final DateTime today = DateTime(now.year, now.month, now.day);
+    final List<RepaymentReminder> out = <RepaymentReminder>[];
+    for (final AccountRecord r in _all) {
+      if (r.kind != AccountKind.credit ||
+          r.isDeleted ||
+          r.archived ||
+          r.balance <= 0 ||
+          r.dueDay == null) {
+        continue;
+      }
+      final DateTime due = nextDueDate(today, r.dueDay!);
+      final int days = due.difference(today).inDays;
+      if (days < 0 || days > withinDays) continue;
+      final AccountRecord? source = r.repayAccountId == null
+          ? null
+          : byId(r.repayAccountId!);
+      final CreditCardRule rule = cardRulesOf(r.id ?? -1);
+      final double? rate = rule.dailyRate;
+      final double? estimated;
+      if (rate == null || rate <= 0) {
+        estimated = null;
+      } else {
+        final double minimum = r.balance * r.minPaymentRate;
+        estimated = (r.balance - minimum) * rate * 30;
+      }
+      out.add(
+        RepaymentReminder(
+          cardName: r.name,
+          daysLeft: days,
+          amount: r.balance,
+          sourceName: source?.name ?? '未设置还款账户',
+          minimumPayment: r.balance * r.minPaymentRate,
+          estimatedMonthlyInterest: estimated,
+        ),
+      );
+    }
+    return List<RepaymentReminder>.unmodifiable(out);
+  }
+
+  /// 求「下一次」是几号发工资要还、账单日是哪天这类每月固定日。
+  /// 月份不足 31 天时钳到当月最后一天（2 月 28/29 日），不跳到 3 月。
+  static DateTime nextDueDate(DateTime today, int dayOfMonth) {
+    int clamped(int year, int month) {
+      final int last = DateTime(year, month + 1, 0).day;
+      return dayOfMonth > last ? last : dayOfMonth;
+    }
+
+    final DateTime thisMonth = DateTime(
+      today.year,
+      today.month,
+      clamped(today.year, today.month),
+    );
+    if (!thisMonth.isBefore(today)) return thisMonth;
+    return DateTime(
+      today.year,
+      today.month + 1,
+      clamped(today.year, today.month + 1),
+    );
+  }
+
   /// 首页看板（3.6）。信用卡 balance 是欠款，只进「欠银行的钱」，
   /// 绝不混进「能花的钱」——DDL 的 CHECK 也从数据层锁死了这条口径。
   ///
@@ -389,4 +531,27 @@ class AccountController extends ChangeNotifier {
 
   /// 恒等式审计（10.9）。DAO 会按账户类别选对应规则，本类不判断口径。
   Future<double> auditBalance(int id) => entryDao.auditBalance(db, id);
+}
+
+/// 3.4 还款提醒的一条（纯数据，界面只显示、不计算）。
+///
+/// [estimatedMonthlyInterest] 为 null 表示「用户没填日利率，不算估算」，
+/// 界面就只说「全额还清没有利息」，不编一个数字出来。
+@immutable
+class RepaymentReminder {
+  const RepaymentReminder({
+    required this.cardName,
+    required this.daysLeft,
+    required this.amount,
+    required this.sourceName,
+    required this.minimumPayment,
+    this.estimatedMonthlyInterest,
+  });
+
+  final String cardName;
+  final int daysLeft;
+  final double amount;
+  final String sourceName;
+  final double minimumPayment;
+  final double? estimatedMonthlyInterest;
 }

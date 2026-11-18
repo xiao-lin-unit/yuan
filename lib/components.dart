@@ -21,17 +21,7 @@ abstract class BaseDao {
 }
 
 class Services {
-  /// 改成 async：首屏渲染前必须把用户数据读出来。
-  /// 原实现 userController.load() 被丢掉，首帧 user == null，页面先闪空白，
-  /// 且 load 抛错时没有任何地方能捕获。
-  ///
-  /// 【装配策略】一个共享账本 + 两个业务处理器：
-  ///   · AccountController（ChangeNotifier）只做查询 / 快照 / 通用记录维护；
-  ///   · SavingsAccountController / CreditCardAccountController 是普通对象，
-  ///     不持有 UI 状态、不通知页面，写完库统一调共享账本的 refresh()。
-  /// 所以返回类型用 [SingleChildWidget]：既放 ChangeNotifierProvider，
-  /// 也能放普通 Provider，不为「塞进列表」而给业务处理器伪装成
-  /// ChangeNotifier。页面一律 `context.read<XxxController>()` 取用。
+  /// 页面一律 `context.read<XxxController>()` 取用。
   static Future<List<SingleChildWidget>> initServices(Database db) async {
     final userDao = UserInfoDao();
     final userController = UserController(db, userDao);

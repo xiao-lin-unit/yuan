@@ -2,6 +2,7 @@ import 'package:sqflite/sqflite.dart';
 
 import '../db_module.dart';
 import 'account_record.dart';
+import 'credit_card_rule.dart';
 
 /// 账户模块的三张表。
 ///
@@ -29,9 +30,11 @@ import 'account_record.dart';
 /// 4. 原型里三类账户卡片长得一样（只是一个 `.credit` / `.locked` 修饰），
 ///    一张表天然对应一套列表渲染。
 ///
-/// 真正**不能**塞进主表的是两类东西，各用一张附属表，而不是拆主表：
+/// 真正**不能**塞进主表的是三类东西，各用一张附属表，而不是拆主表：
 ///   · 受限账户绑定用途（3.5 多对多）→ `account_category_bindings`；
-///   · 每笔资金变动（10.3 每账户一本流水）→ `account_entries`。
+///   · 每笔资金变动（10.3 每账户一本流水）→ `account_entries`；
+///   · 信用卡章程十项（3.4 新增，按卡自己的章程填）→ `credit_card_rules`
+///     （v8 一对一，见 credit_card_rule.dart）。
 /// 「新增关联表」属于新增业务表，不是把主表改成垃圾桶。
 /// 【表结构演进的原则】业务没变化、又非必要时，不为无关改动重建整表
 /// 造成大面积迁移；但只要**完整功能确实需要**，该加的列、该升的版就加，
@@ -57,12 +60,15 @@ import 'account_record.dart';
 /// | account_entries.non_binding | 3.5 软约束「非绑定用途」 |
 /// | account_entries.transfer_group_id / counterparty_account_id | 3.7 账户间转账 |
 /// | account_entries.ref_type / ref_id / category_id / image_ref | 4.3、5.3 业务单据外挂 |
+/// | credit_card_rules.* | 3.4「还清一笔账单要用到的规则（新增）」十项 |
 ///
 /// ══════════════════════════════════════════════════════════════════
 /// 明确**不**放进这些表的东西（避免做成垃圾桶）
 /// ══════════════════════════════════════════════════════════════════
-/// · 信用卡「本期应还 / 还款计划 / 免息期」：属于账单周期计算结果，
-///   将来建 `credit_statements` 表；主表只存生成它需要的账单日/还款日。
+/// · 信用卡「本期应还 / 还款计划 / 免息期归属」：属于**按章程算出来的**
+///   账单周期结果，将来建 `credit_statements` 表；用户填的章程参数本身
+///   已落在 v8 的 `credit_card_rules`（本表只存规则，不算结果，避免拿
+///   估算冒充银行账单）。主表只保留生成提醒要用的账单日/还款日。
 /// · 自动创建的对应负债（3.4 / 7.5）：第二阶段建 `liabilities` 表时
 ///   用 `liabilities.account_id` **反向引用**本表，主表不加悬空外键列。
 /// · 资产↔账户联动（6.3）：同样由资产表带 account_id 反向引用。
@@ -357,5 +363,13 @@ class AccountDb implements DbModule {
       CREATE INDEX IF NOT EXISTS idx_entries_ref
         ON $entriesTable (ref_type, ref_id)
     ''');
+
+    // ── ④ 信用卡章程（3.4，v8 一对一附属表）────────────────────────
+    // 【两处登记，DDL 单一真源】全新安装走这里；开发期老库升级走
+    // DatabaseService._onUpgrade 的 `oldV < 8` 补建段，两边都调
+    // CreditCardRuleDb.create()，不会演化成两份不同结构。
+    // onCreate 是幂等的（IF NOT EXISTS），oldV<4 分支已经建过一次，
+    // 后面补建段再调一次也不会重复建表。
+    await CreditCardRuleDb.create(db);
   }
 }

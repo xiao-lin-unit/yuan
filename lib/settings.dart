@@ -6,11 +6,6 @@ import 'package:yuan/styles/app_typography.dart';
 import 'package:yuan/styles/theme_tokens.dart';
 
 /// 主题种子预设。
-///
-/// 旧版把 8 个 300 系浅色 + `black` / `black54` 混在一起当种子：
-/// 无彩色种子会生成整套灰主题，浅色种子又让主色过淡、按钮白字看不清。
-/// 现在统一用饱和度与明度适中的 500 系色，且每个都经过
-/// ColorMath 的对比度与和谐化计算后才进入界面。
 class ColorSetting {
   ColorSetting._();
 
@@ -81,12 +76,7 @@ const List<String> defaultFontFallback = <String>[
   'sans-serif',
 ];
 
-/// 组件主题：全部接收 [ColorScheme] 与 [AppThemeTokens]，
-/// 不再出现 `Colors.white` / `BorderSide()`（默认黑色）这类写死值。
-///
-/// 注意：旧版给 Switch / Radio / Slider / ProgressIndicator 传了空的
-/// `XxxThemeData()`，这会把 Material 3 的默认组件样式整个覆盖成空构造，
-/// 等于悄悄关掉了 M3 外观。这里直接不设置这些字段，交回 Flutter 默认。
+/// 组件主题：全部接收 [ColorScheme] 与 [AppThemeTokens]
 class ThemeSetting {
   ThemeSetting._();
 
@@ -136,11 +126,6 @@ class ThemeSetting {
       );
 
   /// 侧边导航（宽屏断点新增控件）。
-  ///
-  /// 与 [navigationBarTheme] 同一套取色与圆角，避免「手机底导」和
-  /// 「平板 rail」选中态两种长相：底色 surfaceContainer、指示容器
-  /// secondaryContainer、圆角 Stadium、未选中 onSurfaceVariant。
-  /// 换主题色 / 切明暗时由 ThemeData 一处重算，AppShell 不写任何 Color。
   static NavigationRailThemeData navigationRailTheme(
           ColorScheme cs, AppThemeTokens t) =>
       NavigationRailThemeData(
@@ -216,16 +201,7 @@ class ThemeSetting {
         ),
       );
 
-  /// ===== 输入框（本次核心修复）=====
-  ///
-  /// M3 filled text field 规范：
-  ///  容器 = surfaceContainerHighest，输入文字 = onSurface，
-  ///  label / hint / icon = onSurfaceVariant，聚焦指示线 = primary(1.5dp)，
-  ///  未聚焦指示线 = AppStroke 低对比中性色(0.6dp)，容器高 56dp，左右 16dp。
-  ///
-  /// 旧版：`filled: true` 却不给 fillColor，`enabledBorder: BorderSide()`
-  /// 是默认黑色 1px 边框，focusedBorder 也是黑；再加弹层写死白底，
-  /// 于是出现「灰方块 + 黑描边贴在白纸上」的观感，暗色下更糟。
+  /// ===== 输入框 =====
   static InputDecorationTheme inputDecorationTheme(
       ColorScheme cs, AppThemeTokens t) {
     final shape = BorderRadius.vertical(top: Radius.circular(t.radiusField));

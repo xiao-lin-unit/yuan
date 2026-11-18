@@ -3,6 +3,7 @@ import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:yuan/database/account/account_db.dart';
+import 'package:yuan/database/account/credit_card_rule.dart';
 import 'package:yuan/database/db_module.dart';
 import 'package:yuan/database/category/category_db.dart';
 import 'package:yuan/database/user/user_db.dart';
@@ -24,7 +25,10 @@ class DatabaseService {
   //     DDL 与列结构不变，只做一次幂等 UPDATE；balance_after 原样保留。
   // v7: account_entries 新增 credit_limit_after（每笔流水当时的总额度），
   //     用于精确还原历史流水的可用额度；历史数据按当前额度回填兜底。
-  static const _dbVersion = 7;
+  // v8: 新增 credit_card_rules（3.4 信用卡章程十项，一对一附属表）。
+  //     只补建一张新表，无数据迁移、无重建，accounts / entries 的 DDL
+  //     一字节不动；章程由用户自己填，旧数据按「没填过」兼容。
+  static const _dbVersion = 8;
   Database? _db;
 
   final List<DbModule> _modules = <DbModule>[
@@ -109,6 +113,25 @@ class DatabaseService {
     // 任何起点都要过这一遍。
     if (oldV < 7) {
       await AccountDb.migrateV6ToV7(db);
+    }
+    // v7 → v8：补建 credit_card_rules（新业务表，不是改已有表结构）。
+    //
+    // 【B 延后期间纪律 ① 的落点】开发阶段每加一张新表，必须**同时**
+    // 登记两处：全新安装走 _onCreate → AccountDb.onCreate → 本方法；
+    // 老库升级走这里。两处调同一个 CreditCardRuleDb.create（DDL 单一
+    // 真源、IF NOT EXISTS 幂等），漏一处就会出现「新装正常、开发机老库
+    // 缺表」，而这种 bug 在一直在用的开发机上永远复现不出来。
+    //
+    // 【为什么写成独立 if，4 种起点都过一遍】
+    //   · oldV < 4：上面的 AccountDb.onCreate 已建过，本段幂等跳过；
+    //   · oldV == 4 / 5 / 6：走完各自迁移后在这里补建；
+    //   · oldV == 7：只补建这一张表；
+    //   · 全新安装：不走 onUpgrade，由 _onCreate 建。
+    // 与「建表 / 翻方向 / 加列」是不同事项，不写成 else if。
+    // 无数据迁移（用户还没填过章程），因此不需要 vN → vN+1 的数据订正。
+    // 【事务边界】openDatabase.onUpgrade 整体已在事务内，不自建事务。
+    if (oldV < 8) {
+      await CreditCardRuleDb.create(db);
     }
   }
 

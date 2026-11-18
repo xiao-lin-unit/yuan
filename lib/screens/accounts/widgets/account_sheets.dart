@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
 
 import '../../../database/account/account_record.dart';
+import '../../../database/account/credit_card_rule.dart';
 import '../../../database/category/category_record.dart' show CategoryKind;
 import '../../../service/account_controller.dart';
 import '../../../service/category_controller.dart';
@@ -31,11 +32,17 @@ const String _kTransferTip =
 const String _kAdjustTip =
     '差额将记录为一条「调整」流水，不计入收支，可随时追溯核对。';
 const String _kBindTip =
-    '未选择表示不限制用途。绑定仅影响记账时的账户列表，为提示性约束，不作强制拦截。';
+    '未选择表示不限制用途。绑定仅影响记账时的账户列表，为提示性约束，不作强制拦截。'
+    '社保账户基本无法支取，不能绑定用途。';
 const String _kCreditRuleTip =
     '信用卡记的是已用额度：消费记为出账（欠款增加），还款记为入账（欠款减少）。';
 const String _kRepayTip =
-    '还款同时减少来源账户余额与信用卡已用额度，不计入收支。';
+    '本金 = 还款金额 − 利息，只按本金减少欠款；利息单独记为「借钱的成本」，'
+    '是真花掉的钱。全额还清时利息填 0 即可。';
+const String _kRepayInterestHint = '没有利息就填 0';
+const String _kCardRulesTip =
+    '这些只按你自己填的章程保存在本机，软件不联网查询，也不会拿它替银行算账单。'
+    '完整的还款算法等「我欠的钱」做好后接入。';
 const String _kCreditAdjustTip =
     '差额记为一条「调整」流水；额度不足或账单未同步时使用。';
 
@@ -43,7 +50,8 @@ const String _kCreditAdjustTip =
 /// Sheet 组件使用契约（项目约定）在本模块的落点
 /// ══════════════════════════════════════════════════════════════════
 /// ① 修改 / 新增 → [FormSheetContent]：新增/编辑账户、转账、还款、
-///    消费出账、余额调整、已用额度校准、调整额度、修改绑定用途；
+///    消费出账、余额调整、已用额度校准、调整额度、修改绑定用途、
+///    填写信用卡章程（v8）；
 /// ③ 确认操作 → [ConfirmSheetContent]：归档、恢复、删除；
 /// ⑤ 带图标的类型选择 → [CategorySheetContent]：新增账户先选三大类。
 /// **没有新建任何 `XxxAccountSheetContent` 业务包装组件**：所有表单都是
@@ -403,14 +411,27 @@ Future<void> showAccountRepaySheet(
             onChanged: onChanged,
           ),
         ),
+        // 本息合计：允许大于当前已用额度（差额就是利息），所以这里
+        // 不再拿 used 做上限；真正的交叉校验在 _repay / Controller.repay
+        // （validator 只能看到自己这一项，拿不到利息字段的值）。
         SheetFormSingleLineTextItem(
           key: 'amount',
           label: '还款金额',
+          hint: '从储蓄卡一共出去的钱（本息合计）',
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          validator: (String v) =>
+              (double.tryParse(v.trim()) ?? 0) <= 0 ? _kNumberError : null,
+        ),
+        SheetFormSingleLineTextItem(
+          key: 'interest',
+          label: '其中利息',
+          initialValue: '0',
+          hint: _kRepayInterestHint,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           validator: (String v) {
-            final double n = double.tryParse(v.trim()) ?? 0;
-            if (n <= 0) return _kNumberError;
-            if (n > used + 0.000001) return '还款金额不能超过当前已用额度';
+            final double? n = double.tryParse(v.trim());
+            if (n == null) return _kNumberError;
+            if (n < 0) return '利息不得为负数';
             return null;
           },
         ),
@@ -652,13 +673,158 @@ Future<void> showAccountCreditLimitSheet(
   );
 }
 
+/// ① 填写信用卡章程（3.4 新增十项，v8 一对一附属表）。
+///
+/// 【为什么单独一张 Sheet 而不是塞进新增账户表单】章程是「按这张卡
+/// 自己的章程填」的补充信息，开户时一个字段都不用填；用户看到账单后
+/// 才想起来补。按项目「一个功能只在一个地方出现」原则，唯一入口放在
+/// 信用卡详情页的悬浮按钮，账户编辑表单不重复出现。
+///
+/// 【静态优先】初值从共享账本 `catalog.cardRulesOf` 的内存快照同步取，
+/// 不用 FutureBuilder、不额外查库；写成功后 `saveRules` 会 refresh，
+/// 同一份快照自动更新，提醒条里的估算也随之重建。
+Future<void> showAccountCardRulesSheet(
+  BuildContext context, {
+  required AccountController catalog,
+  required CreditCardAccountController credit,
+  required AccountRecord account,
+}) async {
+  final formController = FormSheetController();
+  final CreditCardRule rule = catalog.cardRulesOf(account.id!);
+  await AppSheetShell.show<SheetFormValues>(
+    context,
+    header: SheetHeader(
+      title: '${account.name} 章程',
+      centered: true,
+      leading: const SheetCancelAction(),
+      trailing: SheetTextAction(
+        label: '保存',
+        emphasized: true,
+        onTap: formController.submit,
+      ),
+    ),
+    child: FormSheetContent(
+      controller: formController,
+      onSubmit: (SheetFormValues values) => _saveCardRules(
+        credit: credit,
+        accountId: account.id!,
+        previous: rule,
+        values: values,
+      ),
+      items: <SheetFormItem>[
+        const SheetFormNoteItem(
+          key: 'rulesIntro',
+          text: '这些只在这张卡上生效，留空表示还没填。',
+          align: TextAlign.start,
+        ),
+        SheetFormSingleLineTextItem(
+          key: 'bookingDay',
+          label: '记账日（1 ~ 31）',
+          initialValue: rule.bookingDay == null ? '' : '${rule.bookingDay}',
+          keyboardType: TextInputType.number,
+          validator: (String v) => _optionalDayError(v, '记账日'),
+        ),
+        SheetFormSingleLineTextItem(
+          key: 'interestFreeDays',
+          label: '免息期天数',
+          initialValue: rule.interestFreeDays == null
+              ? ''
+              : '${rule.interestFreeDays}',
+          keyboardType: TextInputType.number,
+          validator: (String v) =>
+              _optionalNonNegativeIntError(v, '免息期天数'),
+        ),
+        SheetFormSingleLineTextItem(
+          key: 'minPaymentRule',
+          label: '最低还款规则',
+          initialValue: rule.minPaymentRule,
+          hint: '例如：账单金额的 10%',
+        ),
+        SheetFormSingleLineTextItem(
+          key: 'dailyRate',
+          label: '日利率',
+          initialValue:
+              rule.dailyRate == null ? '' : rule.dailyRate.toString(),
+          hint: '小数，例如 0.0005 表示万分之五',
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          validator: _optionalRateError,
+        ),
+        SheetFormCustomItem(
+          key: 'interestMethod',
+          label: '计息方式',
+          builder: (BuildContext ctx, ValueChanged<Object?> onChanged) =>
+              _InterestMethodField(
+            initial: rule.interestMethod,
+            onChanged: onChanged,
+          ),
+        ),
+        SheetFormToggleItem(
+          key: 'monthlyCompound',
+          label: '按月复利',
+          initialValue: rule.monthlyCompound,
+        ),
+        SheetFormSingleLineTextItem(
+          key: 'gracePeriodDays',
+          label: '容时天数',
+          initialValue: '${rule.gracePeriodDays}',
+          keyboardType: TextInputType.number,
+          validator: (String v) =>
+              _optionalNonNegativeIntError(v, '容时天数'),
+        ),
+        SheetFormSingleLineTextItem(
+          key: 'graceAmount',
+          label: '容差金额',
+          initialValue: '${rule.graceAmount}',
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          validator: _optionalMoneyError,
+        ),
+        SheetFormToggleItem(
+          key: 'cashAdvanceInterestFree',
+          label: '取现免息',
+          initialValue: rule.cashAdvanceInterestFree,
+        ),
+        SheetFormSingleLineTextItem(
+          key: 'installmentFeeRule',
+          label: '分期手续费规则',
+          initialValue: rule.installmentFeeRule,
+          hint: '例如：每期 0.6%',
+        ),
+        SheetFormSingleLineTextItem(
+          key: 'lateFeeRule',
+          label: '违约金规则',
+          initialValue: rule.lateFeeRule,
+        ),
+        SheetFormSingleLineTextItem(
+          key: 'rulesNote',
+          label: '备注',
+          initialValue: rule.note,
+        ),
+        const SheetFormNoteItem(
+          key: 'rulesTip',
+          text: _kCardRulesTip,
+          align: TextAlign.start,
+        ),
+      ],
+    ),
+  );
+}
+
 /// ① 修改其他资金账户的绑定用途（3.5）。
+///
+/// 【社保三道锁的第 ① 道在详情页（不显示入口）】这里是防御：万一有人
+/// 误调用，也不弹一个「保存后会被 Controller 拒绝」的无效表单。
 Future<void> showAccountBindingsSheet(
   BuildContext context, {
   required AccountController catalog,
   required SavingsAccountController savings,
   required AccountRecord account,
 }) async {
+  // 社保账户基本无法支取（3.5），不允许打开这个编辑器。
+  // 详情页已经不显示入口，这里是第二层防御；Controller.setBindings
+  // 还有第三层硬校验，三层都不写无效绑定。
+  if (account.type == AccountType.socialSecurity) {
+    throw StateError('社保账户不能绑定支出类型');
+  }
   final formController = FormSheetController();
   final List<SheetTag<Object>> options =
       context.read<CategoryController>().visible(CategoryKind.expense)
@@ -824,7 +990,11 @@ Future<void> _saveSavings({
     note: values.text('note'),
     isLiquid: isLiquid,
     includeInNetWorth: editing?.includeInNetWorth ?? true,
-    bindingIds: kind == AccountKind.restricted
+    // 社保账户不可编辑绑定（3.5）：表单里标签仍可见（因为「具体类型」
+    // 是运行时下拉），所以提交时按最终选中的形态清空，避免写出一条
+    // 永远不会生效的绑定。Controller.save 里还有同样的硬校验。
+    bindingIds: (kind == AccountKind.restricted &&
+            type != AccountType.socialSecurity)
         ? values.tags('bindings').whereType<int>().toSet()
         : const <int>{},
   );
@@ -888,12 +1058,100 @@ Future<void> _repay({
   final int? from = values.raw('from') as int? ??
       creditCard.repayAccountId;
   if (from == null) throw StateError('请选择还款来源账户');
+  final double amount =
+      double.tryParse(values.text('amount').trim()) ?? 0;
+  final double interest =
+      double.tryParse(values.text('interest').trim()) ?? 0;
+  // 交叉校验在这里做：validator 只能看到单个字段，拿不到「还款金额」。
+  // 抛出的信息会由 FormSheetContent 的 SnackBar 显示，弹层保持打开，
+  // 所以写成完整可读的一句话，不写内部字段名。
+  if (interest >= amount) {
+    throw ArgumentError('利息需小于还款金额，本金要大于 0');
+  }
+  if (amount - interest > creditCard.balance + 0.000001) {
+    throw ArgumentError('本金不能超过当前已用额度');
+  }
   await credit.repay(
     creditCardId: creditCard.id!,
     fromAccountId: from,
-    amount: double.tryParse(values.text('amount').trim()) ?? 0,
+    amount: amount,
+    interest: interest,
     note: values.text('note'),
   );
+}
+
+/// 章程表单 → [CreditCardRule] → `CreditCardAccountController.saveRules`。
+/// 所有字段都允许留空（用户嫌麻烦可以一项都不填），空串解析为 null / 0。
+Future<void> _saveCardRules({
+  required CreditCardAccountController credit,
+  required int accountId,
+  required CreditCardRule previous,
+  required SheetFormValues values,
+}) async {
+  // 【为什么计息方式要兜底】SheetFormCustomItem 没被点过时，
+  // FormSheetContent 不会把值写进 values（与 _TypeField 同一套行为）。
+  // 用上一版章程兜底，避免「只改了日利率，却把计息方式清空」。
+  // 文本项 / 开关项都带 initialValue，由公共组件初始化，无需兜底。
+  final CreditInterestMethod method =
+      values.raw('interestMethod') as CreditInterestMethod? ??
+          previous.interestMethod;
+  await credit.saveRules(
+    accountId,
+    CreditCardRule(
+      accountId: accountId,
+      bookingDay: int.tryParse(values.text('bookingDay').trim()),
+      interestFreeDays:
+          int.tryParse(values.text('interestFreeDays').trim()),
+      minPaymentRule: values.text('minPaymentRule'),
+      dailyRate: double.tryParse(values.text('dailyRate').trim()),
+      interestMethod: method,
+      monthlyCompound: values.flag('monthlyCompound'),
+      gracePeriodDays:
+          int.tryParse(values.text('gracePeriodDays').trim()) ?? 0,
+      graceAmount: double.tryParse(values.text('graceAmount').trim()) ?? 0,
+      cashAdvanceInterestFree: values.flag('cashAdvanceInterestFree'),
+      installmentFeeRule: values.text('installmentFeeRule'),
+      lateFeeRule: values.text('lateFeeRule'),
+      note: values.text('rulesNote'),
+      updatedAt: DateTime.now(),
+    ),
+  );
+}
+
+/// 章程里「可空」的数字项：留空合法，填了就必须是合法值。
+/// 与开户表单的必填数字校验分开，不复用同一个 validator。
+String? _optionalDayError(String raw, String label) {
+  final String v = raw.trim();
+  if (v.isEmpty) return null;
+  final int? day = int.tryParse(v);
+  if (day == null || day < 1 || day > 31) {
+    return '请输入有效的$label（1 ~ 31）';
+  }
+  return null;
+}
+
+String? _optionalNonNegativeIntError(String raw, String label) {
+  final String v = raw.trim();
+  if (v.isEmpty) return null;
+  final int? n = int.tryParse(v);
+  if (n == null || n < 0) return '请输入有效的$label（不小于 0）';
+  return null;
+}
+
+String? _optionalRateError(String raw) {
+  final String v = raw.trim();
+  if (v.isEmpty) return null;
+  final double? n = double.tryParse(v);
+  if (n == null || n < 0 || n >= 1) return '请输入 0 到 1 之间的小数';
+  return null;
+}
+
+String? _optionalMoneyError(String raw) {
+  final String v = raw.trim();
+  if (v.isEmpty) return null;
+  final double? n = double.tryParse(v);
+  if (n == null || n < 0) return '请输入不小于 0 的金额';
+  return null;
 }
 
 String? _dayError(String raw, String label) {
@@ -1024,6 +1282,57 @@ class _AccountPickerFieldState extends State<_AccountPickerField> {
                 ),
           ],
           onChanged: (int? v) {
+            setState(() => _value = v);
+            widget.onChanged(v);
+          },
+        ),
+      );
+}
+
+/// 章程里的「计息方式」下拉（3.4）。
+/// 【局部状态工作逻辑】与 _TypeField 完全一致：本组件持有选中值，
+/// 点选后 `onChanged` 上抛给 FormSheetContent 统一收集；没点过时
+/// 不写值，由 _saveCardRules 用上一版章程兜底（见那里注释）。
+class _InterestMethodField extends StatefulWidget {
+  const _InterestMethodField({
+    required this.initial,
+    required this.onChanged,
+  });
+
+  final CreditInterestMethod initial;
+  final ValueChanged<Object?> onChanged;
+
+  @override
+  State<_InterestMethodField> createState() => _InterestMethodFieldState();
+}
+
+class _InterestMethodFieldState extends State<_InterestMethodField> {
+  late CreditInterestMethod _value;
+
+  @override
+  void initState() {
+    super.initState();
+    _value = widget.initial;
+  }
+
+  @override
+  Widget build(BuildContext context) => Container(
+        decoration: AppDecorations.field(context),
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+        child: DropdownButton<CreditInterestMethod>(
+          value: _value,
+          isExpanded: true,
+          underline: const SizedBox.shrink(),
+          style: context.appText.body,
+          items: <DropdownMenuItem<CreditInterestMethod>>[
+            for (final CreditInterestMethod m in CreditInterestMethod.values)
+              DropdownMenuItem<CreditInterestMethod>(
+                value: m,
+                child: Text(m.label),
+              ),
+          ],
+          onChanged: (CreditInterestMethod? v) {
+            if (v == null) return;
             setState(() => _value = v);
             widget.onChanged(v);
           },

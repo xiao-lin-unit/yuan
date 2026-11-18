@@ -7,14 +7,7 @@ import 'styles/theme_tokens.dart';
 
 /// 主题装配。
 ///
-/// 优化点：
-/// 1. 按 (seed, brightness, contrast) 缓存 ThemeData。旧版每次
-///    ThemeController.notifyListeners 都重算 ColorScheme.fromSeed + 十几个
-///    组件主题，切个颜色整棵树都在做无意义的重复计算。
-/// 2. 主题色变化不只是换 seed：先做高对比度修正 → 生成语义色并 harmonize
-///    到 seed → 用对比度函数选出可读的前景 → 挂成 ThemeExtension。
-/// 3. 不再给 Switch/Radio/Slider 等传空的 ThemeData，把 M3 默认样式还回去。
-/// 4. 去掉 materialTapTargetSize.shrinkWrap（它会关掉 48dp 最小点击区）。
+/// 按 (seed, brightness, contrast) 缓存 ThemeData。
 class AppTheme {
   AppTheme._();
 
