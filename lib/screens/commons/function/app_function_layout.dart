@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../../../styles/app_decorations.dart';
+import '../../../styles/color_math.dart';
 import '../../../styles/app_typography.dart';
 import '../../../styles/theme_tokens.dart';
 import '../header/section_header.dart';
@@ -375,6 +376,22 @@ class AppInfoItem {
 /// 设计原则第一条要求的「大白话解释」，每个数字旁边都要说清代表什么。
 /// [progress] 0..1 时显示一条已用比例（信用卡额度条），不传就不画。
 /// [accent] 由调用方从 `context.tokens` 取语义色，本组件不定义颜色。
+///
+/// 【配色试点开关】[emphasized] 默认 false，此时与改造前逐像素一致。
+/// 传 true 才把这张卡换成主色表面：
+///   · 底色 surfaceEmphasis（= cs.primary，随主题色 / 亮暗自动重算）；
+///   · 文字 onEmphasis（= cs.onPrimary 经对比度兜底，**不是硬写白**）；
+///   · 大数字 accentOnEmphasis（由 tertiary 派生并校到 3:1）。
+/// 这是构造期静态 bool，没有运行时注册、没有 Notifier、没有跨帧回调。
+///
+/// 为什么做成开关而不是直接全改：全仓 6 处调用里 3 处传了语义 accent
+/// （warning / expense），那 3 张是「欠款 / 受限」状态卡，不该染主色；
+/// 本轮只在账户首页「全部」那一张开 true 做试点，看完观感再定铺开范围。
+/// 语义 hero 请保持 emphasized=false。
+///
+/// 边界行为：emphasized=true 时 [trailing] 若传 Widget，请调用方自己取
+/// onEmphasis 颜色（本组件不包装 IconTheme，避免又多一层隐式机制）；
+/// [accent] 在强调模式下仍然生效，但会先校到 3:1 再使用，不会糊在底色上。
 class AppSummaryHero extends StatelessWidget {
   const AppSummaryHero({
     super.key,
@@ -385,6 +402,7 @@ class AppSummaryHero extends StatelessWidget {
     this.secondary = const <AppInfoItem>[],
     this.progress,
     this.accent,
+    this.emphasized = false,
   });
 
   final String label;
@@ -397,12 +415,51 @@ class AppSummaryHero extends StatelessWidget {
   final double? progress;
   final Color? accent;
 
+  /// 是否用主色表面。默认 false = 保持原来的中性卡片，逐像素不变。
+  final bool emphasized;
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final Color tone = accent ?? cs.primary;
+    final t = context.tokens;
+    final bool strong = emphasized;
+
+    // 默认分支完全沿用原 TextStyle；只有 strong 才换令牌，
+    // 保证其余 5 处调用逐像素不变。
+    final TextStyle labelStyle = strong
+        ? context.appText.caption.copyWith(color: t.onEmphasis)
+        : context.appText.caption;
+    final TextStyle infoStyle = strong
+        ? context.appText.menuTitle.copyWith(color: t.onEmphasis)
+        : context.appText.menuTitle;
+    final Color background = strong ? t.surfaceEmphasis : t.card;
+    final Color tone = strong
+        ? ColorMath.ensureContrast(
+            accent ?? t.accentOnEmphasis,
+            background,
+            minimum: AppColorEmphasis.accentMinContrast,
+          )
+        : (accent ?? cs.primary);
+
+    // 强调分支只用全局令牌拼装（圆角 / 阴影 / 透明度都来自 styles 层），
+    // 本文件不定义任何新数值。不复用 AppDecorations.card 是因为它带一条
+    // 中性发丝描边，叠在主色底上会显脏。
+    final BoxDecoration decoration = strong
+        ? BoxDecoration(
+            color: background,
+            borderRadius: BorderRadius.circular(AppRadius.card),
+            boxShadow: <BoxShadow>[
+              BoxShadow(
+                color: background.withValues(alpha: AppElevation.cardAlpha),
+                offset: AppElevation.cardOffset,
+                blurRadius: AppElevation.cardBlur,
+              ),
+            ],
+          )
+        : AppDecorations.card(context);
+
     return Container(
-      decoration: AppDecorations.card(context),
+      decoration: decoration,
       padding: const EdgeInsets.all(AppSpacing.md),
       constraints: const BoxConstraints(minHeight: _kHeroMinHeight),
       child: Column(
@@ -411,9 +468,7 @@ class AppSummaryHero extends StatelessWidget {
         children: <Widget>[
           Row(
             children: <Widget>[
-              Expanded(
-                child: Text(label, style: context.appText.caption),
-              ),
+              Expanded(child: Text(label, style: labelStyle)),
               ?trailing,
             ],
           ),
@@ -426,7 +481,7 @@ class AppSummaryHero extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppSpacing.xxs),
-          Text(caption, style: context.appText.caption),
+          Text(caption, style: labelStyle),
           if (progress != null) ...<Widget>[
             const SizedBox(height: AppSpacing.sm),
             ClipRRect(
@@ -434,7 +489,9 @@ class AppSummaryHero extends StatelessWidget {
               child: LinearProgressIndicator(
                 value: progress!.clamp(0.0, 1.0).toDouble(),
                 minHeight: _kProgressHeight,
-                backgroundColor: cs.surfaceContainerHighest,
+                backgroundColor: strong
+                    ? t.onEmphasis.withValues(alpha: AppOpacity.selected)
+                    : cs.surfaceContainerHighest,
                 color: tone,
               ),
             ),
@@ -444,16 +501,13 @@ class AppSummaryHero extends StatelessWidget {
             Row(
               children: <Widget>[
                 for (var i = 0; i < secondary.length; i++) ...<Widget>[
-                  if (i > 0)
-                    const SizedBox(width: AppSpacing.lg),
+                  if (i > 0) const SizedBox(width: AppSpacing.lg),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: <Widget>[
-                      Text(secondary[i].label,
-                          style: context.appText.caption),
-                      Text(secondary[i].value,
-                          style: context.appText.menuTitle),
+                      Text(secondary[i].label, style: labelStyle),
+                      Text(secondary[i].value, style: infoStyle),
                     ],
                   ),
                 ],

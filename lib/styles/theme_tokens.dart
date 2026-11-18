@@ -45,6 +45,21 @@ abstract final class AppOpacity {
   static const double scrim = 0.4;
 }
 
+/// 强调表面的配色旋钮（本轮配色的**唯一可调处**）。
+///
+/// 【为什么集中在这里】配色要在你的掌控里：觉得 tint 太重 / 太轻，
+/// 只改 [surfaceTint] 一个数，组件、页面、ThemeData 一个字都不用动；
+/// 设成 0 就完全回到改造前的中性底，不需要回滚补丁。
+abstract final class AppColorEmphasis {
+  /// 中性容器（card / field）掺主色的比例。0.045 是「贴近才察觉」的量，
+  /// 目的是让底色参与分层，不是把卡片染色 —— 满屏主色会失去留白与呼吸。
+  /// tint 源取 cs.primary（已由 seed 派生），换主题 / 切亮暗自动跟随。
+  static const double surfaceTint = 0.045;
+
+  /// 强调表面上的大数字至少与底色差 3:1（WCAG AA 大字号门槛）。
+  static const double accentMinContrast = 3.0;
+}
+
 /// 组件尺寸阶梯：Material 组件的固定尺寸统一放这里，
 /// 避免 32 / 40 / 48 / 56 / 304 这类数字散落在各个 ThemeData 工厂里。
 ///
@@ -219,6 +234,14 @@ class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
   final Color divider;
   final Color shadow;
 
+  /// 强调表面三件套：只给「一张主色 hero」用，其余卡片仍是中性卡。
+  /// surfaceEmphasis 由 cs.primary 派生；onEmphasis 由 fromSeed 的
+  /// onPrimary 给出（**不是硬写白**）；accentOnEmphasis 由 tertiary
+  /// 派生并校对比度。三者都进 copyWith / lerp，主题切换动画不跳色。
+  final Color surfaceEmphasis;
+  final Color onEmphasis;
+  final Color accentOnEmphasis;
+
   final double radiusCard;
   final double radiusItem;
   final double radiusField;
@@ -239,6 +262,9 @@ class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
     required this.sheet,
     required this.divider,
     required this.shadow,
+    required this.surfaceEmphasis,
+    required this.onEmphasis,
+    required this.accentOnEmphasis,
     this.radiusCard = AppRadius.card,
     this.radiusItem = AppRadius.item,
     this.radiusField = AppRadius.item,
@@ -259,6 +285,33 @@ class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
     final warning = semantic(const Color(0xFFB26A00));
     final info = semantic(const Color(0xFF1565C0));
 
+    // ── 强调表面三件套（本轮配色试点唯一一处新增取色）──────────────
+    // 为什么用 cs.primary / cs.onPrimary 而不是硬写「主色 + 白字」：
+    // 主题色用户可换、可切亮暗，fromSeed 会把它重算到对应 tone；
+    // onPrimary 正是「这个底色上该用什么字」的 WCAG 结果。换成浅主题
+    // 或暗色模式都不会出现白字糊在浅底上。ensureContrast 只是兜底。
+    final Color emphasis = cs.primary;
+    final Color onEmphasis = ColorMath.ensureContrast(cs.onPrimary, emphasis);
+    // 强调色取 M3 tertiary（天生与 primary 形成色相对比），先 harmonize
+    // 到 seed，再校到 3:1：不够时 ensureContrast 朝 onColorFor 插值，
+    // 保留色相的同时提亮 / 压暗，不会硬贴一个刺眼的互补色。
+    final Color accentOnEmphasis = ColorMath.ensureContrast(
+      ColorMath.harmonize(cs.tertiary, seed),
+      emphasis,
+      minimum: AppColorEmphasis.accentMinContrast,
+    );
+
+    // 中性表面掺一点主色：整屏不再零彩度，但仍保持「中性卡」而不是主色卡。
+    // 只在这里算一次，card / field 共用；sheet 玻璃层、语义色、金额色
+    // 刻意不染（那三类不能带主色偏向）。只有两处调用且只是一行插值，
+    // 不再往 ColorMath 抽一层函数，少一次跳转。
+    Color tinted(Color neutral) => Color.lerp(
+          neutral,
+          cs.primary,
+          AppColorEmphasis.surfaceTint,
+        ) ??
+        neutral;
+
     return AppThemeTokens(
       income: income,
       onIncome: ColorMath.ensureContrast(ColorMath.onColorFor(income), income),
@@ -270,14 +323,19 @@ class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
           ColorMath.ensureContrast(ColorMath.onColorFor(warning), warning),
       info: info,
       onInfo: ColorMath.ensureContrast(ColorMath.onColorFor(info), info),
-      // 暗色下容器往上抬一档，避免「深灰卡片压在深灰背景上」没有层次
-      card: dark ? cs.surfaceContainerHigh : cs.surfaceContainerLow,
-      field: cs.surfaceContainerHighest,
+      // 暗色下容器往上抬一档，避免「深灰卡片压在深灰背景上」没有层次；
+      // 再掺一点主色 tint，让中性底色参与分层（强度见 AppColorEmphasis）。
+      card: tinted(dark ? cs.surfaceContainerHigh : cs.surfaceContainerLow),
+      field: tinted(cs.surfaceContainerHighest),
+      // Sheet 玻璃层不染主色，保持中性。
       sheet: dark ? cs.surfaceContainer : cs.surfaceContainerLow,
       // 划分线不再用 M3 outlineVariant 实色（亮色偏深、暗色成深沟），
       // 统一走 AppStroke：往背景掺一点 onSurface 的中性色。
       divider: AppStroke.colorFor(cs),
       shadow: cs.shadow,
+      surfaceEmphasis: emphasis,
+      onEmphasis: onEmphasis,
+      accentOnEmphasis: accentOnEmphasis,
     );
   }
 
@@ -296,6 +354,9 @@ class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
     Color? sheet,
     Color? divider,
     Color? shadow,
+    Color? surfaceEmphasis,
+    Color? onEmphasis,
+    Color? accentOnEmphasis,
     double? radiusCard,
     double? radiusItem,
     double? radiusField,
@@ -316,6 +377,9 @@ class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
       sheet: sheet ?? this.sheet,
       divider: divider ?? this.divider,
       shadow: shadow ?? this.shadow,
+      surfaceEmphasis: surfaceEmphasis ?? this.surfaceEmphasis,
+      onEmphasis: onEmphasis ?? this.onEmphasis,
+      accentOnEmphasis: accentOnEmphasis ?? this.accentOnEmphasis,
       radiusCard: radiusCard ?? this.radiusCard,
       radiusItem: radiusItem ?? this.radiusItem,
       radiusField: radiusField ?? this.radiusField,
@@ -343,6 +407,9 @@ class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
       sheet: c(sheet, other.sheet),
       divider: c(divider, other.divider),
       shadow: c(shadow, other.shadow),
+      surfaceEmphasis: c(surfaceEmphasis, other.surfaceEmphasis),
+      onEmphasis: c(onEmphasis, other.onEmphasis),
+      accentOnEmphasis: c(accentOnEmphasis, other.accentOnEmphasis),
       radiusCard: d(radiusCard, other.radiusCard),
       radiusItem: d(radiusItem, other.radiusItem),
       radiusField: d(radiusField, other.radiusField),

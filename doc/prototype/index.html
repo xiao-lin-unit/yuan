@@ -129,18 +129,58 @@
     </section>
 
     <!-- ==================== 模块2：资债 ==================== -->
+    <!-- ==================== 模块2：资债（按设计文档 六、七 章重构） ====================
+         改动要点：
+         1. 顶部「真正属于你的钱」由明细算出来，不写死；旁边可展开看是怎么算的
+         2. A1/A2（卡里的钱、动不了的钱）改为账户页只读镜像，不进资产求和，杜绝同一笔钱算两遍
+         3. 资产按「在给你钱 / 在拿你钱」分流展示，自住房、车明确出现在「拿你钱」那张里
+         4. 负债补用途标签、真实成本、划不划算、逐月缺口、万一要我还的钱
+    -->
     <section class="page" id="page-asset-liability">
       <div class="nav-top">
         <span class="nav-title">资债</span>
-        <span class="nav-action" onclick="openSheet('az-search-sheet')">🔍</span>
+        <span class="nav-action" onclick="toggleAZSearch()">🔍</span>
       </div>
 
-      <div class="wealth-card">
-        <span class="wealth-label">总资产</span>
-        <span class="wealth-value">¥42,680</span>
-        <div class="wealth-detail">
-          <span>资产估值 ¥47,880</span>
-          <span class="red">负债 ¥5,200</span>
+      <!-- 搜索：资产负债一起搜，结果分组落到底部 -->
+      <div class="az-searchbox" id="az-searchbox" style="display:none;">
+        <span class="as-ico">🔍</span>
+        <input id="az-search-input" placeholder="搜资产、负债、类型、备注" oninput="renderAZ()" autocomplete="off">
+        <span class="as-clear" onclick="clearAZSearch()">✕</span>
+      </div>
+
+      <!-- 家底账：真正属于你的钱 -->
+      <div class="true-money-card" id="true-money-card">
+        <div class="tmc-head" onclick="toggleAZCalc()">
+          <div class="tmc-main">
+            <span class="tmc-label">真正属于你的钱</span>
+            <span class="tmc-value" id="az-networth">¥0</span>
+            <span class="tmc-sub" id="az-networth-sub">把东西全加起来，再减去欠的</span>
+          </div>
+          <span class="tmc-caret" id="az-calc-caret">›</span>
+        </div>
+        <div class="tmc-brief">
+          <div class="tmc-cell"><span>能马上拿出来的</span><b id="az-cash-now">¥0</b></div>
+          <div class="tmc-cell"><span>每月自动进来</span><b class="green" id="az-in">¥0</b></div>
+          <div class="tmc-cell"><span>每月自动出去</span><b class="red" id="az-out">¥0</b></div>
+        </div>
+
+        <!-- 展开：这笔数是怎么算出来的（设计原则第三条：不许黑箱） -->
+        <div class="tmc-calc" id="az-calc" style="display:none;">
+          <div class="calc-title">这笔数是怎么算出来的</div>
+          <div class="calc-row"><span>① 你卡里和手上的钱</span><b id="calc-a1">¥0</b></div>
+          <div class="calc-row"><span>② 暂时动不了的钱</span><b id="calc-a2">¥0</b></div>
+          <div class="calc-row" id="calc-self-row"><span>③ 除了钱以外的东西</span><b id="calc-self">¥0</b></div>
+          <div class="calc-note" id="calc-self-note"></div>
+          <div class="calc-row total"><span>东西一共值</span><b id="calc-assets">¥0</b></div>
+          <div class="calc-row minus"><span>减：你欠的钱</span><b id="calc-debts">¥0</b></div>
+          <div class="calc-row minus"><span>减：万一要你还的钱</span><b id="calc-contingent">不计入</b></div>
+          <div class="calc-result">
+            <span>真正属于你的钱</span>
+            <b id="calc-networth">¥0</b>
+          </div>
+          <div class="calc-note warn" id="calc-stale" style="display:none;"></div>
+          <div class="calc-note">同一笔钱只算一次：卡里的钱和动不了的钱都记在账户页，这里只是跟着看，不会再加一遍。</div>
         </div>
       </div>
 
@@ -149,74 +189,186 @@
         <button class="az-tab" onclick="switchAZ('liability')">负债</button>
       </div>
 
-      <!-- 资产视图 -->
+      <!-- 快筛：资产按「给不给你钱」，负债按「贵不贵」 -->
+      <div class="acc-chips" id="az-chips"></div>
+
+      <!-- ============ 资产视图 ============ -->
       <div id="view-asset">
+
+        <!-- A1/A2 只读镜像：唯一写入点在账户页 -->
         <div class="section-header">
-          <span>实物与金融资产</span>
-          <span class="link-btn" onclick="openSheet('asset-add-sheet')">＋ 新增</span>
+          <span>钱（记在账户页，这里只看）</span>
+          <span class="link-btn" onclick="switchTab('account')">去账户页改 ›</span>
         </div>
-        <div class="card-list">
-          <div class="asset-card up" onclick="switchTab('asset-detail-stock')">
-            <span class="as-name">📈 股票 A <small>600519</small></span>
-            <span class="as-value">¥5,000 <small>+2.3%</small></span>
+        <div class="mirror-list" id="az-mirror"></div>
+
+        <!-- 流向账：哪些在给你钱，哪些在拿你钱 -->
+        <div class="section-header"><span>每个月，它们是给你钱还是拿你钱</span></div>
+        <div class="flow-card">
+          <div class="flow-cell in">
+            <span class="fc-label">给你钱</span>
+            <b class="green" id="flow-in">¥0</b>
+            <span class="fc-sub" id="flow-in-sub">稳稳每月都有的那部分</span>
           </div>
-          <div class="asset-card down" onclick="switchTab('asset-detail-fund')">
-            <span class="as-name">📊 基金 B <small>110022</small></span>
-            <span class="as-value">¥3,000 <small>-1.1%</small></span>
+          <div class="flow-cell out">
+            <span class="fc-label">拿你钱</span>
+            <b class="red" id="flow-out">¥0</b>
+            <span class="fc-sub" id="flow-out-sub">持有成本 + 借款利息</span>
           </div>
-          <div class="asset-card" onclick="switchTab('asset-detail-normal')">
-            <span class="as-name">💰 借给张三</span>
-            <span class="as-value">¥2,000</span>
-          </div>
-          <div class="asset-card" onclick="switchTab('asset-detail-normal2')">
-            <span class="as-name">🏠 公积金余额</span>
-            <span class="as-value">¥28,000</span>
-          </div>
-          <div class="asset-card" onclick="switchTab('asset-detail-normal3')">
-            <span class="as-name">🏥 医保账户余额</span>
-            <span class="as-value">¥1,200</span>
+          <div class="flow-cell net">
+            <span class="fc-label">不上班也能剩</span>
+            <b id="flow-net">¥0</b>
+            <span class="fc-sub">进来的减出去的</span>
           </div>
         </div>
 
-        <div class="section-header"><span>资产估值汇总</span></div>
-        <div class="summary-grid">
-          <div class="sg-item"><span>股票类</span><b>¥5,000</b></div>
-          <div class="sg-item"><span>基金类</span><b>¥3,000</b></div>
-          <div class="sg-item"><span>借出款</span><b>¥2,000</b></div>
-          <div class="sg-item"><span>公积金/医保</span><b>¥29,200</b></div>
-          <div class="sg-item total"><span>资产合计</span><b>¥39,200</b></div>
+        <!-- 给你钱的 -->
+        <div class="acc-group" id="grp-give">
+          <div class="ag-head" onclick="toggleAZGroup('give')">
+            <span class="ag-caret open" id="caret-give">›</span>
+            <span class="ag-label">✅ 在给你钱的</span>
+            <span class="ag-count" id="cnt-give">0</span>
+            <span class="ag-sum green" id="sum-give">¥0</span>
+          </div>
+          <div class="card-list" id="list-give"></div>
+        </div>
+
+        <!-- 拿你钱的：自住房、车会出现在这里 -->
+        <div class="acc-group" id="grp-take">
+          <div class="ag-head" onclick="toggleAZGroup('take')">
+            <span class="ag-caret open" id="caret-take">›</span>
+            <span class="ag-label">💸 在拿你钱的</span>
+            <span class="ag-count" id="cnt-take">0</span>
+            <span class="ag-sum red" id="sum-take">¥0</span>
+          </div>
+          <div class="card-list" id="list-take"></div>
+          <div class="sheet-hint" style="margin:0 16px 8px;">
+            自己住的房子、开的车也会拿你钱（物业、养车、借款利息），但它们不是欠别人的钱，所以记在这里，不记在负债里。
+          </div>
+        </div>
+
+        <!-- 不进不出的 -->
+        <div class="acc-group" id="grp-flat">
+          <div class="ag-head" onclick="toggleAZGroup('flat')">
+            <span class="ag-caret" id="caret-flat">›</span>
+            <span class="ag-label">📦 不进也不出的</span>
+            <span class="ag-count" id="cnt-flat">0</span>
+            <span class="ag-sum" id="sum-flat">¥0</span>
+          </div>
+          <div class="card-list" id="list-flat" style="display:none;"></div>
+        </div>
+
+        <div style="padding:6px 16px 0;">
+          <button class="btn-secondary" style="width:100%;" onclick="openSheet('asset-add-sheet')">＋ 新增资产</button>
+        </div>
+
+        <!-- 汇总：每一项都能和上面的卡片对上 -->
+        <div class="section-header">
+          <span>资产汇总</span>
+          <span class="link-btn" id="az-valuation-btn" onclick="toggleValuationMode()">估值口径：按买入价 ▾</span>
+        </div>
+        <div class="summary-grid" id="az-asset-summary"></div>
+
+        <!-- 能马上拿出来多少 -->
+        <div class="section-header"><span>真要用钱，能拿出多少</span></div>
+        <div class="cash-layers" id="az-cash-layers"></div>
+        <div class="sheet-hint" style="margin:0 16px 4px;">
+          真要全部换成现金，手续费和税费大概要扣 <b id="az-exit-cost">¥0</b>。这是你填的数加起来的，真卖的时候可能不一样。
         </div>
       </div>
 
-      <!-- 负债视图 -->
+      <!-- ============ 负债视图 ============ -->
       <div id="view-liability" style="display:none;">
-        <div class="section-header">
-          <span>负债明细</span>
-          <span class="link-btn" onclick="openSheet('liability-add-sheet')">＋ 新增</span>
+
+        <div class="section-header"><span>一共欠多少、贵不贵</span></div>
+        <div class="debt-hero">
+          <div class="dh-row">
+            <div class="dh-cell main">
+              <span class="dh-label">一共欠多少</span>
+              <b class="dh-value" id="debt-total">¥0</b>
+              <span class="dh-sub" id="debt-count">—</span>
+            </div>
+            <div class="dh-cell">
+              <span class="dh-label">这个月要还</span>
+              <b class="dh-value sm" id="debt-monthpay">¥0</b>
+              <span class="dh-sub" id="debt-ratio">占月收入 —</span>
+            </div>
+          </div>
+          <div class="dh-bar"><div class="dh-bar-fill" id="debt-ratio-bar"></div></div>
+          <div class="dh-safe" id="debt-safe"></div>
         </div>
-        <div class="card-list">
-          <div class="liability-card" onclick="switchTab('liability-detail-car')">
-            <span class="lb-name">🚗 车贷</span>
-            <span class="lb-value red">剩余 ¥3,500</span>
+
+        <!-- 白给银行多少钱：判断债务质量最核心的一行 -->
+        <div class="burn-card">
+          <div class="bc-cell">
+            <span class="bc-label">这个月白给银行的</span>
+            <b class="red" id="bc-cost">¥0</b>
+            <span class="bc-sub" id="bc-ratio">占这个月还款 —</span>
           </div>
-          <div class="liability-card" onclick="switchTab('liability-detail-credit')">
-            <span class="lb-name">💳 招商信用卡</span>
-            <span class="lb-value red">已用 ¥6,800</span>
+          <div class="bc-split">
+            <div class="bc-seg interest" id="bc-seg-i"></div>
+            <div class="bc-seg fee" id="bc-seg-f"></div>
+            <div class="bc-seg principal" id="bc-seg-p"></div>
           </div>
-          <div class="liability-card" onclick="switchTab('liability-detail-friend')">
-            <span class="lb-name">👨‍💼 借同事小李</span>
-            <span class="lb-value red">¥1,700</span>
+          <div class="bc-legend">
+            <span><i class="dot interest"></i>利息（真给银行的）</span>
+            <span><i class="dot fee"></i>手续费（真给银行的）</span>
+            <span><i class="dot principal"></i>本金（只是从左口袋换到右口袋）</span>
           </div>
         </div>
 
-        <div class="section-header"><span>负债汇总</span></div>
-        <div class="summary-grid">
-          <div class="sg-item"><span>车贷</span><b>¥3,500</b></div>
-          <div class="sg-item"><span>信用卡</span><b>¥6,800</b></div>
-          <div class="sg-item"><span>亲友借款</span><b>¥1,700</b></div>
-          <div class="sg-item total"><span>负债合计</span><b class="red">¥12,000</b></div>
-          <div class="sg-item"><span>本月待还</span><b>¥2,480</b></div>
+        <!-- 划不划算 / 逐月能不能拿出来 / 利率一变 -->
+        <div class="mini-grid3">
+          <div class="mg-cell" onclick="openSheet('leverage-sheet')">
+            <span class="mg-label">借钱买的东西划不划算</span>
+            <b class="mg-value" id="mg-leverage">—</b>
+            <span class="mg-sub">点开看每一笔</span>
+          </div>
+          <div class="mg-cell" onclick="openSheet('gap-sheet')">
+            <span class="mg-label">哪个月最紧张</span>
+            <b class="mg-value" id="mg-worst">—</b>
+            <span class="mg-sub">未来 12 个月逐月看</span>
+          </div>
+          <div class="mg-cell">
+            <span class="mg-label">利率涨 1 个点，每月多还</span>
+            <b class="mg-value orange" id="mg-float">¥0</b>
+            <span class="mg-sub">只算会变的那些</span>
+          </div>
         </div>
+
+        <!-- 负债清单：按真实成本从高到低 -->
+        <div class="section-header">
+          <span>欠的每一笔</span>
+          <span class="link-btn" onclick="openSheet('payoff-sheet')">先还哪一笔最划算 ›</span>
+        </div>
+        <div class="card-list" id="az-debt-list"></div>
+        <div style="padding:8px 16px 0;">
+          <button class="btn-secondary" style="width:100%;" onclick="openSheet('liability-add-sheet')">＋ 新增一笔欠款</button>
+        </div>
+
+        <!-- 快到期的 -->
+        <div class="section-header"><span>快到期的</span></div>
+        <div class="due-list" id="az-due"></div>
+
+        <!-- 两张成对出现的清单 -->
+        <div class="section-header"><span>万一要我还的钱</span></div>
+        <div class="contingent-card" id="az-contingent"></div>
+
+        <div class="section-header"><span>万一出事，有人替我付吗</span></div>
+        <div class="contingent-card insured" id="az-insured"></div>
+
+        <div class="sheet-hint" style="margin:0 16px 4px;">
+          这两张都不算进「一共欠多少」，也不算进「真正属于你的钱」——它们现在不用还，但真出事就得还，所以单独摆出来让你看得见。
+        </div>
+
+        <div class="section-header"><span>负债汇总</span></div>
+        <div class="summary-grid" id="az-debt-summary"></div>
+      </div>
+
+      <!-- 搜索结果 -->
+      <div id="view-az-search" style="display:none;">
+        <div class="section-header"><span>搜到的</span><span class="link-btn" onclick="clearAZSearch()">清空</span></div>
+        <div class="card-list" id="az-search-result"></div>
       </div>
     </section>
 
@@ -1107,6 +1259,78 @@
 <!-- ========== 弹层：收支分类选择 ========== -->
 <div class="sheet-mask" id="sheet-mask" onclick="closeSheet()"></div>
 
+<!-- ========== 弹层：借钱买的东西划不划算（13.5） ========== -->
+<div class="sheet sheet-large" id="leverage-sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <span class="sheet-title">借钱买的东西划不划算</span>
+    <span class="sheet-close" onclick="closeSheet()">✕</span>
+  </div>
+  <div style="padding:0 20px 8px;font-size:13px;color:var(--text-sub);line-height:1.6;">
+    只看「稳稳每月都有」的进账，跟这笔债每个月的利息和费用比。本金不算——还本金只是把现金换成少欠一点。
+  </div>
+  <div id="leverage-list" style="padding:0 16px;"></div>
+  <div class="sheet-hint" id="leverage-hint"></div>
+</div>
+
+<!-- ========== 弹层：逐月缺口表（7.9） ========== -->
+<div class="sheet sheet-large" id="gap-sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <span class="sheet-title">每个月要还的，那个月拿得出来吗</span>
+    <span class="sheet-close" onclick="closeSheet()">✕</span>
+  </div>
+  <div style="padding:0 20px 8px;font-size:13px;color:var(--text-sub);line-height:1.6;">
+    以前只看「今天能花的钱够还一年吗」，会漏掉「第 10 个月才到期、到时候却拿不出钱」这种情况。所以逐月看。
+  </div>
+  <div class="gap-table" id="gap-table"></div>
+  <div class="sheet-hint">动不了的钱（公积金、医保）没算进来；真要卖房子、卖车换钱，扣掉的费用也还没减。这是估算。</div>
+</div>
+
+<!-- ========== 弹层：先还哪一笔最划算（7.10） ========== -->
+<div class="sheet sheet-large" id="payoff-sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <span class="sheet-title">先还哪一笔最划算</span>
+    <span class="sheet-close" onclick="closeSheet()">✕</span>
+  </div>
+  <div style="padding:0 20px 8px;font-size:13px;color:var(--text-sub);line-height:1.6;">
+    默认按「实际一年要付多少」从高到低排。提前还掉最贵的那笔，等于稳稳省下这笔利息，比多数理财都划算——但前提是应急金还在。
+  </div>
+  <div id="payoff-list" style="padding:0 16px;"></div>
+  <div class="sheet-hint">提前还之前一定先看两件事：要不要交违约金，还完之后你手上还剩多少够撑几个月。点「算一下提前还要不要紧」就能看到。</div>
+</div>
+
+<!-- ========== 弹层：提前还款四件事（7.10） ========== -->
+<div class="sheet sheet-large" id="prepay-sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <span class="sheet-title" id="prepay-title">提前还款</span>
+    <span class="sheet-close" onclick="closeSheet()">✕</span>
+  </div>
+  <div style="padding:0 20px 8px;">
+    <span class="form-label">打算提前还多少</span>
+    <input class="form-input" id="prepay-amount" type="number" placeholder="填个数" oninput="renderPrepay()">
+  </div>
+  <div id="prepay-result" style="padding:0 16px;"></div>
+  <div class="sheet-hint">利息是按你填的利率估算的，各家银行算法不一样，<b>以你的账单为准</b>。违约金按你这张卡的章程填。</div>
+</div>
+
+<!-- ========== 弹层：资债搜索说明（替代原来那个空壳） ========== -->
+<div class="sheet" id="az-search-sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <span class="sheet-title">找东西</span>
+    <span class="sheet-close" onclick="closeSheet()">✕</span>
+  </div>
+  <div style="padding:4px 20px 0;font-size:14px;line-height:1.7;color:var(--text-sub);">
+    直接点右上角 🔍，资产和负债一起搜，不用分两次找。
+  </div>
+  <div style="padding:12px 16px 0;">
+    <button class="btn-primary" onclick="closeSheet();toggleAZSearch();">去搜一下</button>
+  </div>
+</div>
+
 <div class="sheet" id="category-sheet">
   <div class="sheet-handle"></div>
   <div class="sheet-header">
@@ -1412,6 +1636,7 @@
 <!-- 轻提示 -->
 <div class="cm-toast" id="cm-toast"></div>
 
+<script src="az.js"></script>
 <script src="category.js"></script>
 <script src="app.js"></script>
 </body>

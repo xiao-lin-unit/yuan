@@ -340,6 +340,9 @@ class _AccountsScreenState extends State<AccountsScreen> {
 
     return switch (_filter) {
       _AccountFilter.all => AppSummaryHero(
+          // 配色试点：唯一一张主色 hero。其余三张（含传语义 accent 的
+          // 信用卡 / 受限卡）保持中性卡，看完观感再决定铺开范围。
+          emphasized: true,
           label: '能花的钱',
           value: MoneyFormat.yuan0(stats.spendable),
           caption: '你当前可支配金额，共 ${stats.accountCount} 个账户。',
