@@ -1,9 +1,9 @@
 import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 
-import '../database/asset_liability/az_dao.dart';
-import '../database/asset_liability/az_math.dart';
-import '../database/asset_liability/az_record.dart';
+import '../../database/ledger/az_dao.dart';
+import '../../database/ledger/az_math.dart';
+import '../../database/ledger/az_record.dart';
 
 /// 资债模块的**共享账本**（ChangeNotifier，由 Services.initServices 装配）。
 ///

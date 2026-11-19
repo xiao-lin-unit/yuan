@@ -3,7 +3,7 @@ import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:yuan/database/account/account_db.dart';
-import 'package:yuan/database/asset_liability/az_db.dart';
+import 'package:yuan/database/ledger/az_db.dart';
 import 'package:yuan/database/account/credit_card_rule.dart';
 import 'package:yuan/database/db_module.dart';
 import 'package:yuan/database/category/category_db.dart';

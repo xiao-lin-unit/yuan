@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../database/account/account_record.dart';
-import '../../database/asset_liability/az_record.dart';
+import '../../database/ledger/az_record.dart';
 
 /// 视图层的**纯数据契约**（两个视图 + 页面骨架共用）。
 ///

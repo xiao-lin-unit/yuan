@@ -3,9 +3,9 @@ import 'package:material_ui/material_ui.dart';
 
 import '../screens/commons/icons/app_icons.dart';
 import '../screens/entry/entry_screen.dart';
-import '../screens/asset_liability/asset_detail_screen.dart';
-import '../screens/asset_liability/asset_liability_screen.dart';
-import '../screens/asset_liability/liability_detail_screen.dart';
+import '../screens/ledger/asset_detail_screen.dart';
+import '../screens/ledger/ledger_screen.dart';
+import '../screens/ledger/liability_detail_screen.dart';
 import '../screens/accounts/account_detail_screen.dart';
 import '../screens/accounts/accounts_screen.dart';
 import '../screens/analysis/analysis_screen.dart';
@@ -37,7 +37,7 @@ class RouteNavigation {
 /// 不再在路由层直接写 Icons.xxx 或 emoji。
 const List<RouteNavigation> tabs = [
   RouteNavigation('记账', '/', 0, EntryScreen(), AppIcons.entry),
-  RouteNavigation('资债', '/ledger', 1, AssetLiabilityScreen(), AppIcons.ledger),
+  RouteNavigation('资债', '/ledger', 1, LedgerScreen(), AppIcons.ledger),
   RouteNavigation('账户', '/accounts', 2, AccountsScreen(), AppIcons.accounts),
   RouteNavigation('分析', '/analysis', 3, AnalysisScreen(), AppIcons.analysis),
   RouteNavigation('我的', '/profile', 4, ProfileScreen(), AppIcons.profile),

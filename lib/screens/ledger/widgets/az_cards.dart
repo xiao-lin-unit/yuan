@@ -1,7 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
-import '../../../database/asset_liability/az_math.dart';
-import '../../../database/asset_liability/az_record.dart';
+import '../../../database/ledger/az_math.dart';
+import '../../../database/ledger/az_record.dart';
 import '../../../screens/commons/function/app_function_layout.dart';
 import '../../../screens/commons/icons/app_icons.dart';
 import '../../../styles/app_decorations.dart';
@@ -13,7 +13,7 @@ import '../../../utils/money_format.dart';
 ///
 /// 【通用 / 私有分开】家底账展开、A1/A2 只读镜像、流向三格、白给银行
 /// 分段条这些形态只在资债模块出现，按项目约定留在
-/// `screens/asset_liability/widgets/` 私有区，不上提到 commons。
+/// `screens/ledger/widgets/` 私有区，不上提到 commons。
 /// 真正被 ≥2 个页面复用的（AppSummaryHero / AppInfoGrid / AppStatBar /
 /// AppSegmentTabs / AppFloatingActions）一律直接复用现有公共件。
 ///

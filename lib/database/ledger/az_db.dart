@@ -47,7 +47,7 @@ class AzDb implements DbModule {
   static const String snapshotsTable = 'az_monthly_snapshots';
 
   @override
-  String get name => 'asset_liability';
+  String get name => 'ledger';
 
   /// 唯一 DDL 真源。参数用 [DatabaseExecutor]：`_onCreate` 传事务里的
   /// Transaction、`_onUpgrade` 传 Database，两者都能收。不自建事务。
