@@ -3,7 +3,9 @@ import 'package:material_ui/material_ui.dart';
 
 import '../screens/commons/icons/app_icons.dart';
 import '../screens/entry/entry_screen.dart';
-import '../screens/ledger/ledger_screen.dart';
+import '../screens/asset_liability/asset_detail_screen.dart';
+import '../screens/asset_liability/asset_liability_screen.dart';
+import '../screens/asset_liability/liability_detail_screen.dart';
 import '../screens/accounts/account_detail_screen.dart';
 import '../screens/accounts/accounts_screen.dart';
 import '../screens/analysis/analysis_screen.dart';
@@ -35,7 +37,7 @@ class RouteNavigation {
 /// 不再在路由层直接写 Icons.xxx 或 emoji。
 const List<RouteNavigation> tabs = [
   RouteNavigation('记账', '/', 0, EntryScreen(), AppIcons.entry),
-  RouteNavigation('资债', '/ledger', 1, LedgerScreen(), AppIcons.ledger),
+  RouteNavigation('资债', '/ledger', 1, AssetLiabilityScreen(), AppIcons.ledger),
   RouteNavigation('账户', '/accounts', 2, AccountsScreen(), AppIcons.accounts),
   RouteNavigation('分析', '/analysis', 3, AnalysisScreen(), AppIcons.analysis),
   RouteNavigation('我的', '/profile', 4, ProfileScreen(), AppIcons.profile),
@@ -251,6 +253,21 @@ final appRouter = GoRouter(
           path: '/accounts/detail/:id',
           builder: (context, state) => AccountDetailScreen(
             accountId: int.tryParse(state.pathParameters['id'] ?? '') ?? -1,
+          ),
+        ),
+        // 资产 / 负债明细：同样挂在 ShellRoute **内部**，沿用唯一
+        // Scaffold 的键盘避让（详情里的估值 / 买卖 / 还款 Sheet 都受益）。
+        // 前缀 '/ledger/' 让 AppShell 继续高亮「资债」tab。
+        GoRoute(
+          path: '/ledger/asset/:id',
+          builder: (context, state) => AssetDetailScreen(
+            assetId: int.tryParse(state.pathParameters['id'] ?? '') ?? -1,
+          ),
+        ),
+        GoRoute(
+          path: '/ledger/debt/:id',
+          builder: (context, state) => LiabilityDetailScreen(
+            debtId: int.tryParse(state.pathParameters['id'] ?? '') ?? -1,
           ),
         ),
       ],
