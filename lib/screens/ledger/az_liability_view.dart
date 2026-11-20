@@ -3,7 +3,6 @@ import 'package:material_ui/material_ui.dart';
 import '../../database/ledger/az_math.dart';
 import '../../database/ledger/az_record.dart';
 import '../../screens/commons/function/app_function_layout.dart';
-import '../../screens/commons/icons/app_icons.dart';
 import '../../styles/theme_tokens.dart';
 import '../../utils/money_format.dart';
 import 'az_view_contract.dart';
@@ -118,17 +117,6 @@ class AzLiabilityView extends StatelessWidget {
                       ],
                     ],
                   ),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-          child: OutlinedButton.icon(
-            onPressed: actions.addDebt,
-            icon: const Icon(AppIcons.add, size: AppIconSize.small),
-            label: const Text('＋ 新增一笔欠款'),
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size.fromHeight(AppLayout.fieldMinHeight),
-            ),
           ),
         ),
         // ── 快到期的 ────────────────────────────────────────────

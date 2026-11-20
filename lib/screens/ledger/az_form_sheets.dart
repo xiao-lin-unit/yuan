@@ -26,7 +26,7 @@ import '../commons/icons/app_icons.dart';
 ///   · 修改 / 新增 → [FormSheetContent]（配 [FormSheetController]）；
 ///   · 未指定选择 → [SelectSheetContent]；确认 → [ConfirmSheetContent]；
 ///   · 仅展示 → [OverviewSheetContent]；带图标的类型选择 → 大类选择器见
-///     `az_sheets.dart` 的 [showAzAssetClassSheet]；
+///     本文件的 [showAzAssetClassSheet]；
 ///   · 其他操作 → 本文件里的「算一下提前还」用表单 + 概览两步，仍是既有组件。
 /// **没有新建任何 XxxSheetContent**，也没有第二套弹层外壳。
 ///
@@ -119,8 +119,16 @@ String _positive(String? raw, String label) {
 }
 
 /// 顶栏：取消 / 居中标题 / 保存（账户模块已统一的形态）。
-Widget _header(String title, FormSheetController controller) => SheetHeader(
+/// [subtitle] 只在「两步式新增」里回显刚选的大类 / 欠款类型；其它调用点
+/// 不传，形态与原来逐像素一致。
+Widget _header(
+  String title,
+  FormSheetController controller, {
+  String? subtitle,
+}) =>
+    SheetHeader(
       title: title,
+      subtitle: subtitle,
       centered: true,
       leading: const SheetCancelAction(),
       trailing: SheetTextAction(
@@ -130,167 +138,94 @@ Widget _header(String title, FormSheetController controller) => SheetHeader(
       ),
     );
 
-/// ① 新增 / 编辑一项资产（6.3）。大类只选一次、不进二级菜单（10.5），
-/// 选中后表单里的其余字段对所有大类都适用，专属字段（股票代码、房子用途）
-/// 用可选文本收在同一张表里，不套第二层弹窗。
+/// ① 新增 / 编辑一项资产（6.1 / 6.2 / 6.3）。
+///
+/// 【两步式·为什么】6.1 要求「一排图标只选一次，选完表单自动展开这一类
+/// 专属的几项，其余字段藏起来」。所以新增入口先弹 [showAzAssetClassSheet]，
+/// 把选中的大类用 [presetClass] 传进来；本函数据此**构造期**生成 items，
+/// 运行期不换字段 —— 仍是全静态，没有 StatefulWidget / Notifier。
+/// 编辑时类型取 existing.assetClass，不再让用户改（10.5 只选一次）。
+///
+/// 【未显示的字段不丢】onSubmit 用 `v.contains(key)` 判断：这一项没出现在
+/// 表单里就保留 base.toMap() 的原值，编辑老记录不会把已有数据清成空串。
+/// 大类与字段的对应关系见 [_assetItems]，每类只列自己用得上的那几项。
 Future<void> showAzAssetSheet(
   BuildContext context, {
   AssetRecord? existing,
+  AssetClass? presetClass,
 }) async {
   final FormSheetController ctl = FormSheetController();
   final DateTime now = DateTime.now();
+  final AssetClass cls = existing?.assetClass ?? presetClass ?? AssetClass.misc;
   final AssetRecord base = existing ??
       AssetRecord(
-        assetClass: AssetClass.misc,
+        assetClass: cls,
         name: '',
         cost: 1,
+        // 6.7：贵重物件默认不算进总账，车与其它类默认算。
+        counted: cls != AssetClass.valuable,
         createdAt: now,
         updatedAt: now,
       );
   await AppSheetShell.show<void>(
     context,
-    header: _header(existing == null ? '新增一项东西' : '编辑这项东西', ctl),
+    header: _header(
+      existing == null ? '新增一项东西' : '编辑这项东西',
+      ctl,
+      subtitle: cls.label,
+    ),
     child: FormSheetContent(
       controller: ctl,
       submit: true,
       submitLabel: '保存',
-      items: <SheetFormItem>[
-        SheetFormSingleLineTextItem(
-          key: 'name',
-          label: '给它起个名',
-          initialValue: base.name,
-          hint: '出租的那套小房 / 借给老张的钱',
-          validator: (String v) => v.trim().isEmpty ? '还差一个名字' : null,
-        ),
-        SheetFormCustomItem(
-          key: 'asset_class',
-          label: '这是什么（只选一次）',
-          builder: (BuildContext ctx, ValueChanged<Object?> onChanged) =>
-              _InlineSelect(
-            options: <_SelectOption>[
-              for (final AssetClass c in AssetClass.values)
-                _SelectOption(c.code, c.label)
-            ],
-            initial: base.assetClass.code,
-            onChanged: onChanged,
-          ),
-        ),
-        SheetFormSingleLineTextItem(
-          key: 'cost',
-          label: '买它一共花了多少',
-          initialValue: base.cost.toStringAsFixed(0),
-          hint: _kAmountHint,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          validator: (String v) {
-            final String e = _positive(v, '买它一共花了多少');
-            return e.isEmpty ? null : e;
-          },
-        ),
-        SheetFormSingleLineTextItem(
-          key: 'code',
-          label: '代码 / 编号（可不填）',
-          initialValue: base.code,
-        ),
-        SheetFormSingleLineTextItem(
-          key: 'latest_value',
-          label: '现在大概值多少（可不填）',
-          initialValue: base.latestValue?.toStringAsFixed(0) ?? '',
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        ),
-        SheetFormSingleLineTextItem(
-          key: 'monthly_in',
-          label: '它每个月给你多少钱',
-          initialValue: base.monthlyIn.toStringAsFixed(0),
-          hint: '租金、利息、分红',
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        ),
-        SheetFormSingleLineTextItem(
-          key: 'monthly_out',
-          label: '它每个月要你花多少钱',
-          initialValue: base.monthlyOut.toStringAsFixed(0),
-          hint: '物业、保险、保养',
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        ),
-        SheetFormSingleLineTextItem(
-          key: 'exit_cost',
-          label: '提前拿会不会扣钱',
-          initialValue: base.exitCost.toStringAsFixed(0),
-          hint: '手续费、税费估算',
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        ),
-        SheetFormCustomItem(
-          key: 'liquidity',
-          label: '多久能变成现金',
-          builder: (BuildContext ctx, ValueChanged<Object?> onChanged) =>
-              _InlineSelect(
-            options: <_SelectOption>[
-              for (final Liquidity l in Liquidity.values)
-                _SelectOption(l.dbValue.toString(), l.label)
-            ],
-            initial: base.liquidity.dbValue.toString(),
-            onChanged: onChanged,
-          ),
-        ),
-        SheetFormCustomItem(
-          key: 'stability',
-          label: '这笔进账稳不稳',
-          builder: (BuildContext ctx, ValueChanged<Object?> onChanged) =>
-              _InlineSelect(
-            options: <_SelectOption>[
-              for (final AzStability s in AzStability.values)
-                _SelectOption(s.dbValue, s.label)
-            ],
-            initial: base.stability.dbValue,
-            onChanged: onChanged,
-          ),
-        ),
-        SheetFormToggleItem(
-          key: 'counted',
-          label: '算不算进「真正属于你的钱」',
-          initialValue: base.counted,
-        ),
-        SheetFormSingleLineTextItem(
-          key: 'intention',
-          label: '以后打算拿它做什么（可不填）',
-          initialValue: base.intention,
-        ),
-        SheetFormMultiLineTextItem(
-          key: 'note',
-          label: '备注（可不填）',
-          initialValue: base.note,
-          minLines: 2,
-          maxLines: 3,
-          showCounter: false,
-        ),
-      ],
+      items: _assetItems(cls, base),
       onSubmit: (SheetFormValues v) async {
         final Map<String, Object?> m = base.toMap()..['id'] = base.id;
-        m['name'] = v.text('name').trim();
-        m['asset_class'] = v.get<String>('asset_class') ?? base.assetClass.code;
-        m['cost'] = _num(v, 'cost', base.cost);
-        m['code'] = v.text('code').trim();
-        final double? latest = double.tryParse(v.text('latest_value').trim());
-        m['latest_value'] = latest;
-        m['valued_at'] = latest == null
-            ? base.valuedAt?.millisecondsSinceEpoch
-            : DateTime.now().millisecondsSinceEpoch;
-        m['valuation_source'] = latest == null
-            ? base.valuationSource.dbValue
-            : ValuationSource.manual.dbValue;
-        m['monthly_in'] = _num(v, 'monthly_in');
-        m['monthly_out'] = _num(v, 'monthly_out');
-        m['exit_cost'] = _num(v, 'exit_cost');
-        m['liquidity'] = int.tryParse(
-              v.get<String>('liquidity') ?? '${base.liquidity.dbValue}',
-            ) ??
-            base.liquidity.dbValue;
-        m['stability'] = v.get<String>('stability') ?? base.stability.dbValue;
-        m['counted'] = v.flag('counted') ? 1 : 0;
-        m['intention'] = v.text('intention').trim();
-        m['note'] = v.text('note').trim();
-        m['icon_key'] = AssetClass.fromDb(
-          m['asset_class'] as String?,
-        ).iconKey;
+        m['asset_class'] = cls.code;
+        m['icon_key'] = cls.iconKey;
+        if (v.contains('name')) m['name'] = v.text('name').trim();
+        if (v.contains('cost')) m['cost'] = _num(v, 'cost', base.cost);
+        if (v.contains('code')) m['code'] = v.text('code').trim();
+        if (v.contains('latest_value')) {
+          final double? latest =
+              double.tryParse(v.text('latest_value').trim());
+          m['latest_value'] = latest;
+          m['valued_at'] = latest == null
+              ? base.valuedAt?.millisecondsSinceEpoch
+              : DateTime.now().millisecondsSinceEpoch;
+          m['valuation_source'] = latest == null
+              ? base.valuationSource.dbValue
+              : ValuationSource.manual.dbValue;
+        }
+        if (v.contains('monthly_in')) {
+          m['monthly_in'] = _num(v, 'monthly_in');
+        }
+        if (v.contains('monthly_out')) {
+          m['monthly_out'] = _num(v, 'monthly_out');
+        }
+        if (v.contains('exit_cost')) {
+          m['exit_cost'] = _num(v, 'exit_cost');
+        }
+        if (v.contains('liquidity')) {
+          m['liquidity'] = int.tryParse(
+                v.get<String>('liquidity') ?? '${base.liquidity.dbValue}',
+              ) ??
+              base.liquidity.dbValue;
+        }
+        if (v.contains('stability')) {
+          m['stability'] = v.get<String>('stability') ?? base.stability.dbValue;
+        }
+        if (v.contains('use_mode')) {
+          m['use_mode'] = v.get<String>('use_mode') ?? base.useMode;
+        }
+        if (v.contains('depreciation_note')) {
+          m['depreciation_note'] = v.text('depreciation_note').trim();
+        }
+        if (v.contains('counted')) m['counted'] = v.flag('counted') ? 1 : 0;
+        if (v.contains('intention')) {
+          m['intention'] = v.text('intention').trim();
+        }
+        if (v.contains('note')) m['note'] = v.text('note').trim();
         await context.read<AzWriteController>().saveAsset(
               AssetRecord.fromMap(m),
             );
@@ -299,201 +234,419 @@ Future<void> showAzAssetSheet(
   );
 }
 
-/// ② 新增 / 编辑一笔欠款（7.4 / 7.5）。「实际一年要付多少」由
-/// AzMath.realAnnualRate 算，用户三选一输入方式里这里用「直接填利率 +
-/// 每期费用」，软件反算真实成本，不让用户懂年化。
+/// 【资产大类 → 表单项】6.1「选完某一类，只展开这一类专属的几项」的落地表。
+///
+/// 依据 6.2 大类清单、6.3 共用字段、6.5~6.7 各类专属字段：
+///   · 公共：名字、买入花了多少、多久能变成现金、备注（所有类都要）；
+///   · A4/A5/A6 投资：代码 / 编号、提前赎回扣费；估值由买卖批次算，
+///     不手填「现在值多少」（6.4）；进账（分红）与「稳不稳」也要填；
+///   · A7 房产：租金、每月持有成本、自住/出租（use_mode）、交易税费；
+///   · A8 车：每月养车钱、每年掉多少价（depreciation_note）、是否计入总账；
+///   · A9 贵重物件：默认不计入总账（6.7）、提前变现扣费；
+///   · A3 借出去的钱 / A10 生意股份：进账与「稳不稳」；A3 的 intention
+///     用来写「说好什么时候还」；
+///   · A11 其他：最少字段 + 是否计入总账。
+/// 字段 key 全部沿用原来的 15 项（另加 use_mode / depreciation_note 两个
+/// 库里已有、之前没露出来的列），不新增表结构、不升 DB 版本。
+List<SheetFormItem> _assetItems(AssetClass cls, AssetRecord base) {
+  final bool invest = cls == AssetClass.stock ||
+      cls == AssetClass.fund ||
+      cls == AssetClass.otherInvest;
+  final bool property = cls == AssetClass.property;
+  final bool vehicle = cls == AssetClass.vehicle;
+  final bool valuable = cls == AssetClass.valuable;
+  final bool loan = cls == AssetClass.loan;
+  final bool business = cls == AssetClass.business;
+  final bool hasIncome = loan || invest || property || business;
+  final bool hasHoldCost = property || vehicle;
+  final bool hasExitCost = invest || property || valuable || business;
+
+  return <SheetFormItem>[
+    SheetFormSingleLineTextItem(
+      key: 'name',
+      label: '给它起个名',
+      initialValue: base.name,
+      hint: loan
+          ? '借给老张的钱'
+          : (property ? '出租的那套小房' : null),
+      validator: (String v) => v.trim().isEmpty ? '还差一个名字' : null,
+    ),
+    SheetFormSingleLineTextItem(
+      key: 'cost',
+      label: '买它一共花了多少',
+      initialValue: base.cost.toStringAsFixed(0),
+      hint: _kAmountHint,
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      validator: (String v) {
+        final String e = _positive(v, '买它一共花了多少');
+        return e.isEmpty ? null : e;
+      },
+    ),
+    if (invest)
+      SheetFormSingleLineTextItem(
+        key: 'code',
+        label: '代码 / 编号（可不填）',
+        initialValue: base.code,
+      ),
+    if (!invest)
+      SheetFormSingleLineTextItem(
+        key: 'latest_value',
+        label: '现在大概值多少（可不填）',
+        initialValue: base.latestValue?.toStringAsFixed(0) ?? '',
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      ),
+    if (hasIncome)
+      SheetFormSingleLineTextItem(
+        key: 'monthly_in',
+        label: property ? '每个月租金多少' : '它每个月给你多少钱',
+        initialValue: base.monthlyIn.toStringAsFixed(0),
+        hint: '租金、利息、分红',
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      ),
+    if (hasHoldCost)
+      SheetFormSingleLineTextItem(
+        key: 'monthly_out',
+        label: vehicle ? '每个月养车花多少' : '它每个月要你花多少钱',
+        initialValue: base.monthlyOut.toStringAsFixed(0),
+        hint: '物业、保险、保养',
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      ),
+    if (hasExitCost)
+      SheetFormSingleLineTextItem(
+        key: 'exit_cost',
+        label: '提前拿会不会扣钱',
+        initialValue: base.exitCost.toStringAsFixed(0),
+        hint: '手续费、税费估算',
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      ),
+    SheetFormCustomItem(
+      key: 'liquidity',
+      label: '多久能变成现金',
+      builder: (BuildContext ctx, ValueChanged<Object?> onChanged) =>
+          _InlineSelect(
+        options: <_SelectOption>[
+          for (final Liquidity l in Liquidity.values)
+            _SelectOption(l.dbValue.toString(), l.label)
+        ],
+        initial: base.liquidity.dbValue.toString(),
+        onChanged: onChanged,
+      ),
+    ),
+    if (hasIncome)
+      SheetFormCustomItem(
+        key: 'stability',
+        label: '这笔进账稳不稳',
+        builder: (BuildContext ctx, ValueChanged<Object?> onChanged) =>
+            _InlineSelect(
+          options: <_SelectOption>[
+            for (final AzStability s in AzStability.values)
+              _SelectOption(s.dbValue, s.label)
+          ],
+          initial: base.stability.dbValue,
+          onChanged: onChanged,
+        ),
+      ),
+    if (property)
+      SheetFormCustomItem(
+        key: 'use_mode',
+        label: '现在怎么用',
+        builder: (BuildContext ctx, ValueChanged<Object?> onChanged) =>
+            _InlineSelect(
+          options: const <_SelectOption>[
+            _SelectOption('', '自己住'),
+            _SelectOption('rent', '租给别人'),
+            _SelectOption('empty', '空着'),
+            _SelectOption('business', '做生意用'),
+          ],
+          initial: base.useMode,
+          onChanged: onChanged,
+        ),
+      ),
+    if (vehicle)
+      SheetFormSingleLineTextItem(
+        key: 'depreciation_note',
+        label: '每年大概掉多少价（可不填）',
+        initialValue: base.depreciationNote,
+        hint: '例如 每年大概掉 12%',
+      ),
+    if (vehicle || valuable || cls == AssetClass.misc)
+      SheetFormToggleItem(
+        key: 'counted',
+        label: '算不算进「真正属于你的钱」',
+        initialValue: base.counted,
+      ),
+    SheetFormSingleLineTextItem(
+      key: 'intention',
+      label: loan ? '说好什么时候还（可不填）' : '以后打算拿它做什么（可不填）',
+      initialValue: base.intention,
+    ),
+    SheetFormMultiLineTextItem(
+      key: 'note',
+      label: '备注（可不填）',
+      initialValue: base.note,
+      minLines: 2,
+      maxLines: 3,
+      showCounter: false,
+    ),
+  ];
+}
+
+/// ② 新增 / 编辑一笔欠款（7.2 / 7.4 / 7.5）。
+///
+/// 与资产同一个「两步式」：新增先弹 [showAzLiabilityTypeSheet] 选一次类型，
+/// 表单只显示这一类型用得上的字段。7.4 的「部分类型默认值」在这里落实：
+///   · 信用卡 / 借的亲友钱 → 随借随还，不填每期还多少、期数、怎么还；
+///   · 亲友钱默认不计息，额外给一个「要不要算利息」开关（7.2 T7）；
+///   · 房贷 / 车贷 / 电商分期等 → 完整分期字段（月供、利息、费用、期数…）。
+/// 类型与用途标签的默认值由 [_defaultPurpose] / base 构造期给出，用户可改。
+/// 未显示的字段同样靠 `v.contains(key)` 保留原值，编辑不丢数据。
 Future<void> showAzLiabilitySheet(
   BuildContext context, {
   LiabilityRecord? existing,
+  LiabilityType? presetType,
 }) async {
   final FormSheetController ctl = FormSheetController();
   final DateTime now = DateTime.now();
+  final LiabilityType type =
+      existing?.type ?? presetType ?? LiabilityType.other;
+  final bool revolving =
+      type == LiabilityType.creditCard || type == LiabilityType.personal;
   final LiabilityRecord base = existing ??
       LiabilityRecord(
-        type: LiabilityType.other,
+        type: type,
         name: '',
         principal: 1,
+        purpose: _defaultPurpose(type),
+        interestOn: type != LiabilityType.personal,
+        repayMethod: revolving
+            ? RepayMethod.revolving
+            : RepayMethod.equalPayment,
         createdAt: now,
         updatedAt: now,
       );
   await AppSheetShell.show<void>(
     context,
-    header: _header(existing == null ? '新增一笔欠款' : '编辑这笔欠款', ctl),
+    header: _header(
+      existing == null ? '新增一笔欠款' : '编辑这笔欠款',
+      ctl,
+      subtitle: type.label,
+    ),
     child: FormSheetContent(
       controller: ctl,
       submit: true,
       submitLabel: '保存',
-      items: <SheetFormItem>[
-        SheetFormSingleLineTextItem(
-          key: 'name',
-          label: '欠谁 / 起个名',
-          initialValue: base.name,
-          hint: 'XX 银行房贷',
-          validator: (String v) => v.trim().isEmpty ? '还差一个名字' : null,
-        ),
-        SheetFormCustomItem(
-          key: 'liability_type',
-          label: '欠的什么钱',
-          builder: (BuildContext ctx, ValueChanged<Object?> onChanged) =>
-              _InlineSelect(
-            options: <_SelectOption>[
-              for (final LiabilityType t in LiabilityType.values)
-                _SelectOption(t.dbValue, t.label)
-            ],
-            initial: base.type.dbValue,
-            onChanged: onChanged,
-          ),
-        ),
-        SheetFormCustomItem(
-          key: 'purpose',
-          label: '这钱借来干了什么',
-          builder: (BuildContext ctx, ValueChanged<Object?> onChanged) =>
-              _InlineSelect(
-            options: <_SelectOption>[
-              for (final DebtPurpose p in DebtPurpose.values)
-                _SelectOption(p.dbValue, p.label)
-            ],
-            initial: base.purpose.dbValue,
-            onChanged: onChanged,
-          ),
-        ),
-        SheetFormSingleLineTextItem(
-          key: 'principal',
-          label: '现在还欠多少',
-          initialValue: base.principal.toStringAsFixed(0),
-          hint: _kAmountHint,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          validator: (String v) {
-            final String e = _positive(v, '现在还欠多少');
-            if (e.isNotEmpty) return e;
-            return null;
-          },
-        ),
-        SheetFormSingleLineTextItem(
-          key: 'rate',
-          label: '合同上写的利率（%）',
-          initialValue: (base.rate * 100).toStringAsFixed(2),
-          hint: '例如 3.10 表示 3.1%',
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        ),
-        SheetFormCustomItem(
-          key: 'rate_type',
-          label: '利率会不会变',
-          builder: (BuildContext ctx, ValueChanged<Object?> onChanged) =>
-              _InlineSelect(
-            options: <_SelectOption>[
-              for (final RateType r in RateType.values)
-                _SelectOption(r.dbValue, r.label)
-            ],
-            initial: base.rateType.dbValue,
-            onChanged: onChanged,
-          ),
-        ),
-        SheetFormSingleLineTextItem(
-          key: 'monthly_pay',
-          label: '每期一共还多少',
-          initialValue: base.monthlyPay.toStringAsFixed(0),
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        ),
-        SheetFormSingleLineTextItem(
-          key: 'monthly_interest',
-          label: '其中利息',
-          initialValue: base.monthlyInterest.toStringAsFixed(0),
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        ),
-        SheetFormSingleLineTextItem(
-          key: 'monthly_fee',
-          label: '其中手续费',
-          initialValue: base.monthlyFee.toStringAsFixed(0),
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        ),
-        SheetFormCustomItem(
-          key: 'repay_method',
-          label: '怎么还',
-          builder: (BuildContext ctx, ValueChanged<Object?> onChanged) =>
-              _InlineSelect(
-            options: <_SelectOption>[
-              for (final RepayMethod r in RepayMethod.values)
-                _SelectOption(r.dbValue, '${r.label}（${r.hint}）')
-            ],
-            initial: base.repayMethod.dbValue,
-            onChanged: onChanged,
-          ),
-        ),
-        SheetFormSingleLineTextItem(
-          key: 'pay_day',
-          label: '每月几号还（可不填）',
-          initialValue: base.payDay?.toString() ?? '',
-          keyboardType: TextInputType.number,
-        ),
-        SheetFormSingleLineTextItem(
-          key: 'total_terms',
-          label: '一共几期（可不填）',
-          initialValue: base.totalTerms.toString(),
-          keyboardType: TextInputType.number,
-        ),
-        SheetFormSingleLineTextItem(
-          key: 'paid_terms',
-          label: '已经还了几期',
-          initialValue: base.paidTerms.toString(),
-          keyboardType: TextInputType.number,
-        ),
-        SheetFormSingleLineTextItem(
-          key: 'end_date',
-          label: '什么时候到期',
-          initialValue: base.endDate == null
-              ? ''
-              : '${base.endDate!.year}-${base.endDate!.month.toString().padLeft(2, '0')}-${base.endDate!.day.toString().padLeft(2, '0')}',
-          hint: _kDateHint,
-        ),
-        SheetFormMultiLineTextItem(
-          key: 'note',
-          label: '备注（可不填）',
-          initialValue: base.note,
-          minLines: 2,
-          maxLines: 3,
-          showCounter: false,
-        ),
-        const SheetFormNoteItem(
-          key: 'hint',
-          text: '按你填的数估算，以账单为准；本金不算花掉的钱。',
-          centered: true,
-        ),
-      ],
+      items: _liabilityItems(type, base),
       onSubmit: (SheetFormValues v) async {
         final Map<String, Object?> m = base.toMap()..['id'] = base.id;
-        final String type = v.get<String>('liability_type') ?? base.type.dbValue;
-        final double pay = _num(v, 'monthly_pay');
-        final double interest = _num(v, 'monthly_interest');
-        final double fee = _num(v, 'monthly_fee');
-        m['name'] = v.text('name').trim();
-        m['liability_type'] = type;
-        m['icon_key'] = LiabilityType.fromDb(type).iconKey;
-        m['purpose'] = v.get<String>('purpose') ?? base.purpose.dbValue;
-        m['principal'] = _num(v, 'principal', base.principal);
-        m['original_principal'] = base.originalPrincipal == 0
-            ? m['principal']
-            : base.originalPrincipal;
-        m['rate'] = _num(v, 'rate', base.rate * 100) / 100;
-        m['rate_type'] = v.get<String>('rate_type') ?? base.rateType.dbValue;
-        m['monthly_pay'] = pay;
-        m['monthly_interest'] = interest;
-        m['monthly_fee'] = fee;
-        m['monthly_principal'] =
-            (pay - interest - fee) > 0 ? pay - interest - fee : 0;
-        m['repay_method'] =
-            v.get<String>('repay_method') ?? base.repayMethod.dbValue;
-        m['pay_day'] = int.tryParse(v.text('pay_day').trim());
-        m['total_terms'] = _count(v, 'total_terms');
-        m['paid_terms'] = _count(v, 'paid_terms');
-        m['end_date'] = _date(v.text('end_date'))?.millisecondsSinceEpoch;
-        m['note'] = v.text('note').trim();
+        m['liability_type'] = type.dbValue;
+        m['icon_key'] = type.iconKey;
+        if (v.contains('name')) m['name'] = v.text('name').trim();
+        if (v.contains('purpose')) {
+          m['purpose'] = v.get<String>('purpose') ?? base.purpose.dbValue;
+        }
+        if (v.contains('principal')) {
+          m['principal'] = _num(v, 'principal', base.principal);
+          m['original_principal'] = base.originalPrincipal == 0
+              ? m['principal']
+              : base.originalPrincipal;
+        }
+        if (v.contains('interest_on')) {
+          m['interest_on'] = v.flag('interest_on') ? 1 : 0;
+        }
+        if (v.contains('rate')) {
+          m['rate'] = _num(v, 'rate', base.rate * 100) / 100;
+        }
+        if (v.contains('rate_type')) {
+          m['rate_type'] = v.get<String>('rate_type') ?? base.rateType.dbValue;
+        }
+        if (v.contains('monthly_pay') &&
+            v.contains('monthly_interest') &&
+            v.contains('monthly_fee')) {
+          final double pay = _num(v, 'monthly_pay');
+          final double interest = _num(v, 'monthly_interest');
+          final double fee = _num(v, 'monthly_fee');
+          m['monthly_pay'] = pay;
+          m['monthly_interest'] = interest;
+          m['monthly_fee'] = fee;
+          m['monthly_principal'] =
+              (pay - interest - fee) > 0 ? pay - interest - fee : 0;
+        }
+        if (v.contains('repay_method')) {
+          m['repay_method'] =
+              v.get<String>('repay_method') ?? base.repayMethod.dbValue;
+        }
+        if (v.contains('pay_day')) {
+          m['pay_day'] = int.tryParse(v.text('pay_day').trim());
+        }
+        if (v.contains('total_terms')) {
+          m['total_terms'] = _count(v, 'total_terms');
+        }
+        if (v.contains('paid_terms')) {
+          m['paid_terms'] = _count(v, 'paid_terms');
+        }
+        if (v.contains('end_date')) {
+          m['end_date'] = _date(v.text('end_date'))?.millisecondsSinceEpoch;
+        }
+        if (v.contains('note')) m['note'] = v.text('note').trim();
         await context.read<AzWriteController>().saveLiability(
               LiabilityRecord.fromMap(m),
             );
       },
     ),
   );
+}
+
+/// 7.2：按类型带出用途标签默认值，用户仍可在表单里改。
+DebtPurpose _defaultPurpose(LiabilityType t) => switch (t) {
+      LiabilityType.mortgage => DebtPurpose.t1,
+      LiabilityType.carLoan => DebtPurpose.t2,
+      LiabilityType.personal => DebtPurpose.t7,
+      _ => DebtPurpose.t4,
+    };
+
+/// 【欠款类型 → 表单项】7.4 的字段表按类型收窄：
+///   · 公共：名字、用途、现在还欠多少、利率、利率会不会变、备注；
+///   · 信用卡：7.7 规定「随借随还、账单日/还款日在信用卡账户里设」，
+///     不显示每期还多少、期数、怎么还、到期日；
+///   · 借的亲友钱：默认不计息，给「要不要算利息」开关，同样不显示分期字段；
+///   · 其余 9 类（房贷 / 车贷 / 分期等）：完整分期字段。
+/// 「实际一年要付多少」由 AzMath.realAnnualRate 从填的数算，用户不用懂年化。
+List<SheetFormItem> _liabilityItems(LiabilityType t, LiabilityRecord base) {
+  final bool revolving =
+      t == LiabilityType.creditCard || t == LiabilityType.personal;
+  return <SheetFormItem>[
+    SheetFormSingleLineTextItem(
+      key: 'name',
+      label: '欠谁 / 起个名',
+      initialValue: base.name,
+      hint: 'XX 银行房贷',
+      validator: (String v) => v.trim().isEmpty ? '还差一个名字' : null,
+    ),
+    SheetFormCustomItem(
+      key: 'purpose',
+      label: '这钱借来干了什么',
+      builder: (BuildContext ctx, ValueChanged<Object?> onChanged) =>
+          _InlineSelect(
+        options: <_SelectOption>[
+          for (final DebtPurpose p in DebtPurpose.values)
+            _SelectOption(p.dbValue, p.label)
+        ],
+        initial: base.purpose.dbValue,
+        onChanged: onChanged,
+      ),
+    ),
+    SheetFormSingleLineTextItem(
+      key: 'principal',
+      label: '现在还欠多少',
+      initialValue: base.principal.toStringAsFixed(0),
+      hint: _kAmountHint,
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      validator: (String v) {
+        final String e = _positive(v, '现在还欠多少');
+        return e.isEmpty ? null : e;
+      },
+    ),
+    if (t == LiabilityType.personal)
+      SheetFormToggleItem(
+        key: 'interest_on',
+        label: '要不要算利息',
+        initialValue: base.interestOn,
+      ),
+    SheetFormSingleLineTextItem(
+      key: 'rate',
+      label: t == LiabilityType.personal
+          ? '要算利息的话，年利率（%）'
+          : '合同上写的利率（%）',
+      initialValue: (base.rate * 100).toStringAsFixed(2),
+      hint: '例如 3.10 表示 3.1%',
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+    ),
+    SheetFormCustomItem(
+      key: 'rate_type',
+      label: '利率会不会变',
+      builder: (BuildContext ctx, ValueChanged<Object?> onChanged) =>
+          _InlineSelect(
+        options: <_SelectOption>[
+          for (final RateType r in RateType.values)
+            _SelectOption(r.dbValue, r.label)
+        ],
+        initial: base.rateType.dbValue,
+        onChanged: onChanged,
+      ),
+    ),
+    if (!revolving) ...<SheetFormItem>[
+      SheetFormSingleLineTextItem(
+        key: 'monthly_pay',
+        label: '每期一共还多少',
+        initialValue: base.monthlyPay.toStringAsFixed(0),
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      ),
+      SheetFormSingleLineTextItem(
+        key: 'monthly_interest',
+        label: '其中利息',
+        initialValue: base.monthlyInterest.toStringAsFixed(0),
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      ),
+      SheetFormSingleLineTextItem(
+        key: 'monthly_fee',
+        label: '其中手续费',
+        initialValue: base.monthlyFee.toStringAsFixed(0),
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      ),
+      SheetFormCustomItem(
+        key: 'repay_method',
+        label: '怎么还',
+        builder: (BuildContext ctx, ValueChanged<Object?> onChanged) =>
+            _InlineSelect(
+          options: <_SelectOption>[
+            for (final RepayMethod r in RepayMethod.values)
+              _SelectOption(r.dbValue, '${r.label}（${r.hint}）')
+          ],
+          initial: base.repayMethod.dbValue,
+          onChanged: onChanged,
+        ),
+      ),
+      SheetFormSingleLineTextItem(
+        key: 'pay_day',
+        label: '每月几号还（可不填）',
+        initialValue: base.payDay?.toString() ?? '',
+        keyboardType: TextInputType.number,
+      ),
+      SheetFormSingleLineTextItem(
+        key: 'total_terms',
+        label: '一共几期（可不填）',
+        initialValue: base.totalTerms.toString(),
+        keyboardType: TextInputType.number,
+      ),
+      SheetFormSingleLineTextItem(
+        key: 'paid_terms',
+        label: '已经还了几期',
+        initialValue: base.paidTerms.toString(),
+        keyboardType: TextInputType.number,
+      ),
+      SheetFormSingleLineTextItem(
+        key: 'end_date',
+        label: '什么时候到期',
+        initialValue: base.endDate == null
+            ? ''
+            : '${base.endDate!.year}-${base.endDate!.month.toString().padLeft(2, '0')}-${base.endDate!.day.toString().padLeft(2, '0')}',
+        hint: _kDateHint,
+      ),
+    ],
+    SheetFormMultiLineTextItem(
+      key: 'note',
+      label: '备注（可不填）',
+      initialValue: base.note,
+      minLines: 2,
+      maxLines: 3,
+      showCounter: false,
+    ),
+    const SheetFormNoteItem(
+      key: 'hint',
+      text: '按你填的数估算，以账单为准；本金不算花掉的钱。',
+      centered: true,
+    ),
+  ];
 }
 
 /// ③ 两张成对清单的唯一编辑入口（7.11 / 13.13）。
@@ -916,11 +1069,14 @@ Future<void> showAzDeleteSheet(
   );
 }
 
-/// ⑩ 选资产大类（10.5 只选一次、带图标的类型选择）。
-/// 新增资产时一步到位：这里回传大类，调用方再打开同一张表单并预选。
+/// ⑩ 选资产大类（6.1 一排图标、只选一次、不进二级菜单）。
+/// 复用公共 [CategorySheetContent]（契约第 5 条），点一格立即回传并关弹层；
+/// 调用方拿到大类后再打开只有这一类字段的表单，不套第二层菜单。
 Future<AssetClass?> showAzAssetClassSheet(BuildContext context) =>
     AppSheetShell.show<AssetClass>(
       context,
+      // 只有右侧关闭按钮、没有左侧取消，居中会把标题推偏；与主题选择
+      // 弹层一致用左对齐（centered 默认 false）。
       header: const SheetHeader(
         title: '你新增的是什么？',
         trailing: SheetCloseButton(),
@@ -934,16 +1090,44 @@ Future<AssetClass?> showAzAssetClassSheet(BuildContext context) =>
               icon: _classIcon(c.iconKey),
             )
         ],
-
       ),
     );
 
+/// ⑩-2 选欠款类型（7.2 一排图标、只选一次）。与资产大类同一个公共组件，
+/// 只换数据与标题；选中后由调用方打开该类型专属字段的表单。
+Future<LiabilityType?> showAzLiabilityTypeSheet(BuildContext context) =>
+    AppSheetShell.show<LiabilityType>(
+      context,
+      header: const SheetHeader(
+        title: '你新增的是哪种欠款？',
+        trailing: SheetCloseButton(),
+      ),
+      child: CategorySheetContent<LiabilityType>(
+        categories: <SheetCategory<LiabilityType>>[
+          for (final LiabilityType t in LiabilityType.values)
+            SheetCategory<LiabilityType>(
+              value: t,
+              label: t.label,
+              icon: _classIcon(t.iconKey),
+            )
+        ],
+      ),
+    );
+
+/// 语义 key → 图标。资产大类与欠款类型共用这一张表（与 azIcon 同一取舍），
+/// 数据库只存 key；新增类型时在这里加一行即可，不用迁移数据。
 IconData _classIcon(String key) => switch (key) {
       'finance' => AppIcons.finance,
       'investment' => AppIcons.investment,
       'housing' => AppIcons.housing,
+      'rent' => AppIcons.rent,
       'car' => AppIcons.car,
       'gift' => AppIcons.gift,
+      'basket' => AppIcons.basket,
+      'study' => AppIcons.study,
+      'homeImprovement' => AppIcons.homeImprovement,
+      'accountCreditCard' => AppIcons.accountCreditCard,
+      'insurance' => AppIcons.insurance,
       _ => AppIcons.other,
     };
 

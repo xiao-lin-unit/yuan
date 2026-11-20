@@ -64,6 +64,26 @@ class _LedgerScreenState extends State<LedgerScreen> {
     super.dispose();
   }
 
+  /// 【新增两步：先选类型，再只填这一类专属字段】工作逻辑：
+  ///   ① 点右上角「新增资产 / 新增欠款」→ 弹一排图标（CategorySheetContent，
+  ///      契约第 5 条）选一次大类 / 类型，6.1 与 7.2 要求「只选一次」；
+  ///   ② 把选中的枚举传给表单的 presetClass / presetType，表单构造期就定死
+  ///      items，运行期不换字段 —— 静态优先，没有第二套状态；
+  ///   ③ 用户关掉选择弹层（返回 null）就什么都不做；异步回来先查 mounted，
+  ///      避免弹层还没关、页面已销毁时继续 push。
+  /// 这是本轮唯一的跨帧流程，不是状态字段；页面本身仍只有原有 4 处 state。
+  Future<void> _addAsset(BuildContext context) async {
+    final AssetClass? cls = await showAzAssetClassSheet(context);
+    if (cls == null || !context.mounted) return;
+    await showAzAssetSheet(context, presetClass: cls);
+  }
+
+  Future<void> _addDebt(BuildContext context) async {
+    final LiabilityType? type = await showAzLiabilityTypeSheet(context);
+    if (type == null || !context.mounted) return;
+    await showAzLiabilitySheet(context, presetType: type);
+  }
+
   @override
   Widget build(BuildContext context) {
     // 两个共享账本一起 watch：账户余额一变，家底账的只读镜像当场跟着变，
@@ -116,6 +136,18 @@ class _LedgerScreenState extends State<LedgerScreen> {
         AppLayout.pageBottom,
       ),
       actions: <Widget>[
+        // 【新增入口固定在首屏】原先藏在滚动列表中部（三个分组 / 欠的每一笔
+        // 之后），要滑过整屏才看得见。AppHomePage.actions 在滚动区之外、
+        // 恒定可见，且契约注释里本就写着「右上角动作（新增 / 更多）」。
+        // 用主色实心按钮 + 随 tab 切换的文案，比原来的描边文字按钮醒目；
+        // 两个视图里那两处 OutlinedButton 已删除，保持「一个功能一个入口」。
+        FilledButton.icon(
+          onPressed: _tab == _AzTab.asset
+              ? viewActions.addAsset
+              : viewActions.addDebt,
+          icon: const Icon(AppIcons.add, size: AppIconSize.small),
+          label: Text(_tab == _AzTab.asset ? '新增资产' : '新增欠款'),
+        ),
         IconButton(
           tooltip: '搜资产、负债、类型、备注',
           icon: const Icon(AppIcons.search),
@@ -291,8 +323,8 @@ class _LedgerScreenState extends State<LedgerScreen> {
             unawaited(context.push('/ledger/debt/${x.id}')),
         openContingent: (ContingentRecord c) =>
             unawaited(showAzContingentSheet(context, existing: c, kind: c.kind)),
-        addAsset: () => unawaited(showAzAssetSheet(context)),
-        addDebt: () => unawaited(showAzLiabilitySheet(context)),
+        addAsset: () => unawaited(_addAsset(context)),
+        addDebt: () => unawaited(_addDebt(context)),
         addContingent: () => unawaited(
           showAzContingentSheet(
             context,

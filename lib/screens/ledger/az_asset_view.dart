@@ -4,7 +4,6 @@ import 'package:yuan/styles/app_typography.dart';
 import '../../database/ledger/az_math.dart';
 import '../../database/ledger/az_record.dart';
 import '../../screens/commons/function/app_function_layout.dart';
-import '../../screens/commons/icons/app_icons.dart';
 import '../../styles/theme_tokens.dart';
 import '../../utils/money_format.dart';
 import 'az_view_contract.dart';
@@ -13,7 +12,8 @@ import 'widgets/az_cards.dart';
 /// 资产视图（原型 `#view-asset`）。
 ///
 /// 顺序严格照原型：只读镜像 → 流向账 → 在给你钱/在拿你钱/不进不出 →
-/// 新增按钮 → 资产汇总 → 真要用钱能拿出多少。
+/// 资产汇总 → 真要用钱能拿出多少。新增入口固定在页面右上角动作行
+/// （AppHomePage.actions），不在滚动区里再放一份。
 /// 所有数字现场调 [AzMath] 从明细算出来，页面上不写死任何金额。
 class AzAssetView extends StatelessWidget {
   const AzAssetView({
@@ -119,22 +119,6 @@ class AzAssetView extends StatelessWidget {
         _group(context, 'give', '在给你钱的', shown['give']!, debts, d),
         _group(context, 'take', '在拿你钱的', shown['take']!, debts, d),
         _group(context, 'flat', '不进也不出的', shown['flat']!, debts, d),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.md,
-            AppSpacing.xs,
-            AppSpacing.md,
-            0,
-          ),
-          child: OutlinedButton.icon(
-            onPressed: actions.addAsset,
-            icon: const Icon(AppIcons.add, size: AppIconSize.small),
-            label: const Text('＋ 新增资产'),
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size.fromHeight(AppLayout.fieldMinHeight),
-            ),
-          ),
-        ),
         // ── 资产汇总 ────────────────────────────────────────────
         AppFunctionSection(
           title: '资产汇总',
