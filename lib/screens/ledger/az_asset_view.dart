@@ -102,7 +102,6 @@ class AzAssetView extends StatelessWidget {
             ],
           ),
         ),
-        const AzHint('卡里的钱和动不了的钱都记在账户页，这里只是跟着看，不会再加一遍。'),
         // ── 流向账 ──────────────────────────────────────────────
         const AppFunctionSection(
           title: '每个月，它们是给你钱还是拿你钱',
@@ -111,18 +110,14 @@ class AzAssetView extends StatelessWidget {
         AzFlowCard(
           flow: flow,
           inSub: flow.occasional > 0
-              ? '稳稳每月都有（另有 ${MoneyFormat.yuan0(flow.occasional)} 偶尔才有，没算进来）'
-              : '稳稳每月都有的那部分',
+              ? '每月都有（另有 ${MoneyFormat.yuan0(flow.occasional)} 偶尔才有，未计）'
+              : '每月都有',
           outSub:
               '东西的开销 ${MoneyFormat.yuan0(flow.holdCost)} + 借款利息费用 ${MoneyFormat.yuan0(flow.interest + flow.fee)}',
         ),
         // ── 三组折叠 ────────────────────────────────────────────
         _group(context, 'give', '在给你钱的', shown['give']!, debts, d),
         _group(context, 'take', '在拿你钱的', shown['take']!, debts, d),
-        const AzHint(
-          '自己住的房子、开的车也会拿你钱（物业、养车、借款利息），'
-          '但它们不是欠别人的钱，所以记在这里，不记在「欠的每一笔」里。',
-        ),
         _group(context, 'flat', '不进也不出的', shown['flat']!, debts, d),
         Padding(
           padding: const EdgeInsets.fromLTRB(
@@ -154,7 +149,7 @@ class AzAssetView extends StatelessWidget {
                 ),
               if (uncounted > 0)
                 AzKeyValueRow(
-                  label: '没算进总账的（你自己关掉的）',
+                  label: '不算进总账的',
                   value: MoneyFormat.yuan0(uncounted),
                 ),
               AzKeyValueRow(
@@ -170,26 +165,15 @@ class AzAssetView extends StatelessWidget {
             ],
           ),
         ),
-        const AzHint(
-          '「每月出」只填这项东西自己的开销（物业、养车），'
-          '借钱的月供不用填在这儿，那笔在「欠的每一笔」里算过了，不会扣两遍。',
-        ),
         // ── 真要用钱能拿出多少 ──────────────────────────────────
         const AppFunctionSection(
           title: '真要用钱，能拿出多少',
           child: SizedBox.shrink(),
         ),
         AzCashLayers(layers: layers, total: total <= 0 ? 1 : total),
-        AzHint(
-          '真要全部换成现金，手续费和税费大概要扣 '
-          '${MoneyFormat.yuan0(AzMath.exitCost(d))}。'
-          '这是你填的数加起来的，真卖的时候可能不一样。',
-        ),
-        AzHint(
-          '按${d.preferences.valuationMode == ValuationMode.cost ? '买入时算，没算涨跌' : '你自己填的最新价算，软件不联网，不会自动变'}。'
-          '没更新过价的持仓显示「还没卖，先不算赚没赚」。'
-          '${stale.isEmpty ? '' : '有 ${stale.length} 样的价是很久以前填的，总数可能不准。'}',
-        ),
+        AzHint('换成现金大概还要扣 ${MoneyFormat.yuan0(AzMath.exitCost(d))}（估算）。'),
+        if (stale.isNotEmpty)
+          AzHint('${stale.length} 样的价很久没更新，总数可能不准。'),
         Text(
           '共 ${all.length} 项 · ${MoneyFormat.yuan0(total)}',
           style: context.appText.caption,

@@ -88,16 +88,14 @@ class _LedgerScreenState extends State<LedgerScreen> {
         .length;
 
     final String valuationNote = d.preferences.valuationMode == ValuationMode.cost
-        ? '按买入时算（保守口径），没算涨跌；没更新过价的持仓显示「还没卖，先不算赚没赚」。'
-        : '按你自己填的最新价算，软件不联网，不会自动变；这不是查来的准数。';
+        ? '按买入价算'
+        : '按你填的最新价算';
     final String staleNote = stale.isEmpty
         ? ''
-        : '有 ${stale.length} 样的价是很久以前填的（'
-            '${stale.map((AssetRecord a) => a.name).join('、')}），总数可能不准。';
+        : '${stale.length} 样的价很久没更新，总数可能不准。';
     final String caption = netWorth >= 0
-        ? '把东西全加起来，再减去欠的；欠的都还完，还剩这么多。'
-        : '欠的比手上有的还多 ${MoneyFormat.yuan0(-netWorth)}。'
-            '刚工作、还在读书时欠着助学贷很正常，别只看这个数。';
+        ? '全部东西减掉欠款'
+        : '欠的比手上有的还多 ${MoneyFormat.yuan0(-netWorth)}';
 
     final AzViewData viewData = AzViewData(
       data: d,
@@ -127,7 +125,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
           }),
         ),
         IconButton(
-          tooltip: '填每月到手的钱 / 必须花的钱 / 应急金',
+          tooltip: '几个要自己填的数',
           icon: const Icon(AppIcons.edit),
           onPressed: () => unawaited(showAzPreferenceSheet(context)),
         ),
@@ -246,7 +244,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
             ],
           ),
           if (assets.isEmpty && debts.isEmpty)
-            const AzSmallEmpty('没搜到，换个名字或类型试试'),
+            const AzSmallEmpty('没搜到'),
           for (final AssetRecord x in assets) ...<Widget>[
             AzAssetCard(
               asset: x,

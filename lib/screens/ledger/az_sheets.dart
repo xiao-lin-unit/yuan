@@ -47,7 +47,6 @@ Future<void> showAzValuationModeSheet(
     context,
     header: const SheetHeader(
       title: '总账按哪个价算',
-      subtitle: '切了会留痕；历史月份的数不会跟着改',
       centered: true,
       leading: SheetCancelAction(),
     ),
@@ -85,7 +84,6 @@ Future<void> showAzDebtRatioSheet(
     context,
     header: const SheetHeader(
       title: '每月要还的钱，多少算安全',
-      subtitle: '只是判断口径，账本里的数一个不动',
       centered: true,
       leading: SheetCancelAction(),
     ),
@@ -121,7 +119,7 @@ Future<void> showAzPreferenceSheet(BuildContext context) async {
     context,
     header: SheetHeader(
       title: '几个要自己填的数',
-      subtitle: '不填就不判断，软件不会替你猜一个数',
+      subtitle: '不填显示「—」',
       centered: true,
       leading: const SheetCancelAction(),
       trailing: SheetTextAction(
@@ -139,14 +137,12 @@ Future<void> showAzPreferenceSheet(BuildContext context) async {
           key: 'monthly_income',
           label: '每月到手的钱',
           initialValue: p.monthlyIncome == 0 ? '' : p.monthlyIncome.toStringAsFixed(0),
-          hint: '用来算「每月要还的钱占挣的多少」',
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
         ),
         SheetFormSingleLineTextItem(
           key: 'must_cost',
           label: '每月必须花的钱',
           initialValue: p.mustCost == 0 ? '' : p.mustCost.toStringAsFixed(0),
-          hint: '用来算「不上班也能撑住」和应急金',
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
         ),
         SheetFormSingleLineTextItem(
@@ -159,7 +155,6 @@ Future<void> showAzPreferenceSheet(BuildContext context) async {
           key: 'inflation_rate',
           label: '东西一年大概贵百分之几（可跳过）',
           initialValue: p.inflationRate == 0 ? '' : p.inflationRate.toStringAsFixed(1),
-          hint: '默认 0；这是你自己填的假设，软件不查也不预测',
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
         ),
         SheetFormSingleLineTextItem(
@@ -177,12 +172,6 @@ Future<void> showAzPreferenceSheet(BuildContext context) async {
           key: 'include_debt_cost_in_expense',
           label: '借钱的成本计入「这个月一共花了多少」',
           initialValue: p.includeDebtCostInExpense,
-        ),
-        const SheetFormNoteItem(
-          key: 'hint',
-          text: '账本里记的都是当时填下的钱数，软件不会因物价自动调大调小；'
-              '「东西一年贵百分之几」只在推演里当假设用，回写不到账本。',
-          centered: true,
         ),
       ],
       onSubmit: (SheetFormValues v) async {
@@ -233,22 +222,20 @@ Future<void> showAzSnapshotSheet(BuildContext context) async {
     context,
     header: const SheetHeader(
       title: '按月末存一次数',
-      subtitle: '存下就锁定，之后改了数也不改历史',
+      subtitle: '存下就锁定',
       centered: true,
       leading: SheetCancelAction(),
     ),
     child: ConfirmSheetContent(
       title: '把 $month 的数存下来？',
       description:
-          '卡里的和动不了的 ${MoneyFormat.yuan0(accountTotal)}、'
+          '存下 $month 的数：卡里和动不了的 ${MoneyFormat.yuan0(accountTotal)}、'
           '除了钱以外的 ${MoneyFormat.yuan0(AzMath.selfAssets(d))}、'
-          '欠的 ${MoneyFormat.yuan0(debtTotal)}，连同当时的估值口径一起存一份。'
-          '这个月已经存过就不会覆盖。',
+          '欠的 ${MoneyFormat.yuan0(debtTotal)}。已存过不覆盖。',
       secondaryLabel: '再想想',
       primaryLabel: '存一次',
       intent: SheetIntent.neutral,
       icon: AppIcons.calendarMonth,
-      footnote: '之后改房价、改股价、切口径，只影响当月及以后。',
       onPrimaryAsync: () async {
         await context.read<AzWriteController>().writeSnapshot(
               MonthlySnapshotRecord(
@@ -285,7 +272,6 @@ Future<void> showAzLeverageSheet(BuildContext context) async {
     context,
     header: const SheetHeader(
       title: '借钱买的东西划不划算',
-      subtitle: '看钱往哪边流，不是给你的消费打分',
       centered: true,
       leading: SheetCancelAction(),
     ),
@@ -312,9 +298,8 @@ Future<void> showAzLeverageSheet(BuildContext context) async {
             ),
         ],
         updatedAt: list.isEmpty
-            ? '没有一笔债是连着东西的：记欠款时填上「这笔钱买来的东西」，这里就会自动帮你算。'
-            : '只算标了「每月都有」的进账；分红、说不准的租金不参与判断。'
-                '本金部分不算「拿走的钱」。应急借的钱单独看，不按消费问题给建议。',
+            ? '暂无连着东西的债。'
+            : '只算标了「每月都有」的进账。',
         actionLabel: '知道了',
         onAction: () => SheetActions.close(sheetContext),
       ),
@@ -344,7 +329,7 @@ Future<void> showAzGapSheet(BuildContext context) async {
     context,
     header: const SheetHeader(
       title: '这个月要还的，那个月拿得出来吗',
-      subtitle: '未来 12 个月逐月看，缺口的月份标出来',
+      subtitle: '未来 12 个月',
       centered: true,
       leading: SheetCancelAction(),
     ),
@@ -368,10 +353,9 @@ Future<void> showAzGapSheet(BuildContext context) async {
         ],
         updatedAt: worst.gap > 0
             ? '${worst.month} 要还 ${MoneyFormat.yuan0(worst.pay)}，'
-                '那个月能马上拿出来的只有 ${MoneyFormat.yuan0(worst.available)}，'
-                '差 ${MoneyFormat.yuan0(worst.gap)}。提前把钱挪过去。'
-                '动不了的钱（公积金、医保）没算进来，卖房子卖车要扣的费用也先减了。这是估算。'
-            : '未来 12 个月每个月都还得上。动不了的钱没算进来；这是估算，不是预言。',
+                '能拿出 ${MoneyFormat.yuan0(worst.available)}，'
+                '差 ${MoneyFormat.yuan0(worst.gap)}。动不了的钱未计入，这是估算。'
+            : '未来 12 个月都还得上。动不了的钱未计入，这是估算。',
         actionLabel: '知道了',
         onAction: () => SheetActions.close(sheetContext),
       ),
@@ -398,7 +382,6 @@ Future<void> showAzPayoffSheet(BuildContext context) async {
     context,
     header: const SheetHeader(
       title: '先还哪一笔最划算',
-      subtitle: '先还最贵的那笔，相当于稳稳省下它的成本',
       centered: true,
       leading: SheetCancelAction(),
     ),
@@ -425,11 +408,9 @@ Future<void> showAzPayoffSheet(BuildContext context) async {
             ),
         ],
         updatedAt: order.isEmpty
-            ? '没有欠款，这是好事。'
-            : '先还「${order.first.name}」：它实际一年要付 '
-                '${(topRate * 100).toStringAsFixed(1)}%，是现在最贵的。'
-                '另一种思路是「先还最小的一笔」，还得快、容易坚持 —— 两种都行，'
-                '看你更需要省钱还是需要撑住劲。提前还之前先看应急金够不够 3 个月。',
+            ? '暂无欠款'
+            : '先还「${order.first.name}」：实际一年 '
+                '${(topRate * 100).toStringAsFixed(1)}%，现在最贵。',
         actionLabel: '知道了',
         onAction: () => SheetActions.close(sheetContext),
       ),

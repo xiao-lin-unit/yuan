@@ -103,7 +103,7 @@ class LiabilityDetailScreen extends StatelessWidget {
                 context,
                 title: '把「${debt.name}」放进回收站？',
                 description:
-                    '${plans.length} 期还款计划会保留，30 天内可恢复。删掉后它就不再进「一共欠多少」。',
+                    '${plans.length} 期还款计划会保留，30 天内可恢复。',
                 onConfirm: () async {
                   await context.read<AzWriteController>().softDelete(
                         AzDb.liabilitiesTable,
@@ -185,10 +185,10 @@ class LiabilityDetailScreen extends StatelessWidget {
               padding: const EdgeInsets.only(bottom: AppSpacing.sm),
               child: Text(
                 lev.net >= 0
-                    ? '借钱买的「${lev.asset.name}」稳稳每月进 ${MoneyFormat.yuan0(lev.steadyIn)}，'
-                        '这笔债每月利息费用 ${MoneyFormat.yuan0(lev.cost)} —— 它替你付了利息，还多留 ${MoneyFormat.yuan0(lev.net)}。'
-                    : '借钱买的「${lev.asset.name}」稳稳每月进 ${MoneyFormat.yuan0(lev.steadyIn)}，'
-                        '这笔债每月利息费用 ${MoneyFormat.yuan0(lev.cost)} —— 它每月从你口袋拿走 ${MoneyFormat.yuan0(-lev.net)}。',
+                    ? '「${lev.asset.name}」每月进 ${MoneyFormat.yuan0(lev.steadyIn)}，'
+                        '成本 ${MoneyFormat.yuan0(lev.cost)}，多留 ${MoneyFormat.yuan0(lev.net)}。'
+                    : '「${lev.asset.name}」每月进 ${MoneyFormat.yuan0(lev.steadyIn)}，'
+                        '成本 ${MoneyFormat.yuan0(lev.cost)}，净拿走 ${MoneyFormat.yuan0(-lev.net)}。',
                 style: context.appText.body.copyWith(
                   color: lev.net >= 0
                       ? context.tokens.income
@@ -201,20 +201,8 @@ class LiabilityDetailScreen extends StatelessWidget {
             actionLabel: '先还哪一笔最划算 ›',
             onAction: () => unawaited(showAzPayoffSheet(context)),
             child: plans.isEmpty
-                ? const AzSmallEmpty('这笔还没有逐期计划，点「编辑」填上期数就能生成')
+                ? const AzSmallEmpty('暂无逐期计划')
                 : _planTable(context, plans),
-          ),
-          const AzHint(
-            '这一期里，利息和手续费是真给银行的；本金只是从左口袋换到右口袋，'
-            '还完本金「真正属于你的钱」不变，只有利息与费用才让它减少。',
-          ),
-          const AzHint(
-            '软件不联网，也不替银行计息：这里的利息、分期折算结果都是按你填的数和'
-            '这张卡自己的章程估的，一律标「估算，以账单为准」。',
-          ),
-          const AzHint(
-            '记还款只登记「这一期还了」：卡里扣的钱与负债本金要成对变动，'
-            '等记账模块接上账户流水才会自动记。现在「现在还欠多少」按你编辑时填的数为准。',
           ),
         ],
       ),

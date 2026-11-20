@@ -195,21 +195,20 @@ Future<void> showAzAssetSheet(
           key: 'latest_value',
           label: '现在大概值多少（可不填）',
           initialValue: base.latestValue?.toStringAsFixed(0) ?? '',
-          hint: '默认不填，按买入价算，不用天天盯价格',
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
         ),
         SheetFormSingleLineTextItem(
           key: 'monthly_in',
           label: '它每个月给你多少钱',
           initialValue: base.monthlyIn.toStringAsFixed(0),
-          hint: '租金、利息、分红；没有就填 0',
+          hint: '租金、利息、分红',
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
         ),
         SheetFormSingleLineTextItem(
           key: 'monthly_out',
           label: '它每个月要你花多少钱',
           initialValue: base.monthlyOut.toStringAsFixed(0),
-          hint: '物业、保险、保养；借钱的月供不用填在这儿',
+          hint: '物业、保险、保养',
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
         ),
         SheetFormSingleLineTextItem(
@@ -262,12 +261,6 @@ Future<void> showAzAssetSheet(
           minLines: 2,
           maxLines: 3,
           showCounter: false,
-        ),
-        const SheetFormNoteItem(
-          key: 'hint',
-          text: '「每个月要你花多少钱」只填这项东西自己的开销；'
-              '借钱的月供在「欠的每一笔」里算过了，不重复扣。',
-          centered: true,
         ),
       ],
       onSubmit: (SheetFormValues v) async {
@@ -412,7 +405,6 @@ Future<void> showAzLiabilitySheet(
           key: 'monthly_fee',
           label: '其中手续费',
           initialValue: base.monthlyFee.toStringAsFixed(0),
-          hint: '「免息分期」也要填，真实成本按这个折算',
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
         ),
         SheetFormCustomItem(
@@ -464,8 +456,7 @@ Future<void> showAzLiabilitySheet(
         ),
         const SheetFormNoteItem(
           key: 'hint',
-          text: '软件不联网、不替银行计息：实际一年要付多少按你填的数和费用折算，'
-              '是估算，以账单为准。本金不算花掉的钱。',
+          text: '按你填的数估算，以账单为准；本金不算花掉的钱。',
           centered: true,
         ),
       ],
@@ -571,14 +562,14 @@ Future<void> showAzContingentSheet(
         if (existing != null && kind == ContingentKind.contingent)
           const SheetFormToggleItem(
             key: 'convert',
-            label: '转成我欠的钱（正式进「一共欠多少」）',
+            label: '转成我欠的钱',
             initialValue: false,
           ),
         SheetFormNoteItem(
           key: 'hint',
           text: kind == ContingentKind.contingent
-              ? '默认不算进「一共欠多少」，也不进「真正属于你的钱」。转成正式欠款后才进总账。'
-              : '这些都不算资产、也不抵扣欠款，只是让你知道出事时有人兜底。软件不评价保障够不够。',
+              ? '默认不计入总账，转成欠款后才计入。'
+              : '不计入资产，也不抵扣欠款。',
           centered: true,
         ),
       ],
@@ -638,9 +629,7 @@ Future<void> showAzValuationSheet(
         ),
         SheetFormNoteItem(
           key: 'hint',
-          text: '这是你 ${MoneyFormat.yuan0(asset.cost)} 买入时花的钱。'
-              '填了新价之后会标「这是你 X 天前自己填的」，软件不联网，不会自动变；'
-              '每次更新都留痕，历史不覆盖。',
+          text: '买入价 ${MoneyFormat.yuan0(asset.cost)}；更新留痕，历史不覆盖。',
           centered: true,
         ),
       ],
@@ -704,14 +693,12 @@ Future<void> showAzTradeSheet(
         ),
         const SheetFormNoteItem(
           key: 'hint',
-          text: '买入只是「现金换成东西」，不算「这个月花了多少」；'
-              '卖出到手的钱也不算收入。只有卖掉那一次才结算赚没赚。',
+          text: '买入不算支出，卖出不算收入；卖出时结算赚亏。',
           centered: true,
         ),
         const SheetFormNoteItem(
           key: 'boundary',
-          text: '本轮只登记买卖批次并结算赚亏，不改账户余额、不写账户流水；'
-              '卡里扣的钱 / 回的钱等记账模块接上账户流水才会自动记。',
+          text: '暂不写账户流水。',
           centered: true,
         ),
       ],
@@ -777,12 +764,6 @@ Future<void> showAzRepaySheet(
           key: 'reason',
           label: '备注 / 这次怎么还的',
           hint: '全额 / 最低 / 分期 / 部分 / 提前',
-        ),
-        const SheetFormNoteItem(
-          key: 'hint',
-          text: '本金只是把现金换成少欠一点，不算花掉的钱；利息与费用才是真花掉的。'
-              '还款本身不进「记支出」。',
-          centered: true,
         ),
       ],
       onSubmit: (SheetFormValues v) async {
@@ -866,9 +847,10 @@ Future<void> showAzPrepaySheet(
         ],
         changeLabel: p.safe ? '可以还' : '先别急',
         updatedAt:
-            '③ 还完手上还剩能花的钱 ${MoneyFormat.yuan0(p.cashAfter)}，够撑 ${p.months.toStringAsFixed(1)} 个月必须花的钱。'
-            '④ ${p.safe ? '建议先留够 3 个月，再拿多出来的还。' : '建议先留够 3 个月再还，应急金不够时别急着省利息。'}'
-            '按实际一年 ${(p.realRate * 100).toStringAsFixed(1)}% 估算，各家算法不一样，以账单为准。',
+            '③ 还完手上还剩 ${MoneyFormat.yuan0(p.cashAfter)}，'
+                '够撑 ${p.months.toStringAsFixed(1)} 个月。'
+            '④ ${p.safe ? '建议先留够 3 个月再还。' : '应急金不够，建议先别还。'}'
+            '按实际一年 ${(p.realRate * 100).toStringAsFixed(1)}% 估算，以账单为准。',
         actionLabel: '知道了',
         onAction: () => SheetActions.close(sheetContext),
       ),
@@ -899,9 +881,7 @@ Future<void> showAzCountedSheet(
       onApplyAsync: (String value) async {
         final Map<String, Object?> m = asset.toMap()..['id'] = asset.id;
         m['counted'] = value == 'yes' ? 1 : 0;
-        m['counted_reason'] = value == 'yes'
-            ? ''
-            : '日常用的东西，你自己关掉了「算进总账」，随时可以打开';
+        m['counted_reason'] = value == 'yes' ? '' : '你自己关掉了「算进总账」';
         await context.read<AzWriteController>().saveAsset(
               AssetRecord.fromMap(m),
             );
@@ -930,7 +910,7 @@ Future<void> showAzDeleteSheet(
       secondaryLabel: '再想想',
       primaryLabel: '确认删除',
       intent: SheetIntent.danger,
-      footnote: '30 天内可以恢复，不是真的删掉。',
+      footnote: '30 天内可恢复',
       onPrimaryAsync: onConfirm,
     ),
   );
@@ -943,7 +923,6 @@ Future<AssetClass?> showAzAssetClassSheet(BuildContext context) =>
       context,
       header: const SheetHeader(
         title: '你新增的是什么？',
-        subtitle: '只选一次，选完把要填的几项一次填完',
         trailing: SheetCloseButton(),
       ),
       child: CategorySheetContent<AssetClass>(
@@ -955,7 +934,7 @@ Future<AssetClass?> showAzAssetClassSheet(BuildContext context) =>
               icon: _classIcon(c.iconKey),
             )
         ],
-        hint: '卡里的钱和动不了的钱记在账户页，这里只记别的。',
+
       ),
     );
 

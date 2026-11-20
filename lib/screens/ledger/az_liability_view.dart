@@ -38,13 +38,12 @@ class AzLiabilityView extends StatelessWidget {
     final double limit = level.limit;
 
     final String safeText = !incomeSet
-        ? '还没填「每月到手的钱」：去设置里填一次，这里才看得出每个月要还的钱占挣的多少。'
+        ? '先填「每月到手的钱」'
         : (stats.payIncomeRatio > limit
-            ? '已经超过${level.label}口径的 ${(limit * 100).toStringAsFixed(0)}%：'
-                '每挣 100 块有 ${(stats.payIncomeRatio * 100).toStringAsFixed(0)} 块要拿去还债，'
-                '手上一有闪失就转不动。'
-            : '还在${level.label}口径的安全线内（${(limit * 100).toStringAsFixed(0)}%）。'
-                '换口径点右边「偿债口径」。');
+            ? '月还款占收入 ${(stats.payIncomeRatio * 100).toStringAsFixed(0)}%，'
+                '超过 ${(limit * 100).toStringAsFixed(0)}%'
+            : '月还款占收入 ${(stats.payIncomeRatio * 100).toStringAsFixed(0)}%'
+                '（${(limit * 100).toStringAsFixed(0)}% 以内）');
 
     final List<LiabilityRecord> ordered = AzMath.payoffOrder(d);
     final List<LiabilityRecord> shown = _filter(debts, view.filter, d, view.today);
@@ -98,7 +97,7 @@ class AzLiabilityView extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
             child: shown.isEmpty
-                ? const AzSmallEmpty('没有欠款，这是好事')
+                ? const AzSmallEmpty('暂无欠款')
                 : Column(
                     mainAxisSize: MainAxisSize.min,
                     children: <Widget>[
@@ -163,10 +162,6 @@ class AzLiabilityView extends StatelessWidget {
           onAdd: actions.addInsured,
           onTap: actions.openContingent,
         ),
-        const AzHint(
-          '这两张都不算进「一共欠多少」，也不算进「真正属于你的钱」——'
-          '它们现在不用还，但真出事就得还，所以单独摆出来让你看得见。',
-        ),
         // ── 负债汇总 ────────────────────────────────────────────
         AppFunctionSection(
           title: '负债汇总',
@@ -203,10 +198,6 @@ class AzLiabilityView extends StatelessWidget {
               ),
             ],
           ),
-        ),
-        const AzHint(
-          '这里记的是真要还给别人、有账期的钱；自己住的房子每个月要贴的钱，'
-          '记在那套房子的卡片上。软件不评价你花钱对不对，只把钱往哪边流摆出来。',
         ),
       ],
     );
@@ -309,8 +300,8 @@ class AzLiabilityView extends StatelessWidget {
           ? '它替你付了利息，还多留 ${MoneyFormat.yuan0(lev.net)}'
           : '它每月从你口袋拿走 ${MoneyFormat.yuan0(-lev.net)}';
     }
-    if (x.purpose == DebtPurpose.t4) return '借来先花了再还，成本最高';
-    if (x.purpose == DebtPurpose.t5) return '这是应急借的，不是乱花';
+    if (x.purpose == DebtPurpose.t4) return '先花后还';
+    if (x.purpose == DebtPurpose.t5) return '应急借的';
     return '';
   }
 

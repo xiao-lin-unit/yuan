@@ -277,14 +277,9 @@ class _AzNetWorthCardState extends State<AzNetWorthCard> {
                                 .copyWith(color: t.warning),
                           ),
                         ),
-                      AzHint(
-                        '同一笔钱只算一次：卡里的钱和动不了的钱都记在账户页，'
-                        '这里只是跟着看，不会再加一遍。'
-                        '账本里记的都是当时填下的钱数，软件不会自己改大改小。',
-                      ),
                       const AzHint(
-                        '变化趋势按月末存一次数看：之后改了数也不改历史，'
-                        '点开看「这个月多出来的钱是怎么来的」。',
+                        '账本里记的都是当时填下的钱数，不会自己改大改小；'
+                        '变化趋势按月末存一次数，之后改了数也不改历史。',
                       ),
                     ],
                   ),
@@ -508,7 +503,7 @@ class AzGroupSection extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
             child: children.isEmpty
-                ? const AzSmallEmpty('这里还没有这一类的东西')
+                ? const AzSmallEmpty('暂无')
                 : Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     mainAxisSize: MainAxisSize.min,
@@ -845,7 +840,7 @@ class AzBurnCard extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.xs),
             Text(
-              '利息和手续费是真给银行的；本金只是从左口袋换到右口袋，不算花掉的钱。',
+              '本金不算花掉的钱，利息和手续费才算。',
               style: context.appText.caption,
             ),
           ],
@@ -1040,7 +1035,7 @@ class AzDueList extends StatelessWidget {
     if (debts.isEmpty) {
       return const Padding(
         padding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
-        child: AzSmallEmpty('未来 3 个月没有到期的，该还的日子都还上了'),
+        child: AzSmallEmpty('未来 3 个月没有到期的'),
       );
     }
     return Padding(
@@ -1167,7 +1162,7 @@ class AzContingentList extends StatelessWidget {
             const SizedBox(height: AppSpacing.xs),
           ],
           if (items.isEmpty)
-            const AzSmallEmpty('还没有记，点右上角 ＋ 添一笔'),
+            const AzSmallEmpty('暂无记录'),
           Align(
             alignment: Alignment.centerLeft,
             child: TextButton.icon(
@@ -1178,8 +1173,8 @@ class AzContingentList extends StatelessWidget {
           ),
           Text(
             insured
-                ? '最多合计 ${MoneyFormat.yuan0(total)} 有人替你付；这些都不算资产、也不抵扣欠款，只是让你知道出事时有人兜底。'
-                : '合计最多可能要还 ${MoneyFormat.yuan0(total)}，不算进「一共欠多少」。真要代还时点「转成我欠的钱」才正式进账。',
+                ? '最多合计 ${MoneyFormat.yuan0(total)} 有人替你付，不计入总账。'
+                : '最多可能要还 ${MoneyFormat.yuan0(total)}，不计入总账。',
             style: context.appText.caption,
           ),
         ],

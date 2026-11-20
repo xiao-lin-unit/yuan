@@ -107,7 +107,7 @@ class AssetDetailScreen extends StatelessWidget {
                 context,
                 title: '把「${asset.name}」放进回收站？',
                 description:
-                    '${trades.length} 笔买卖记录会保留，30 天内可恢复。删掉后它就不再进「真正属于你的钱」。',
+                    '${trades.length} 笔买卖记录会保留，30 天内可恢复。',
                 onConfirm: () async {
                   await context.read<AzWriteController>().softDelete(
                         AzDb.assetsTable,
@@ -129,8 +129,8 @@ class AssetDetailScreen extends StatelessWidget {
             label: asset.counted ? '现在按什么价算' : '这一项不算进总账',
             value: asset.counted ? MoneyFormat.yuan0(value) : '不算进总账',
             caption: staleDays < 0
-                ? '按买入时算，没算涨跌；还没卖，先不算赚没赚。'
-                : '这是你 $staleDays 天前自己填的，软件不联网，不会自动变。',
+                ? '按买入价算'
+                : '$staleDays 天前填的',
             accent: tag.bad ? context.tokens.expense : null,
             secondary: <AppInfoItem>[
               AppInfoItem(
@@ -174,7 +174,7 @@ class AssetDetailScreen extends StatelessWidget {
           AppFunctionSection(
             title: '买卖记录',
             child: trades.isEmpty
-                ? const AzSmallEmpty('还没记过买入或卖出')
+                ? const AzSmallEmpty('暂无买卖记录')
                 : Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     mainAxisSize: MainAxisSize.min,
@@ -203,13 +203,6 @@ class AssetDetailScreen extends StatelessWidget {
             ],
           ),
           const SizedBox(height: AppSpacing.sm),
-          const AzHint(
-            '把几次买的价钱平均一下就是成本；卖出时一次算清赚没赚，平时不用天天盯价格。',
-          ),
-          const AzHint(
-            '这里只登记买卖批次并结算赚亏：卡里扣的钱、回的钱要等记账模块接上账户流水'
-            '才会自动记，本轮不会替你改账户余额，也不会把买东西算成「这个月花了多少」。',
-          ),
           if (asset.countedReason.isNotEmpty)
             AzHint(asset.countedReason),
         ],
