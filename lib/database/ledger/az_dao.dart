@@ -39,10 +39,6 @@ class AzDao {
     );
     final List<Map<String, Object?>> prefs =
         await db.query(AzDb.preferencesTable);
-    final List<Map<String, Object?>> snapshots = await db.query(
-      AzDb.snapshotsTable,
-      orderBy: 'year_month ASC',
-    );
     return AzData(
       assets: assets.map(AssetRecord.fromMap).toList(growable: false),
       liabilities:
@@ -52,8 +48,6 @@ class AzDao {
       contingents:
           contingents.map(ContingentRecord.fromMap).toList(growable: false),
       preferences: AzPreferences.fromRows(prefs),
-      snapshots:
-          snapshots.map(MonthlySnapshotRecord.fromMap).toList(growable: false),
     );
   }
 
@@ -187,7 +181,7 @@ class AzDao {
     );
   }
 
-  /// 口径开关。切估值口径 / 偿债比例档都要留痕（6.4 / 10.9），
+  /// 记录 / 显示口径开关。切估值口径要留痕（6.4 / 10.9），
   /// 所以每次写入都把 revision +1，updated_at 记下时间。
   Future<void> setPreference(
     DatabaseExecutor db,
@@ -216,18 +210,8 @@ class AzDao {
     );
   }
 
-  /// 月末快照：**只插入，不更新**。10.9 / 13.12 规定历史月份一律不重算，
-  /// 之后改价、切口径、补记旧账都只影响当月及以后。
-  Future<void> insertSnapshot(
-    DatabaseExecutor db,
-    MonthlySnapshotRecord record,
-  ) async {
-    await db.insert(
-      AzDb.snapshotsTable,
-      record.toMap(),
-      conflictAlgorithm: ConflictAlgorithm.ignore,
-    );
-  }
+  /// 月末快照表由分析模块（8.1.3 / 8.1.4 / 13.12）接管：DDL 保留在
+  /// 本模块建表，但资债不再读写它，不留下「点了没反应」的半成品入口。
 
   /// 软删进回收站（10.2 / 10.7）：保留历史记录，30 天内可恢复。
   /// [reason] 必填，与账户「余额调整必须填原因」同一条留痕规矩。

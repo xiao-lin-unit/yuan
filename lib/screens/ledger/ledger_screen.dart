@@ -26,8 +26,10 @@ import 'widgets/az_cards.dart';
 ///
 /// 【为什么用 AppHomePage】约定：Home 页不渲染 AppBar、不渲染标题、
 /// 不渲染返回按钮 —— 导航栏已经说明这是哪个页面，顶上再放一行标题是
-/// 重复信息。首屏第一块直接是「真正属于你的钱」，视觉重心落在数字上；
-/// 右上角只保留纯动作行（搜索 / 口径设置 / 月末存一次数）。
+/// 重复信息。首屏第一块直接是「真正属于你的钱」，视觉重心落在数字上。
+/// 【职责边界】资债只做记录：月收入、应急金月数、物价假设这类参数是
+/// 情境设计（8.2 / 13.2）的输入，月末快照属分析（13.12），都不在本页
+/// 录入也不展示；右上角只留搜索一个动作，新增在右下角悬浮按钮。
 ///
 /// 【动态状态，工作逻辑写清楚】为什么动态：视图、快筛、搜索词、分组折叠
 /// 都是用户点击后才有的状态，构造期定不死。全部收在 StatefulWidget 里：
@@ -159,16 +161,6 @@ class _LedgerScreenState extends State<LedgerScreen> {
             _searchVisible = !_searchVisible;
             if (!_searchVisible) _search.clear();
           }),
-        ),
-        IconButton(
-          tooltip: '设置',
-          icon: const Icon(AppIcons.edit),
-          onPressed: () => unawaited(showAzPreferenceSheet(context)),
-        ),
-        IconButton(
-          tooltip: '存快照',
-          icon: const Icon(AppIcons.calendarMonth),
-          onPressed: () => unawaited(showAzSnapshotSheet(context)),
         ),
       ],
       hero: Padding(
@@ -352,9 +344,6 @@ class _LedgerScreenState extends State<LedgerScreen> {
         gap: () => unawaited(showAzGapSheet(context)),
         payoff: () => unawaited(showAzPayoffSheet(context)),
         goAccounts: () => context.go('/accounts'),
-        ratioLevel: () => unawaited(
-          showAzDebtRatioSheet(context, d.preferences.debtRatioLevel),
-        ),
         filterChanged: (String f) => setState(() => _filter = f),
         toggleGroup: (String g) => setState(
           () => _collapsed[g] = !(_collapsed[g] ?? false),

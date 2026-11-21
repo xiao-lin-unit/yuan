@@ -278,8 +278,7 @@ class _AzNetWorthCardState extends State<AzNetWorthCard> {
                           ),
                         ),
                       const AzHint(
-                        '账本里记的都是当时填下的钱数，不会自己改大改小；'
-                        '变化趋势按月末存一次数，之后改了数也不改历史。',
+                        '账本里记的都是当时填下的钱数，不会自己改大改小。',
                       ),
                     ],
                   ),
@@ -670,93 +669,53 @@ class AzDebtCard extends StatelessWidget {
   }
 }
 
-/// 负债页顶部：一共欠多少 / 这个月要还 / 偿债比例条 / 安全提示。
+/// 负债页顶部：一共欠多少 / 这个月要还。只加总已记录数据，
+/// 月收入占比、偿债档位、安全线这类推算归情境设计，不在本模块展示。
 class AzDebtHero extends StatelessWidget {
   const AzDebtHero({
     super.key,
     required this.stats,
-    required this.incomeSet,
-    required this.levelLabel,
-    required this.safeText,
   });
 
   final AzDebtStats stats;
-  final bool incomeSet;
-  final String levelLabel;
-  final String safeText;
 
   @override
-  Widget build(BuildContext context) {
-    final t = context.tokens;
-    final double ratio = stats.payIncomeRatio;
-    final bool over = incomeSet && ratio > 0.4;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-      child: Container(
-        decoration: AppDecorations.card(context),
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Row(
-              children: <Widget>[
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: <Widget>[
-                      Text('一共欠多少', style: context.appText.caption),
-                      Text(
-                        MoneyFormat.yuan0(stats.total),
-                        style: context.appText.pageTitle,
-                      ),
-                      Text('${stats.count} 笔欠款', style: context.appText.caption),
-                    ],
-                  ),
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+        child: Container(
+          decoration: AppDecorations.card(context),
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: Row(
+            children: <Widget>[
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: <Widget>[
-                    Text('这个月要还', style: context.appText.caption),
+                    Text('一共欠多少', style: context.appText.caption),
                     Text(
-                      MoneyFormat.yuan0(stats.monthPay),
-                      style: context.appText.menuTitle,
+                      MoneyFormat.yuan0(stats.total),
+                      style: context.appText.pageTitle,
                     ),
-                    Text(
-                      incomeSet
-                          ? '占每月到手 ${(ratio * 100).toStringAsFixed(0)}%'
-                          : '未填月收入',
-                      style: context.appText.caption,
-                    ),
+                    Text('${stats.count} 笔欠款', style: context.appText.caption),
                   ],
                 ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(AppRadius.small),
-              child: LinearProgressIndicator(
-                value: incomeSet ? ratio.clamp(0.0, 1.0).toDouble() : 0,
-                minHeight: AppComponentSize.linearProgressHeight + 2,
-                backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-                color: over ? t.expense : Theme.of(context).colorScheme.primary,
               ),
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              safeText,
-              style: context.appText.caption.copyWith(
-                color: over ? t.expense : null,
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Text('这个月要还', style: context.appText.caption),
+                  Text(
+                    MoneyFormat.yuan0(stats.monthPay),
+                    style: context.appText.menuTitle,
+                  ),
+                ],
               ),
-            ),
-            Text('当前口径：$levelLabel', style: context.appText.caption),
-          ],
+            ],
+          ),
         ),
-      ),
-    );
-  }
+      );
 }
 
 /// 白给银行多少钱：利息 / 手续费 / 本金三段条 + 图例。

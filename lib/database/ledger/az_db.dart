@@ -23,9 +23,10 @@ import '../db_module.dart';
 ///   az_asset_trades  股票/基金买入卖出批次（6.5），结算已落袋赚亏
 ///   az_contingents   「万一要我还的钱」+「万一出事有人替我付」成对清单，
 ///                     一张表用 kind 区分（7.11 / 13.10），默认不进总账
-///   az_preferences   口径开关 KV（估值口径、90 天提示、偿债三档、月收入、
-///                     每月必须花的钱、应急金月数、物价假设）——13.13 唯一入口
-///   az_monthly_snapshots 月末快照（10.9 / 13.12），INSERT OR IGNORE 锁历史
+///   az_preferences   记录 / 显示口径 KV（估值口径、价格过期天数、隐藏已还清）
+///   az_monthly_snapshots 月末快照（10.9 / 13.12）：DDL 在此建，读写由
+///                     分析模块 8.1.3 / 8.1.4 接管，资债不读写；保留表
+///                     避免为「暂时没人引用」去重建整表、升版本。
 ///
 /// 【DDL 不锁枚举取值】v5 曾把 type 写死在 CHECK 里，加「花呗/借呗」被迫
 /// 重建整表。这里所有枚举字符串（asset_class / purpose / status / …）都只
@@ -250,9 +251,9 @@ class AzDb implements DbModule {
         ON $contingentsTable (book_id, kind, deleted_at, sort_order, id)
     ''');
 
-    // ── ⑥ 口径开关（13.13 唯一入口）──────────────────────────────
-    // 不替用户猜月收入 / 每月必须花的钱：默认 0，界面显示「—」并提示
-    // 去设置里填。物价假设默认 0（13.1 默认不开启）。
+    // ── ⑥ 记录 / 显示口径开关 ────────────────────────────────────
+    // 只放资债自己要用的三项。月收入、必须花的钱、应急金月数、物价
+    // 假设、偿债档位、借钱成本计入支出归情境设计 / 分析，不在本表播种。
     await db.execute('''
       CREATE TABLE IF NOT EXISTS $preferencesTable (
         key         TEXT PRIMARY KEY,
@@ -263,8 +264,8 @@ class AzDb implements DbModule {
     ''');
 
     // ── ⑦ 月末快照（10.9 / 13.12）───────────────────────────────
-    // 主键即年月，写入用 INSERT OR IGNORE：之后改价、切口径、改分类标记
-    // 都不改写历史月份。8.1.3 趋势与 8.1.4 归因读这份，不回溯重算。
+    // 资债只负责把表建出来，不读写：读写入口归分析模块 8.1.3 / 8.1.4。
+    // 主键即年月，写入用 INSERT OR IGNORE，之后改价 / 切口径不改写历史。
     await db.execute('''
       CREATE TABLE IF NOT EXISTS $snapshotsTable (
         year_month      TEXT PRIMARY KEY,
@@ -280,19 +281,13 @@ class AzDb implements DbModule {
       )
     ''');
 
-    // 偏好默认值种子：INSERT OR IGNORE 幂等，全新安装与老库补建都安全。
+    // 记录口径默认值种子：INSERT OR IGNORE 幂等，全新安装与老库补建都安全。
     // 用户改过的值不会被覆盖（10.9「改了不覆盖历史」）。
     final int now = DateTime.now().millisecondsSinceEpoch;
     for (final MapEntry<String, String> entry in const <String, String>{
       'valuation_mode': 'cost',
       'stale_days': '90',
-      'debt_ratio_level': 'std',
       'hide_zero': '1',
-      'monthly_income': '0',
-      'must_cost': '0',
-      'emergency_months': '3',
-      'inflation_rate': '0',
-      'include_debt_cost_in_expense': '1',
     }.entries) {
       await db.insert(
         preferencesTable,

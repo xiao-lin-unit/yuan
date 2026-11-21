@@ -7,12 +7,9 @@ import '../../database/account/account_record.dart';
 import '../../database/ledger/az_math.dart';
 import '../../database/ledger/az_record.dart';
 import '../../screens/commons/sheet/app_sheet_shell.dart';
-import '../../screens/commons/sheet/contents/confirm_sheet_content.dart';
-import '../../screens/commons/sheet/contents/form_sheet_content.dart';
 import '../../screens/commons/sheet/contents/overview_sheet_content.dart';
 import '../../screens/commons/sheet/contents/select_sheet_content.dart';
 import '../../screens/commons/sheet/parts/sheet_primitives.dart';
-import '../../screens/commons/sheet/sheet_form_items.dart';
 import '../../screens/commons/sheet/sheet_models.dart';
 import '../../service/account_controller.dart';
 import '../../service/ledger/az_controller.dart';
@@ -22,13 +19,17 @@ import '../commons/icons/app_icons.dart';
 /// 表单类入口统一从这里导出：页面只 `import 'az_sheets.dart'` 一处。
 export 'az_form_sheets.dart';
 
-/// 资债模块的**展示 / 口径类 Sheet**。
+/// 资债模块的**展示类 Sheet**。
 ///
-/// 【契约】全部走 `AppSheetShell.show` 唯一外壳 + 既有 7 类内容组件：
-///   · 口径切换 / 偿债档 → [SelectSheetContent]（未指定选择）；
-///   · 月末存一次数 → [ConfirmSheetContent]（确认）；
-///   · 划不划算 / 逐月缺口 / 先还哪一笔 → [OverviewSheetContent]（仅展示）；
-///   · 设置（月收入、必须花的钱、应急金、物价）→ [FormSheetContent]（修改）。
+/// 【职责边界】资债只做记录：月收入、每月必须花的钱、应急金月数、
+/// 物价假设、偿债档位等是情境设计（8.2 / 13.2）与分析（7.9）的输入，
+/// 月末快照属分析（8.1.3 / 13.12），都不在本模块录入或直接展示。
+/// 本文件只留基于**已记录数据**的只读展示，以及估值口径这一记录口径
+/// （6.4，放资产汇总行的下拉，不单开设置弹层）。
+///
+/// 【契约】全部走 `AppSheetShell.show` 唯一外壳 + 既有内容组件：
+///   · 估值口径 → [SelectSheetContent]（未指定选择）；
+///   · 划不划算 / 逐月缺口 / 先还哪一笔 → [OverviewSheetContent]（仅展示）。
 /// **没有新建任何 XxxSheetContent，也没有第二套弹层外壳。**
 ///
 /// 【关闭按钮怎么拿到渲染时 context】[OverviewSheetContent.onAction] 是
@@ -69,185 +70,6 @@ Future<void> showAzValuationModeSheet(
         await context.read<AzWriteController>().setPreference(
               'valuation_mode',
               v.dbValue,
-            );
-      },
-    ),
-  );
-}
-
-/// ② 偿债比例三档（7.9）。只改判断的安全线，不改任何真实数字。
-Future<void> showAzDebtRatioSheet(
-  BuildContext context,
-  DebtRatioLevel current,
-) async {
-  await AppSheetShell.show<DebtRatioLevel>(
-    context,
-    header: const SheetHeader(
-      title: '偿债档位',
-      centered: true,
-      leading: SheetCancelAction(),
-    ),
-    child: SelectSheetContent<DebtRatioLevel>(
-      options: <SheetOption<DebtRatioLevel>>[
-        for (final DebtRatioLevel l in DebtRatioLevel.values)
-          SheetOption<DebtRatioLevel>(
-            value: l,
-            label: '${l.label}：≤ ${(l.limit * 100).toStringAsFixed(0)}%',
-            icon: AppIcons.about,
-          ),
-      ],
-      initialValue: current,
-      actionLabel: '确定',
-      onApplyAsync: (DebtRatioLevel v) async {
-        await context.read<AzWriteController>().setPreference(
-              'debt_ratio_level',
-              v.dbValue,
-            );
-      },
-    ),
-  );
-}
-
-/// ③ 设置（13.13 唯一入口）：每月到手的钱、每月必须花的钱、想留几个月、
-/// 东西一年贵百分之几、隐藏余额为 0 的欠款、借钱的成本计不计入支出。
-/// 【不替用户猜】默认都是 0 / 可跳过，没填就显示「—」，不编一个数。
-Future<void> showAzPreferenceSheet(BuildContext context) async {
-  final AzController az = context.read<AzController>();
-  final AzPreferences p = az.preferences;
-  final FormSheetController ctl = FormSheetController();
-  await AppSheetShell.show<void>(
-    context,
-    header: SheetHeader(
-      title: '口径设置',
-      subtitle: '可跳过',
-      centered: true,
-      leading: const SheetCancelAction(),
-      trailing: SheetTextAction(
-        label: '保存',
-        emphasized: true,
-        onTap: ctl.submit,
-      ),
-    ),
-    child: FormSheetContent(
-      controller: ctl,
-      submit: true,
-      submitLabel: '保存',
-      items: <SheetFormItem>[
-        SheetFormSingleLineTextItem(
-          key: 'monthly_income',
-          label: '月收入',
-          initialValue: p.monthlyIncome == 0 ? '' : p.monthlyIncome.toStringAsFixed(0),
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        ),
-        SheetFormSingleLineTextItem(
-          key: 'must_cost',
-          label: '月支出',
-          initialValue: p.mustCost == 0 ? '' : p.mustCost.toStringAsFixed(0),
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        ),
-        SheetFormSingleLineTextItem(
-          key: 'emergency_months',
-          label: '备用月数',
-          initialValue: p.emergencyMonths.toString(),
-          keyboardType: TextInputType.number,
-        ),
-        SheetFormSingleLineTextItem(
-          key: 'inflation_rate',
-          label: '通胀率',
-          initialValue: p.inflationRate == 0 ? '' : p.inflationRate.toStringAsFixed(1),
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        ),
-        SheetFormSingleLineTextItem(
-          key: 'stale_days',
-          label: '提醒天数',
-          initialValue: p.staleDays.toString(),
-          keyboardType: TextInputType.number,
-        ),
-        SheetFormToggleItem(
-          key: 'hide_zero',
-          label: '隐藏还清',
-          initialValue: p.hideZero,
-        ),
-        SheetFormToggleItem(
-          key: 'include_debt_cost_in_expense',
-          label: '计入支出',
-          initialValue: p.includeDebtCostInExpense,
-        ),
-      ],
-      onSubmit: (SheetFormValues v) async {
-        final AzWriteController write = context.read<AzWriteController>();
-        double? numOr(String key) => double.tryParse(v.text(key).trim());
-        await write.setPreference(
-          'monthly_income',
-          (numOr('monthly_income') ?? 0).toString(),
-        );
-        await write.setPreference(
-          'must_cost',
-          (numOr('must_cost') ?? 0).toString(),
-        );
-        await write.setPreference(
-          'emergency_months',
-          (int.tryParse(v.text('emergency_months').trim()) ?? 3).toString(),
-        );
-        await write.setPreference(
-          'inflation_rate',
-          (numOr('inflation_rate') ?? 0).toString(),
-        );
-        await write.setPreference(
-          'stale_days',
-          (int.tryParse(v.text('stale_days').trim()) ?? 90).toString(),
-        );
-        await write.setPreference('hide_zero', v.flag('hide_zero') ? '1' : '0');
-        await write.setPreference(
-          'include_debt_cost_in_expense',
-          v.flag('include_debt_cost_in_expense') ? '1' : '0',
-        );
-      },
-    ),
-  );
-}
-
-/// ④ 按月末存一次数（10.9 / 13.12）。写进去就不改历史。
-Future<void> showAzSnapshotSheet(BuildContext context) async {
-  final AzController az = context.read<AzController>();
-  final List<AccountRecord> accounts = context.read<AccountController>().all;
-  final AzData d = az.data;
-  final DateTime today = DateTime.now();
-  final double accountTotal = AzMath.accountTotal(AzMath.mirrors(accounts));
-  final double assetTotal = accountTotal + AzMath.selfAssets(d);
-  final double debtTotal = AzMath.debtsTotal(d, accounts);
-  final String month =
-      '${today.year}-${today.month.toString().padLeft(2, '0')}';
-  await AppSheetShell.show<void>(
-    context,
-    header: const SheetHeader(
-      title: '存快照',
-      subtitle: '存快照',
-      centered: true,
-      leading: SheetCancelAction(),
-    ),
-    child: ConfirmSheetContent(
-      title: '存 $month？',
-      description:
-          '存下 $month 的数：卡里和动不了的 ${MoneyFormat.yuan0(accountTotal)}、'
-          '除了钱以外的 ${MoneyFormat.yuan0(AzMath.selfAssets(d))}、'
-          '欠的 ${MoneyFormat.yuan0(debtTotal)}。已存过不覆盖。',
-      secondaryLabel: '再想想',
-      primaryLabel: '存一次',
-      intent: SheetIntent.neutral,
-      icon: AppIcons.calendarMonth,
-      onPrimaryAsync: () async {
-        await context.read<AzWriteController>().writeSnapshot(
-              MonthlySnapshotRecord(
-                yearMonth: month,
-                accountTotal: accountTotal,
-                assetTotal: assetTotal,
-                debtTotal: debtTotal,
-                netWorth: assetTotal - debtTotal,
-                valuationMode: d.preferences.valuationMode,
-                snapshotAt: today,
-                note: '存快照',
-              ),
             );
       },
     ),

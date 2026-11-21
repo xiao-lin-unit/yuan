@@ -240,24 +240,6 @@ enum LiabilityStatus {
       };
 }
 
-/// 偿债比例三档（7.9），用户可切，切了留痕。
-enum DebtRatioLevel {
-  loose('loose', '宽松', 0.50),
-  std('std', '标准', 0.40),
-  strict('strict', '保守', 0.30);
-
-  const DebtRatioLevel(this.dbValue, this.label, this.limit);
-  final String dbValue;
-  final String label;
-  final double limit;
-
-  static DebtRatioLevel fromDb(Object? v) => switch (_str(v, 'std')) {
-        'loose' => loose,
-        'strict' => strict,
-        _ => std,
-      };
-}
-
 enum PlanStatus {
   pending('pending', '待还'),
   partial('partial', '部分已还'),
@@ -845,31 +827,22 @@ class ContingentRecord {
       };
 }
 
-/// 口径开关的聚合视图（KV 表读出来后拼成一份不可变对象）。
-/// 不替用户猜：monthlyIncome / mustCost 默认 0，界面显示「—」。
+/// 资债模块只解析「记录 / 显示口径」三项：估值口径、价格过期天数、
+/// 隐藏已还清。其余参数（月收入、每月必须花的钱、应急金月数、物价假设、
+/// 偿债档位、借钱成本计入支出）是情境设计（8.2 / 13.2）与分析（7.9）
+/// 模块的输入，资债不读取、不推断、不展示；老库里若还留着那些 KV 行，
+/// 不解析即为无效，不会混进本页数字。
 @immutable
 class AzPreferences {
   const AzPreferences({
     this.valuationMode = ValuationMode.cost,
     this.staleDays = 90,
-    this.debtRatioLevel = DebtRatioLevel.std,
     this.hideZero = true,
-    this.monthlyIncome = 0,
-    this.mustCost = 0,
-    this.emergencyMonths = 3,
-    this.inflationRate = 0,
-    this.includeDebtCostInExpense = true,
   });
 
   final ValuationMode valuationMode;
   final int staleDays;
-  final DebtRatioLevel debtRatioLevel;
   final bool hideZero;
-  final double monthlyIncome;
-  final double mustCost;
-  final int emergencyMonths;
-  final double inflationRate;
-  final bool includeDebtCostInExpense;
 
   factory AzPreferences.fromRows(List<Map<String, Object?>> rows) {
     final Map<String, String> kv = <String, String>{
@@ -879,71 +852,9 @@ class AzPreferences {
     return AzPreferences(
       valuationMode: ValuationMode.fromDb(kv['valuation_mode']),
       staleDays: int.tryParse(kv['stale_days'] ?? '') ?? 90,
-      debtRatioLevel: DebtRatioLevel.fromDb(kv['debt_ratio_level']),
       hideZero: (kv['hide_zero'] ?? '1') == '1',
-      monthlyIncome: double.tryParse(kv['monthly_income'] ?? '') ?? 0,
-      mustCost: double.tryParse(kv['must_cost'] ?? '') ?? 0,
-      emergencyMonths: int.tryParse(kv['emergency_months'] ?? '') ?? 3,
-      inflationRate: double.tryParse(kv['inflation_rate'] ?? '') ?? 0,
-      includeDebtCostInExpense:
-          (kv['include_debt_cost_in_expense'] ?? '1') == '1',
     );
   }
-}
-
-/// 月末快照的一行（10.9 / 13.12，锁历史不重算）。
-@immutable
-class MonthlySnapshotRecord {
-  const MonthlySnapshotRecord({
-    required this.yearMonth,
-    required this.accountTotal,
-    required this.assetTotal,
-    required this.debtTotal,
-    required this.netWorth,
-    required this.valuationMode,
-    required this.snapshotAt,
-    this.note = '',
-    this.locked = true,
-    this.revision = 1,
-  });
-
-  final String yearMonth;
-  final double accountTotal;
-  final double assetTotal;
-  final double debtTotal;
-  final double netWorth;
-  final ValuationMode valuationMode;
-  final DateTime snapshotAt;
-  final String note;
-  final bool locked;
-  final int revision;
-
-  factory MonthlySnapshotRecord.fromMap(Map<String, Object?> m) =>
-      MonthlySnapshotRecord(
-        yearMonth: _str(m['year_month']),
-        accountTotal: _dbl(m['account_total']),
-        assetTotal: _dbl(m['asset_total']),
-        debtTotal: _dbl(m['debt_total']),
-        netWorth: _dbl(m['net_worth']),
-        valuationMode: ValuationMode.fromDb(m['valuation_mode']),
-        snapshotAt: _date(m['snapshot_at']),
-        note: _str(m['note']),
-        locked: _int(m['locked'], 1) == 1,
-        revision: _int(m['revision'], 1),
-      );
-
-  Map<String, Object?> toMap() => <String, Object?>{
-        'year_month': yearMonth,
-        'account_total': accountTotal,
-        'asset_total': assetTotal,
-        'debt_total': debtTotal,
-        'net_worth': netWorth,
-        'valuation_mode': valuationMode.dbValue,
-        'snapshot_at': snapshotAt.millisecondsSinceEpoch,
-        'note': note,
-        'locked': locked ? 1 : 0,
-        'revision': revision,
-      };
 }
 
 /// 一次读出的全部资债数据（给 [AzMath] 当输入，页面不各读一遍）。
@@ -956,7 +867,6 @@ class AzData {
     this.trades = const <AssetTradeRecord>[],
     this.contingents = const <ContingentRecord>[],
     this.preferences = const AzPreferences(),
-    this.snapshots = const <MonthlySnapshotRecord>[],
   });
 
   final List<AssetRecord> assets;
@@ -965,7 +875,6 @@ class AzData {
   final List<AssetTradeRecord> trades;
   final List<ContingentRecord> contingents;
   final AzPreferences preferences;
-  final List<MonthlySnapshotRecord> snapshots;
 
   List<AssetRecord> get activeAssets =>
       assets.where((AssetRecord a) => !a.isDeleted && !a.archived).toList();

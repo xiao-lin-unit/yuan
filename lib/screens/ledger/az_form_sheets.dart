@@ -31,8 +31,9 @@ import '../commons/icons/app_icons.dart';
 /// **没有新建任何 XxxSheetContent**，也没有第二套弹层外壳。
 ///
 /// 【一个功能只有一个入口】「万一要我还的钱」只在 [showAzContingentSheet]
-/// 可编辑；「算不算进总账」只在 [showAzCountedSheet] 可切；口径开关只在
-/// `az_sheets.dart` 的设置弹层里。其余位置全是只读展示或跳转（13.13）。
+/// 可编辑；「算不算进总账」只在 [showAzCountedSheet] 可切；估值口径只在
+/// `az_sheets.dart` 的估值口径弹层里。情境设计参数与月末快照不在资债
+/// 录入（8.2 / 13.12）。其余位置全是只读展示或跳转（13.13）。
 ///
 /// 【静态优先 / 动态逻辑】Sheet 内容组件都是项目里现成的；本文件只有
 /// 「打开弹层 + 把表单值写库」的函数。唯一一处自定义控件 [_InlineSelect]
@@ -935,8 +936,9 @@ Future<void> showAzRepaySheet(
 }
 
 /// ⑦ 「算一下提前还」两步：先用表单收金额（[FormSheetContent] 无 onSubmit
-/// 时会把值回传给 show 的返回值），再用 [OverviewSheetContent] 把四件事
-/// 一次摆出来。两步是**前后两个弹层**，不是弹窗里套弹窗。
+/// 时会把值回传给 show 的返回值），再用 [OverviewSheetContent] 把已记录
+/// 数据能算出的三件事摆出来。两步是**前后两个弹层**，不是弹窗套弹窗。
+/// 「还完还能撑几个月」是情境设计（13.2）的推算，不在资债展示。
 Future<void> showAzPrepaySheet(
   BuildContext context,
   LiabilityRecord debt,
@@ -998,11 +1000,9 @@ Future<void> showAzPrepaySheet(
           SheetMetric(label: '违约金', value: MoneyFormat.yuan0(p.penalty)),
           SheetMetric(label: '净省', value: MoneyFormat.yuan0(p.netSave)),
         ],
-        changeLabel: p.safe ? '可以还' : '先别急',
+        changeLabel: '仅供参考',
         updatedAt:
-            '③ 还完手上还剩 ${MoneyFormat.yuan0(p.cashAfter)}，'
-                '够撑 ${p.months.toStringAsFixed(1)} 个月。'
-            '④ ${p.safe ? '建议先留够 3 个月再还。' : '应急金不够，建议先别还。'}'
+            '还完手上还剩 ${MoneyFormat.yuan0(p.cashAfter)}。'
             '按实际一年 ${(p.realRate * 100).toStringAsFixed(1)}% 估算，以账单为准。',
         actionLabel: '知道了',
         onAction: () => SheetActions.close(sheetContext),

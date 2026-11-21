@@ -10,9 +10,9 @@ import 'widgets/az_cards.dart';
 
 /// 负债视图（原型 `#view-liability`）。
 ///
-/// 顺序照原型：一共欠多少、贵不贵 → 这个月白给银行多少 → 划不划算 /
-/// 哪个月最紧张 / 利率涨 1 个点 → 欠的每一笔 → 快到期的 → 两张成对
-/// 清单 → 负债汇总。所有数字由 [AzMath] 现场算，页面不写死金额。
+/// 顺序照原型：欠款概览 → 欠的每一笔 → 快到期的 → 两张成对清单 →
+/// 负债汇总。只展示已记录数据的加总；月收入占比、偿债档位、偿债能力比值
+/// 这类推算归情境设计，本页不展示。数字由 [AzMath] 现场算，不写死金额。
 class AzLiabilityView extends StatelessWidget {
   const AzLiabilityView({
     super.key,
@@ -31,17 +31,6 @@ class AzLiabilityView extends StatelessWidget {
     final List<AzGapRow> gaps = AzMath.gapTable(d, view.accounts, view.today);
     final AzDebtStats stats = AzMath.debtStats(d, gaps);
     final AzFlow flow = AzMath.flow(d);
-    final DebtRatioLevel level = d.preferences.debtRatioLevel;
-    final bool incomeSet = d.preferences.monthlyIncome > 0;
-    final bool mustCostSet = d.preferences.mustCost > 0;
-    final double limit = level.limit;
-
-    final String safeText = !incomeSet
-        ? '先填月收入'
-        : (stats.payIncomeRatio > limit
-            ? '占收入 ${(stats.payIncomeRatio * 100).toStringAsFixed(0)}%（超 ${(limit * 100).toStringAsFixed(0)}%）'
-            : '占收入 ${(stats.payIncomeRatio * 100).toStringAsFixed(0)}%');
-
     final List<LiabilityRecord> ordered = AzMath.payoffOrder(d);
     final List<LiabilityRecord> shown = _filter(debts, view.filter, d, view.today);
     final List<LiabilityRecord> due = AzMath.dueSoon(d, view.today, 90);
@@ -61,12 +50,7 @@ class AzLiabilityView extends StatelessWidget {
           title: '欠款概览',
           child: SizedBox.shrink(),
         ),
-        AzDebtHero(
-          stats: stats,
-          incomeSet: incomeSet,
-          levelLabel: level.label,
-          safeText: safeText,
-        ),
+        AzDebtHero(stats: stats),
         const SizedBox(height: AppSpacing.sm),
         AzBurnCard(
           cost: stats.monthCost,
@@ -75,8 +59,7 @@ class AzLiabilityView extends StatelessWidget {
           pay: stats.monthPay,
           ratioText: stats.monthPay == 0
               ? '本月无分期'
-              : '占这个月还款 ${(stats.interestRatio * 100).toStringAsFixed(0)}%'
-                  '${incomeSet ? ' · 占月收入 ${(stats.monthCost / d.preferences.monthlyIncome * 100).toStringAsFixed(0)}%' : ''}',
+              : '占这个月还款 ${(stats.interestRatio * 100).toStringAsFixed(0)}%',
         ),
         const SizedBox(height: AppSpacing.sm),
         AzMiniGrid3(
@@ -151,8 +134,6 @@ class AzLiabilityView extends StatelessWidget {
         // ── 负债汇总 ────────────────────────────────────────────
         AppFunctionSection(
           title: '负债汇总',
-          actionLabel: '${level.label} ▾',
-          onAction: actions.ratioLevel,
           child: AzSummaryRows(
             rows: <AzKeyValueRow>[
               for (final AzClassSum s in AzMath.byType(d))
@@ -169,18 +150,6 @@ class AzLiabilityView extends StatelessWidget {
               AzKeyValueRow(
                 label: '本月还',
                 value: MoneyFormat.yuan0(stats.monthPay),
-              ),
-              AzKeyValueRow(
-                label: '本月成本',
-                value: MoneyFormat.yuan0(stats.monthCost),
-                valueColor: t.expense,
-              ),
-              AzKeyValueRow(
-                label: '偿债余力',
-                value: (!incomeSet || !mustCostSet || stats.monthPay == 0)
-                    ? '—'
-                    : '${stats.afterDebt.toStringAsFixed(1)} 倍',
-                valueColor: stats.afterDebt < 1.5 ? t.expense : t.income,
               ),
             ],
           ),

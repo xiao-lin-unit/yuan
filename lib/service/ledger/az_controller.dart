@@ -40,7 +40,6 @@ class AzController extends ChangeNotifier {
   List<AssetRecord> get assets => _data.activeAssets;
   List<LiabilityRecord> get liabilities => _data.activeLiabilities;
   List<ContingentRecord> get contingents => _data.activeContingents;
-  List<MonthlySnapshotRecord> get snapshots => _data.snapshots;
 
   /// 今天由调用方在 build 里取一次传进 AzMath；这里不缓存，避免跨天不刷新。
   DateTime get today => DateTime.now();
@@ -292,19 +291,11 @@ class AzWriteController {
     return id;
   }
 
-  /// 口径开关（估值口径 / 90 天 / 偿债三档 / 月收入 / 每月必须花的钱 /
-  /// 应急金月数 / 物价假设）。切了留痕，13.13 唯一入口。
+  /// 记录 / 显示口径（估值口径 / 价格过期天数 / 隐藏已还清）。切了留痕。
+  /// 情境设计与分析模块的参数不在这里写。
   Future<void> setPreference(String key, String value) async {
     await db.transaction((Transaction txn) async {
       await dao.setPreference(txn, key, value);
-    });
-    await ledger.refresh();
-  }
-
-  /// 月末快照：INSERT OR IGNORE，历史月份不重算（10.9 / 13.12）。
-  Future<void> writeSnapshot(MonthlySnapshotRecord record) async {
-    await db.transaction((Transaction txn) async {
-      await dao.insertSnapshot(txn, record);
     });
     await ledger.refresh();
   }

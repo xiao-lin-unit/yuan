@@ -109,8 +109,6 @@ class AzDebtStats {
     required this.monthPay,
     required this.monthCost,
     required this.interestRatio,
-    required this.payIncomeRatio,
-    required this.afterDebt,
     required this.floatDelta,
     required this.worstMonth,
     required this.worstPay,
@@ -121,8 +119,6 @@ class AzDebtStats {
   final double monthPay;
   final double monthCost;
   final double interestRatio;
-  final double payIncomeRatio;
-  final double afterDebt;
   final double floatDelta;
   final String worstMonth;
   final double worstPay;
@@ -152,8 +148,6 @@ class AzPrepay {
     required this.penalty,
     required this.netSave,
     required this.cashAfter,
-    required this.months,
-    required this.safe,
     required this.realRate,
   });
 
@@ -161,8 +155,6 @@ class AzPrepay {
   final double penalty;
   final double netSave;
   final double cashAfter;
-  final double months;
-  final bool safe;
   final double realRate;
 }
 
@@ -421,7 +413,8 @@ abstract final class AzMath {
         (double s, LiabilityRecord x) => s + x.monthlyPay,
       );
 
-  /// 7.9 负债统计。income / mustCost 为 0 时不编造比值，页面显示「—」。
+  /// 7.9 负债统计（只加总已记录数据）。月收入占比 / 偿债能力比值依赖
+  /// 情境设计（8.2 / 13.2）的参数，资债不计算，也不显示「—」占位。
   static AzDebtStats debtStats(AzData d, List<AzGapRow> gaps) {
     final List<LiabilityRecord> debts = d.activeLiabilities;
     final double total = debts.fold<double>(
@@ -431,8 +424,6 @@ abstract final class AzMath {
     final double pay = monthPay(d);
     final AzFlow f = flow(d);
     final double cost = f.interest + f.fee;
-    final double income = d.preferences.monthlyIncome;
-    final double mustCost = d.preferences.mustCost;
     // 「利率涨 1 个点」只作用于会变的那些（7.6 / 8.2.2）。
     final double floatDelta = debts
             .where((LiabilityRecord x) => x.rateType == RateType.float)
@@ -451,8 +442,6 @@ abstract final class AzMath {
       monthPay: pay,
       monthCost: cost,
       interestRatio: pay == 0 ? 0 : cost / pay,
-      payIncomeRatio: income == 0 ? 0 : pay / income,
-      afterDebt: pay == 0 || mustCost == 0 ? 0 : (income - mustCost) / pay,
       floatDelta: floatDelta,
       worstMonth: worst.month,
       worstPay: worst.pay,
@@ -466,7 +455,7 @@ abstract final class AzMath {
   ///   ② 每月应还 = 剩余期数还覆盖得到的所有负债月供之和；
   ///   ③ 到那个月能拿出的钱 = 已排期的钱 − 之前各月已用掉的正缺口；
   ///   ④ gap = 应还 − 能拿出，正数标红。这是估算，不预测收入。
-  /// 【边界】月收入/必须花的钱没填时不参与，只做「应还 vs 能到手」对照。
+  /// 【边界】只用已记录的资产变现期与月供，不读情境设计参数。
   static List<AzGapRow> gapTable(
     AzData d,
     List<AccountRecord> accounts,
@@ -510,8 +499,9 @@ abstract final class AzMath {
     return 0;
   }
 
-  /// 提前还款四件事（7.10）。省息是线性近似并乘 0.72 贴近等额本息重算，
-  /// 界面必须标「估算，以账单为准」；不替用户做决定，只把四件事摆出来。
+  /// 提前还款（7.10）。省息是线性近似并乘 0.72 贴近等额本息重算，
+  /// 界面必须标「估算，以账单为准」。「还完还能撑几个月」是情境设计的
+  /// 推算（13.2），资债不算、不存、不展示。
   static AzPrepay prepayPlan(
     AzData d,
     List<AccountRecord> accounts,
@@ -524,15 +514,11 @@ abstract final class AzMath {
     final double saveInterest = amount * r * left * 0.72;
     final double penalty = prepayPenalty(debt, amount);
     final double cashAfter = cashLayers(d, accounts)[0].amount - amount;
-    final double mustCost = d.preferences.mustCost;
-    final double months = mustCost == 0 ? 0 : cashAfter / mustCost;
     return AzPrepay(
       saveInterest: saveInterest,
       penalty: penalty,
       netSave: saveInterest - penalty,
       cashAfter: cashAfter,
-      months: months,
-      safe: months >= 3,
       realRate: realRate,
     );
   }

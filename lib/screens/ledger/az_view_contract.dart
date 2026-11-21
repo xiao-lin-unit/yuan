@@ -31,7 +31,7 @@ class AzViewData {
   /// 账户页的内存快照（只读）。A1/A2 由它现场聚合，不落库、不缓存。
   final List<AccountRecord> accounts;
 
-  /// 由页面在 build 里取一次，跨天自动刷新；也便于月末快照复现。
+  /// 由页面在 build 里取一次，跨天自动刷新；本模块不写快照。
   final DateTime today;
 
   /// 快筛：all / give / take / A7 / A4 / stale / cost / T4 / float / due。
@@ -61,7 +61,6 @@ class AzViewActions {
     required this.gap,
     required this.payoff,
     required this.goAccounts,
-    required this.ratioLevel,
     required this.filterChanged,
     required this.toggleGroup,
   });
@@ -78,7 +77,6 @@ class AzViewActions {
   final VoidCallback gap;
   final VoidCallback payoff;
   final VoidCallback goAccounts;
-  final VoidCallback ratioLevel;
   final ValueChanged<String> filterChanged;
   final ValueChanged<String> toggleGroup;
 }

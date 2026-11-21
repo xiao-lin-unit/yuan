@@ -12,8 +12,8 @@ import 'widgets/az_cards.dart';
 /// 资产视图（原型 `#view-asset`）。
 ///
 /// 顺序严格照原型：只读镜像 → 流向账 → 在给你钱/在拿你钱/不进不出 →
-/// 资产汇总 → 真要用钱能拿出多少。新增入口固定在页面右上角动作行
-/// （AppHomePage.actions），不在滚动区里再放一份。
+/// 资产汇总 → 真要用钱能拿出多少。新增入口固定在右下角悬浮按钮
+/// （AppHomePage.floating），不在滚动区里再放一份。
 /// 所有数字现场调 [AzMath] 从明细算出来，页面上不写死任何金额。
 class AzAssetView extends StatelessWidget {
   const AzAssetView({

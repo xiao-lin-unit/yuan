@@ -52,11 +52,8 @@ const String _kTrendNote =
 // A3（3.8 / 13.1 / 13.12）：账本永远是名义金额。
 const String _kNominalNote =
     '账本里记的都是当时填下的钱数，软件不会自己把它调大或调小。';
-// A1（P1）：两行只读槽位。数据源分别是 4.2 分类标记 + 支出流水、
-// 5.2 / 6.3 两处「每月都有」标记，两个模块都还没做，所以按 10.6
-// 显示「—」并说清原因，绝不拿别的数凑一个看起来像答案的数字。
-const String _kReadOnlyReason =
-    '等你标好「每月必须花的钱」「稳稳每月进来的钱」，这两行会自动算出来。';
+// A1（3.6 两行）属情境设计：月收入、必须花的钱是 8.2 / 13.2 的推算
+// 参数，结果只在情境设计里出，不在账户 / 资债页摆「—」占位槽位。
 const String _kReminderDisclaimer = '估算，按你填的日利率粗算，以账单为准。';
 
 /// 类型快筛标签。**只按账户类型分**，不含原型的「常用」：
@@ -796,14 +793,9 @@ class _RepaymentReminders extends StatelessWidget {
   }
 }
 
-/// 账户页底部「再看看」：A1 的两行只读槽位 + A2 趋势口径 + A3 名义金额
-/// 口径 + 原来的总账说明。
-///
-/// 【为什么是静态槽位而不是算出来的数字】A1 两行的数据源（4.2 分类
-/// 标记 + 支出流水、5.2 / 6.3 两处「每月都有」）都还没开发，按 10.6
-/// 显示「—」并在 [_kReadOnlyReason] 里说清原因。等模块开工，只需把
-/// 这里的 `'—'` 换成从聚合查询取到的字符串，页面结构一行不用改 ——
-/// 这正是「先立静态槽位，不伪装成最终数字」的意思。
+/// 账户页底部「再看看」：A2 趋势口径 + A3 名义金额口径 + 总账说明。
+/// A1 两行「留够应急金 / 不上班能撑住」是情境设计的推算结果，
+/// 不在记录页摆静态槽位（8.2 / 13.2）。
 class _BoardNotes extends StatelessWidget {
   const _BoardNotes({required this.netWorthText});
 
@@ -824,11 +816,6 @@ class _BoardNotes extends StatelessWidget {
             children: <Widget>[
               Text('再看看', style: context.appText.sectionHeader),
               const SizedBox(height: AppSpacing.sm),
-              _row(context, '留够应急金后，还多出来多少', '—'),
-              _row(context, '不上班也能撑住多少', '—'),
-              const SizedBox(height: AppSpacing.xs),
-              Text(_kReadOnlyReason, style: context.appText.caption),
-              const Divider(height: AppSpacing.lg),
               Text(_kTrendNote, style: context.appText.caption),
               const SizedBox(height: AppSpacing.xs),
               Text(_kNominalNote, style: context.appText.caption),
@@ -842,13 +829,4 @@ class _BoardNotes extends StatelessWidget {
         ),
       );
 
-  Widget _row(BuildContext context, String label, String value) => Padding(
-        padding: const EdgeInsets.only(bottom: AppSpacing.xxs),
-        child: Row(
-          children: <Widget>[
-            Expanded(child: Text(label, style: context.appText.caption)),
-            Text(value, style: context.appText.menuTitle),
-          ],
-        ),
-      );
 }
