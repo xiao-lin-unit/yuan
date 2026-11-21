@@ -101,7 +101,8 @@ class AzWriteController {
   final AzDao dao;
   final AzController ledger;
 
-  /// 新增 / 编辑一项资产。名称重复由部分唯一索引兜底，提前给一句校验。
+  /// 新增 / 编辑一项资产。名称重复由部分唯一索引兜底，提前给一句校验；
+  /// 投资类代码相同不允许二次新增（用户口径），表单即时校验 + 这里查库兜底。
   Future<int> saveAsset(AssetRecord record) async {
     _requirePositive(record.cost, '买它一共花了多少');
     if (await dao.nameExists(
@@ -111,6 +112,13 @@ class AzWriteController {
       exceptId: record.id,
     )) {
       throw ArgumentError('已经有同名的一项东西了，换个名字吧');
+    }
+    // 表单里已经拦过一次，这里再查库：防两个弹层同时提交，或以后别的
+    // 入口绕过表单。空代码不查；软删的行不占用代码（与名称索引同口径）。
+    final String code = record.code.trim();
+    if (code.isNotEmpty &&
+        await dao.codeExists(db, 'az_assets', code, exceptId: record.id)) {
+      throw ArgumentError('这个代码已经登记过了');
     }
     late int id;
     await db.transaction((Transaction txn) async {

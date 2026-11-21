@@ -293,6 +293,27 @@ class AzDao {
     return rows.isNotEmpty;
   }
 
+  /// 「代码唯一校验」：投资类 A4/A5/A6 的代码相同不允许二次新增。
+  /// 只查未软删的行（与名称唯一索引同口径），空代码不参与；
+  /// 用 TRIM(code) 兼容老数据里可能带空格的代码。不加数据库唯一索引，
+  /// 避免老库已有重复代码时升级直接失败；由表单 + 写侧两层拦截。
+  Future<bool> codeExists(
+    DatabaseExecutor db,
+    String table,
+    String code, {
+    int? exceptId,
+  }) async {
+    final List<Map<String, Object?>> rows = await db.query(
+      table,
+      columns: <String>['id'],
+      where: "TRIM(code) = ? AND code <> '' "
+          'AND deleted_at IS NULL AND id <> ?',
+      whereArgs: <Object?>[code, exceptId ?? -1],
+      limit: 1,
+    );
+    return rows.isNotEmpty;
+  }
+
   /// 删掉一个资产前数它的买卖记录（3.8「这个账户下还有 XX 笔记录」同款）。
   Future<int> countTrades(DatabaseExecutor db, int assetId) async {
     final List<Map<String, Object?>> rows = await db.rawQuery(

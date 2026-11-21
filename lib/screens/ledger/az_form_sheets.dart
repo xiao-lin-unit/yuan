@@ -163,6 +163,14 @@ Future<void> showAzAssetSheet(
   final FormSheetController ctl = FormSheetController();
   final DateTime now = DateTime.now();
   final AssetClass cls = existing?.assetClass ?? presetClass ?? AssetClass.misc;
+  // 【代码唯一】构造期取一次共享账本快照：同一代码只允许登记一次。
+  // 只算未软删的行（回收站里的可以重新登记），编辑时排除自己这一条；
+  // 空代码不参与 —— 表单允许「可不填」，不填就不该互相撞车。
+  final Set<String> usedCodes = <String>{
+    for (final AssetRecord a in context.read<AzController>().data.assets)
+      if (!a.isDeleted && a.id != existing?.id && a.code.trim().isNotEmpty)
+        a.code.trim(),
+  };
   final AssetRecord base = existing ??
       AssetRecord(
         assetClass: cls,
@@ -170,6 +178,9 @@ Future<void> showAzAssetSheet(
         cost: 1,
         // 6.7：贵重物件默认不算进总账，车与其它类默认算。
         counted: cls != AssetClass.valuable,
+        // 按大类给一个合理的「多久能变成现金」默认值：房产几个月、
+        // 生意很难，其余默认几天；用户仍可在表单里改（需求 2.1 / 5.1）。
+        liquidity: _defaultLiquidity(cls),
         createdAt: now,
         updatedAt: now,
       );
@@ -184,7 +195,7 @@ Future<void> showAzAssetSheet(
       controller: ctl,
       submit: true,
       submitLabel: '保存',
-      items: _assetItems(cls, base),
+      items: _assetItems(cls, base, usedCodes),
       onSubmit: (SheetFormValues v) async {
         final Map<String, Object?> m = base.toMap()..['id'] = base.id;
         m['asset_class'] = cls.code;
@@ -240,6 +251,16 @@ Future<void> showAzAssetSheet(
   );
 }
 
+/// 按大类给「多久能变成现金」的默认值（只在新增时用，编辑保留原值）。
+/// 房产几个月、生意很难，其余默认几天；都可以在表单里再改。
+Liquidity _defaultLiquidity(AssetClass cls) => switch (cls) {
+      AssetClass.property => Liquidity.months,
+      AssetClass.business => Liquidity.hard,
+      AssetClass.loan => Liquidity.months,
+      AssetClass.misc => Liquidity.months,
+      _ => Liquidity.days,
+    };
+
 /// 【资产大类 → 表单项】6.1「选完某一类，只展开这一类专属的几项」的落地表。
 ///
 /// 分两条字段链，依据是 6.2 的「由谁提供金额」，不是金额大小：
@@ -253,7 +274,19 @@ Future<void> showAzAssetSheet(
 /// 两链共用 6.3 的名字 / 成本 / 变现 / 备注。不显示的字段靠 onSubmit 的
 /// `v.contains(key)` 保留原值，编辑老记录不丢数据。字段 key 全部沿用库里
 /// 已有的列，不新增表结构、不升 DB 版本；label 一律不超过 4 个字。
-List<SheetFormItem> _assetItems(AssetClass cls, AssetRecord base) {
+///
+/// 【按类型细化】label 守住 4 字，容易填错的地方全放进 hint 与静态小字：
+/// 房产「成本」是落地总价、月出不含月供；车「成本」不是裸车价、年折旧
+/// 只是备注；金饰的工费卖时不算钱；投资「代码」只登记一次。
+///
+/// 【后续任务，本轮不做】投资类同一代码只登记一次后，「追加购买」入口
+/// 按需求设计放在该标的详情页（现在详情页已有通用「买入」），等账户
+/// 单写点联动时再收敛成投资专属入口。本轮不碰详情页，只在此登记。
+List<SheetFormItem> _assetItems(
+  AssetClass cls,
+  AssetRecord base,
+  Set<String> usedCodes,
+) {
   final bool invest = cls.isInvestment;
   final bool property = cls == AssetClass.property;
   final bool vehicle = cls == AssetClass.vehicle;
@@ -263,23 +296,80 @@ List<SheetFormItem> _assetItems(AssetClass cls, AssetRecord base) {
   // 只有「有约定进账」的类别才问月入与稳不稳；投资不在此列。
   final bool hasIncome = loan || property || business;
   final bool hasHoldCost = property || vehicle;
-  final bool hasExitCost = invest || property || valuable || business;
+  // 车补「退出费」：过户、违章处理也是变现摩擦（列已有，只改表单露出）。
+  final bool hasExitCost =
+      invest || property || vehicle || valuable || business;
+
+  // 按大类给的白话提示：细节只进 hint / 静态小字，不撑长 label。
+  final String nameHint = switch (cls) {
+    AssetClass.loan => '借给老张的钱',
+    AssetClass.stock => '例如 贵州茅台',
+    AssetClass.fund => '例如 沪深300',
+    AssetClass.otherInvest => '例如 三年国债',
+    AssetClass.property => '出租的那套小房',
+    AssetClass.vehicle => '家用车',
+    AssetClass.valuable => '金条 100g',
+    AssetClass.business => '和小李合开的店',
+    AssetClass.misc => '自己起个名',
+  };
+  final String costHint = switch (cls) {
+    AssetClass.loan => '实际借出去的钱',
+    AssetClass.property => '含契税、中介、装修',
+    AssetClass.vehicle => '落地一共花的钱',
+    AssetClass.valuable => '当时买花的钱',
+    AssetClass.business => '投进去多少',
+    AssetClass.misc => _kAmountHint,
+    _ => '起始登记，买卖在详情记',
+  };
+  final String? noteHint = switch (cls) {
+    AssetClass.loan => '借条、转账、利息约定写这儿',
+    AssetClass.property => '产权、合同、交割写这儿',
+    AssetClass.vehicle => '发票、改装、事故写这儿',
+    AssetClass.valuable => '发票、证书、配件写这儿',
+    AssetClass.business => '协议、分红、账目写这儿',
+    _ => null,
+  };
+  final String intentionLabel = switch (cls) {
+    AssetClass.loan => '约定还日',
+    AssetClass.property => '证照',
+    AssetClass.vehicle => '手续',
+    AssetClass.valuable => '放在哪',
+    AssetClass.business => '占多少',
+    _ => '用途',
+  };
+  final String? intentionHint = switch (cls) {
+    AssetClass.loan => '说好什么时候还，可空',
+    AssetClass.property => '产权、共有、押证写一句',
+    AssetClass.vehicle => '上牌、绿本、保单',
+    AssetClass.valuable => '家里、保险箱',
+    AssetClass.business => '写个大概就行',
+    _ => null,
+  };
+  final String monthlyInHint = switch (cls) {
+    AssetClass.property => '每月到账；自住填 0',
+    AssetClass.business => '最近一次分红，不保证有',
+    _ => '每月到账，没利息填 0',
+  };
+  final String? latestValueHint = property ? '一年改一次就行' : null;
+  final String exitHint = invest
+      ? '卖出大概扣多少'
+      : (property
+          ? '中介费、税费估算'
+          : (vehicle ? '过户、违章处理' : '手续费'));
 
   return <SheetFormItem>[
     SheetFormSingleLineTextItem(
       key: 'name',
       label: '名称',
       initialValue: base.name,
-      hint: loan
-          ? '借给老张的钱'
-          : (property ? '小房' : (invest ? '例如 沪深300' : null)),
+      hint: nameHint,
       validator: (String v) => v.trim().isEmpty ? '请填名称' : null,
     ),
     SheetFormSingleLineTextItem(
       key: 'cost',
       label: '成本',
       initialValue: base.cost.toStringAsFixed(0),
-      hint: _kAmountHint,
+      hint: costHint,
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
       validator: (String v) {
         final String e = _positive(v, '成本');
@@ -291,13 +381,21 @@ List<SheetFormItem> _assetItems(AssetClass cls, AssetRecord base) {
         key: 'code',
         label: '代码',
         initialValue: base.code,
-        hint: '可不填',
+        hint: '可不填；填了不能重复',
+        // 同一代码只登记一次（用户口径）。空代码放行；写侧还有一次
+        // 查库兜底，防止两个弹层同时提交绕过这里的即时校验。
+        validator: (String v) {
+          final String c = v.trim();
+          if (c.isEmpty) return null;
+          return usedCodes.contains(c) ? '这个代码已经登记过了' : null;
+        },
       ),
     if (!invest)
       SheetFormSingleLineTextItem(
         key: 'latest_value',
         label: '现值',
         initialValue: base.latestValue?.toStringAsFixed(0) ?? '',
+        hint: latestValueHint,
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
       ),
     if (hasIncome)
@@ -305,7 +403,7 @@ List<SheetFormItem> _assetItems(AssetClass cls, AssetRecord base) {
         key: 'monthly_in',
         label: property ? '月租' : '月入',
         initialValue: base.monthlyIn.toStringAsFixed(0),
-        hint: '每月到账',
+        hint: monthlyInHint,
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
       ),
     if (hasHoldCost)
@@ -313,7 +411,10 @@ List<SheetFormItem> _assetItems(AssetClass cls, AssetRecord base) {
         key: 'monthly_out',
         label: vehicle ? '月养' : '月出',
         initialValue: base.monthlyOut.toStringAsFixed(0),
-        hint: '持有费',
+        // 房产的月出只填自己的持有成本，月供在欠款里算，不重复扣。
+        hint: vehicle
+            ? '保险、油电、保养、停车摊月'
+            : '物业、供暖、保险、维修摊月；月供不填',
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
       ),
     if (hasExitCost)
@@ -321,7 +422,7 @@ List<SheetFormItem> _assetItems(AssetClass cls, AssetRecord base) {
         key: 'exit_cost',
         label: invest ? '赎回费' : '退出费',
         initialValue: base.exitCost.toStringAsFixed(0),
-        hint: '手续费',
+        hint: exitHint,
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
       ),
     SheetFormCustomItem(
@@ -372,9 +473,11 @@ List<SheetFormItem> _assetItems(AssetClass cls, AssetRecord base) {
         key: 'depreciation_note',
         label: '年折旧',
         initialValue: base.depreciationNote,
-        hint: '例如 12%',
+        // 只是备注，不参与任何计算：软件不会每年自动把车价调小。
+        hint: '例如 12%，只是备注',
       ),
-    if (vehicle || valuable || cls == AssetClass.misc)
+    // 房产也允许「先不算进总账」（需求 5.2 变现组）；贵重物默认关。
+    if (vehicle || valuable || property || cls == AssetClass.misc)
       SheetFormToggleItem(
         key: 'counted',
         label: '计入',
@@ -383,12 +486,14 @@ List<SheetFormItem> _assetItems(AssetClass cls, AssetRecord base) {
     if (!invest)
       SheetFormSingleLineTextItem(
         key: 'intention',
-        label: loan ? '约定还日' : '用途',
+        label: intentionLabel,
+        hint: intentionHint,
         initialValue: base.intention,
       ),
     SheetFormMultiLineTextItem(
       key: 'note',
       label: '备注',
+      hint: noteHint,
       initialValue: base.note,
       minLines: 2,
       maxLines: 3,
@@ -398,6 +503,21 @@ List<SheetFormItem> _assetItems(AssetClass cls, AssetRecord base) {
       const SheetFormNoteItem(
         key: 'hint',
         text: '按买入价',
+        centered: true,
+      ),
+    // 每类一句白话，把外行最容易填错的地方说清楚；不是新组件，只是
+    // 公共 [SheetFormNoteItem] 的一段静态小字，label 长度约束不适用。
+    if (!invest)
+      SheetFormNoteItem(
+        key: 'type_hint',
+        text: switch (cls) {
+          AssetClass.loan => '没写利息，就先按没利息记',
+          AssetClass.property => '月供不用填在这儿，那笔在欠款里算过了',
+          AssetClass.vehicle => '车一年比一年不值钱；软件不会自动改这里的数',
+          AssetClass.valuable => '金饰的工费和牌子，卖的时候不算钱',
+          AssetClass.business => '投了多少是事实，现在值多少是自己填的',
+          _ => '说不清的放这儿，不参与每月进出',
+        },
         centered: true,
       ),
   ];
