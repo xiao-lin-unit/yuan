@@ -286,6 +286,10 @@ abstract final class AzMath {
     double occ = 0;
     double holdCost = 0;
     for (final AssetRecord a in d.activeAssets) {
+      // 投资（A4/A5/A6）不按固定收付记账：估值走买入批次，分红是已发生
+      // 的事实，不是「每月都有」的进账。老记录里若曾误填 monthly_in /
+      // monthly_out，这里一律不参与流向账，避免被当成稳定收入（6.4/6.5）。
+      if (a.assetClass.isInvestment) continue;
       if (a.stability == AzStability.fixed) {
         fixed += a.monthlyIn;
       } else if (a.monthlyIn > 0) {
@@ -374,6 +378,11 @@ abstract final class AzMath {
   }
 
   static AzFlowTag flowTagOf(AssetRecord a, List<LiabilityRecord> debts) {
+    // 投资不进「在给你钱 / 在拿你钱」两组：按买入价记，赚亏只在卖出时
+    // 结算（6.4/6.5），没有每月净流向；老记录的月入值也不参与判断。
+    if (a.assetClass.isInvestment) {
+      return const AzFlowTag(good: false, bad: false, text: '按买卖算');
+    }
     final double steady = a.stability == AzStability.fixed ? a.monthlyIn : 0;
     final double out = a.monthlyOut + linkCostOf(a, debts);
     final double net = steady - out;
@@ -397,8 +406,10 @@ abstract final class AzMath {
       }
     }
     if (found == null) return null;
-    final double steady =
-        found.stability == AzStability.fixed ? found.monthlyIn : 0;
+    // 投资没有「稳稳每月都有」的分红，借钱买投资不按固定进账算划算与否。
+    final double steady = found.assetClass.isInvestment
+        ? 0
+        : (found.stability == AzStability.fixed ? found.monthlyIn : 0);
     return AzLeverage(
       asset: found,
       debt: d,

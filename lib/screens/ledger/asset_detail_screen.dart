@@ -149,10 +149,15 @@ class AssetDetailScreen extends StatelessWidget {
             items: <AppInfoItem>[
               AppInfoItem(label: '属于哪类', value: asset.assetClass.label),
               AppInfoItem(label: '变现', value: asset.liquidity.label),
-              AppInfoItem(label: '稳定性', value: asset.stability.label),
-              AppInfoItem(label: '月入', value: MoneyFormat.yuan0(asset.monthlyIn)),
-              AppInfoItem(label: '月出', value: MoneyFormat.yuan0(asset.monthlyOut)),
-              AppInfoItem(label: '净流向', value: tag.text),
+              // 投资没有每月净流向：赚亏只在卖出时结算，不摆固定收付的格子。
+              if (!asset.assetClass.isInvestment) ...<AppInfoItem>[
+                AppInfoItem(label: '稳定性', value: asset.stability.label),
+                AppInfoItem(label: '月入', value: MoneyFormat.yuan0(asset.monthlyIn)),
+                AppInfoItem(label: '月出', value: MoneyFormat.yuan0(asset.monthlyOut)),
+                AppInfoItem(label: '净流向', value: tag.text),
+              ],
+              if (asset.assetClass.isInvestment && asset.code.isNotEmpty)
+                AppInfoItem(label: '代码', value: asset.code),
               AppInfoItem(label: '退出费', value: MoneyFormat.yuan0(asset.exitCost)),
               AppInfoItem(label: '计入', value: asset.counted ? '算' : '不算'),
               AppInfoItem(label: '付款卡', value: accountName),

@@ -34,7 +34,8 @@ class AzViewData {
   /// 由页面在 build 里取一次，跨天自动刷新；本模块不写快照。
   final DateTime today;
 
-  /// 快筛：all / give / take / A7 / A4 / stale / cost / T4 / float / due。
+  /// 快筛：all / give / take / A7 / A4（投资 A4/A5/A6）/ stale / cost /
+  /// T4 / float / due。
   final String filter;
 
   /// 三个资产分组的折叠状态。页面持有，视图只按它渲染。

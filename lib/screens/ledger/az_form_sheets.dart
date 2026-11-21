@@ -150,6 +150,11 @@ Widget _header(
 /// 【未显示的字段不丢】onSubmit 用 `v.contains(key)` 判断：这一项没出现在
 /// 表单里就保留 base.toMap() 的原值，编辑老记录不会把已有数据清成空串。
 /// 大类与字段的对应关系见 [_assetItems]，每类只列自己用得上的那几项。
+///
+/// 【投资不按固定收付】A4/A5/A6 由买卖记录自动算（6.2 / 6.5），表单不出现
+/// 月入 / 稳定性 / 月出，也不让用户填「预计一年赚多少」。老记录里若曾误填
+/// 这类值，onSubmit 靠 `v.contains(key)` 保留原值、不清空不改数，AzMath 也
+/// 不把它们算进流向账 —— 资债只记录，不推算收益。
 Future<void> showAzAssetSheet(
   BuildContext context, {
   AssetRecord? existing,
@@ -237,62 +242,61 @@ Future<void> showAzAssetSheet(
 
 /// 【资产大类 → 表单项】6.1「选完某一类，只展开这一类专属的几项」的落地表。
 ///
-/// 依据 6.2 大类清单、6.3 共用字段、6.5~6.7 各类专属字段：
-///   · 公共：名字、买入花了多少、多久能变成现金、备注（所有类都要）；
-///   · A4/A5/A6 投资：代码 / 编号、提前赎回扣费；估值由买卖批次算，
-///     不手填「现在值多少」（6.4）；进账（分红）与「稳不稳」也要填；
-///   · A7 房产：租金、每月持有成本、自住/出租（use_mode）、交易税费；
-///   · A8 车：每月养车钱、每年掉多少价（depreciation_note）、是否计入总账；
-///   · A9 贵重物件：默认不计入总账（6.7）、提前变现扣费；
-///   · A3 借出去的钱 / A10 生意股份：进账与「稳不稳」；A3 的 intention
-///     用来写「说好什么时候还」；
-///   · A11 其他：最少字段 + 是否计入总账。
-/// 字段 key 全部沿用原来的 15 项（另加 use_mode / depreciation_note 两个
-/// 库里已有、之前没露出来的列），不新增表结构、不升 DB 版本。
+/// 分两条字段链，依据是 6.2 的「由谁提供金额」，不是金额大小：
+///   · 收益不定的投资 A4/A5/A6：6.5 明确「由买卖记录自动算」，没有
+///     「每月给你多少钱 / 每月拿走多少钱」的概念。只填名字、成本、代码、
+///     赎回费、变现；估值按买入价，改价与买卖都在详情页操作。分红、
+///     手续费是已发生的事实，不在这里填「预计一年赚多少」。
+///   · 有约定 / 固定现金流的资产 A3/A7/A10：借出去的钱收利息、房子收租、
+///     生意分红，才显示月入与稳定性（6.3 / 6.6 / 6.7）；车、贵重物、其他
+///     显示各自的持有成本、折旧、计入开关。
+/// 两链共用 6.3 的名字 / 成本 / 变现 / 备注。不显示的字段靠 onSubmit 的
+/// `v.contains(key)` 保留原值，编辑老记录不丢数据。字段 key 全部沿用库里
+/// 已有的列，不新增表结构、不升 DB 版本；label 一律不超过 4 个字。
 List<SheetFormItem> _assetItems(AssetClass cls, AssetRecord base) {
-  final bool invest = cls == AssetClass.stock ||
-      cls == AssetClass.fund ||
-      cls == AssetClass.otherInvest;
+  final bool invest = cls.isInvestment;
   final bool property = cls == AssetClass.property;
   final bool vehicle = cls == AssetClass.vehicle;
   final bool valuable = cls == AssetClass.valuable;
   final bool loan = cls == AssetClass.loan;
   final bool business = cls == AssetClass.business;
-  final bool hasIncome = loan || invest || property || business;
+  // 只有「有约定进账」的类别才问月入与稳不稳；投资不在此列。
+  final bool hasIncome = loan || property || business;
   final bool hasHoldCost = property || vehicle;
   final bool hasExitCost = invest || property || valuable || business;
 
   return <SheetFormItem>[
     SheetFormSingleLineTextItem(
       key: 'name',
-          label: '名称',
+      label: '名称',
       initialValue: base.name,
       hint: loan
           ? '借给老张的钱'
-          : (property ? '小房' : null),
-          validator: (String v) => v.trim().isEmpty ? '请填名称' : null,
+          : (property ? '小房' : (invest ? '例如 沪深300' : null)),
+      validator: (String v) => v.trim().isEmpty ? '请填名称' : null,
     ),
     SheetFormSingleLineTextItem(
       key: 'cost',
-          label: '成本',
+      label: '成本',
       initialValue: base.cost.toStringAsFixed(0),
       hint: _kAmountHint,
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
       validator: (String v) {
-            final String e = _positive(v, '成本');
+        final String e = _positive(v, '成本');
         return e.isEmpty ? null : e;
       },
     ),
     if (invest)
       SheetFormSingleLineTextItem(
         key: 'code',
-          label: '代码',
+        label: '代码',
         initialValue: base.code,
+        hint: '可不填',
       ),
     if (!invest)
       SheetFormSingleLineTextItem(
         key: 'latest_value',
-          label: '现值',
+        label: '现值',
         initialValue: base.latestValue?.toStringAsFixed(0) ?? '',
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
       ),
@@ -301,7 +305,7 @@ List<SheetFormItem> _assetItems(AssetClass cls, AssetRecord base) {
         key: 'monthly_in',
         label: property ? '月租' : '月入',
         initialValue: base.monthlyIn.toStringAsFixed(0),
-          hint: '月收入',
+        hint: '每月到账',
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
       ),
     if (hasHoldCost)
@@ -309,20 +313,20 @@ List<SheetFormItem> _assetItems(AssetClass cls, AssetRecord base) {
         key: 'monthly_out',
         label: vehicle ? '月养' : '月出',
         initialValue: base.monthlyOut.toStringAsFixed(0),
-          hint: '持有费',
+        hint: '持有费',
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
       ),
     if (hasExitCost)
       SheetFormSingleLineTextItem(
         key: 'exit_cost',
-          label: '退出费',
+        label: invest ? '赎回费' : '退出费',
         initialValue: base.exitCost.toStringAsFixed(0),
-          hint: '手续费',
+        hint: '手续费',
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
       ),
     SheetFormCustomItem(
       key: 'liquidity',
-          label: '变现',
+      label: '变现',
       builder: (BuildContext ctx, ValueChanged<Object?> onChanged) =>
           _InlineSelect(
         options: <_SelectOption>[
@@ -336,7 +340,7 @@ List<SheetFormItem> _assetItems(AssetClass cls, AssetRecord base) {
     if (hasIncome)
       SheetFormCustomItem(
         key: 'stability',
-          label: '稳定性',
+        label: '稳定性',
         builder: (BuildContext ctx, ValueChanged<Object?> onChanged) =>
             _InlineSelect(
           options: <_SelectOption>[
@@ -373,22 +377,29 @@ List<SheetFormItem> _assetItems(AssetClass cls, AssetRecord base) {
     if (vehicle || valuable || cls == AssetClass.misc)
       SheetFormToggleItem(
         key: 'counted',
-          label: '计入',
+        label: '计入',
         initialValue: base.counted,
       ),
-    SheetFormSingleLineTextItem(
-      key: 'intention',
-      label: loan ? '约定还日' : '用途',
-      initialValue: base.intention,
-    ),
+    if (!invest)
+      SheetFormSingleLineTextItem(
+        key: 'intention',
+        label: loan ? '约定还日' : '用途',
+        initialValue: base.intention,
+      ),
     SheetFormMultiLineTextItem(
       key: 'note',
-          label: '备注',
+      label: '备注',
       initialValue: base.note,
       minLines: 2,
       maxLines: 3,
       showCounter: false,
     ),
+    if (invest)
+      const SheetFormNoteItem(
+        key: 'hint',
+        text: '按买入价',
+        centered: true,
+      ),
   ];
 }
 

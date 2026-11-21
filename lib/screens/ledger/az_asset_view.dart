@@ -59,10 +59,8 @@ class AzAssetView extends StatelessWidget {
             return a.valuedAt != null &&
                 view.today.difference(a.valuedAt!).inDays > d.preferences.staleDays;
           }
-          if (f == 'A4') {
-            return a.assetClass == AssetClass.stock ||
-                a.assetClass == AssetClass.fund;
-          }
+          // 投资是一整条字段链（A4/A5/A6），快筛按枚举判定，不写死两类。
+          if (f == 'A4') return a.assetClass.isInvestment;
           return a.assetClass.code == f;
         }).toList();
 
@@ -87,7 +85,7 @@ class AzAssetView extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
-        // ── 快筛：资产按「给不给你钱」────────────────────────────
+        // ── 快筛：流向 + 投资（投资按买卖记录算，不按每月进账）────
         _chips(context, all, pick, stale.length),
         // ── A1/A2 只读镜像 ──────────────────────────────────────
         AppFunctionSection(
@@ -179,7 +177,7 @@ class AzAssetView extends StatelessWidget {
       <String>['give', '给你钱', '${pick('give').length}'],
       <String>['take', '拿你钱', '${pick('take').length}'],
       <String>['A7', '房子', '${pick('A7').length}'],
-      <String>['A4', '股票基金', '${pick('A4').length}'],
+      <String>['A4', '投资', '${pick('A4').length}'],
       <String>['stale', '待更新', '$staleCount'],
     ];
     return Padding(
