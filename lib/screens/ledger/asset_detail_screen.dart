@@ -169,10 +169,21 @@ class AssetDetailScreen extends StatelessWidget {
                   label: '持有数量',
                   value: '${asset.quantity!.toStringAsFixed(2)} 份',
                 ),
+              // 新增表单按类复用 use_mode / depreciation_note 两列：
+              // A3 存借出情形、A7 存用途；A8 存「一年掉」、A9 存「凭证」。
+              // 这里按类回显，避免新增存了「凭证」、详情却显示「年折旧」。
               if (asset.useMode.isNotEmpty)
-                AppInfoItem(label: '用途', value: asset.useMode),
+                AppInfoItem(
+                  label: asset.assetClass == AssetClass.loan ? '借出情形' : '用途',
+                  value: _useModeText(asset.useMode),
+                ),
               if (asset.depreciationNote.isNotEmpty)
-                AppInfoItem(label: '年折旧', value: asset.depreciationNote),
+                AppInfoItem(
+                  label: asset.assetClass == AssetClass.valuable
+                      ? '凭证'
+                      : '一年掉',
+                  value: asset.depreciationNote,
+                ),
             ],
           ),
           const SizedBox(height: AppLayout.sectionGap),
@@ -266,6 +277,14 @@ class AssetDetailScreen extends StatelessWidget {
     }
     return '原卡已删除';
   }
+
+  /// 房产用途在库里存短码，界面一律白话；A3 借出情形本来就存中文，原样回显。
+  static String _useModeText(String raw) => switch (raw) {
+        'rent' => '租给别人',
+        'empty' => '空着',
+        'business' => '做生意用',
+        _ => raw,
+      };
 
   static String _dateText(DateTime d) =>
       '${d.year}-${d.month.toString().padLeft(2, '0')}-'

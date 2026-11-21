@@ -104,6 +104,62 @@ class AzWriteController {
   /// 新增 / 编辑一项资产。名称重复由部分唯一索引兜底，提前给一句校验；
   /// 投资类代码相同不允许二次新增（用户口径），表单即时校验 + 这里查库兜底。
   Future<int> saveAsset(AssetRecord record) async {
+    await _checkAssetUnique(record);
+    late int id;
+    await db.transaction((Transaction txn) async {
+      id = await dao.saveAsset(txn, record);
+    });
+    await ledger.refresh();
+    return id;
+  }
+
+  /// 投资类「新增」：建档 + 首笔买入批次，**一个事务**（6.5.1）。
+  ///
+  /// 首次买入就在这里录完，后续「追加购买」才放详情页（本轮不做）。
+  /// 单价 × 数量 + 费用 = 一共从卡里出去的钱，也就是 az_assets.cost；
+  /// 同时插一条 buy 批次，详情页「买卖记录 / 持仓量 / 持仓成本」立刻
+  /// 有数，不会留下一个空标的。账户余额联动仍等「记支出 / 记收入」
+  /// 模块接 AccountEntryDao.append，本方法不碰账户（与既有边界一致）。
+  Future<int> saveInvestmentWithFirstBuy({
+    required AssetRecord record,
+    required double unitPrice,
+    required double quantity,
+    double fee = 0,
+  }) async {
+    await _checkAssetUnique(record);
+    _requirePositive(unitPrice, '每个多少钱');
+    _requirePositive(quantity, '买了多少');
+    if (fee < 0) throw ArgumentError('另外交的钱不能是负数');
+    final double total = unitPrice * quantity + fee;
+    if ((record.cost - total).abs() > 0.0001) {
+      throw ArgumentError('一共花了多少和单价、数量、费用对不上');
+    }
+    late int id;
+    final DateTime now = DateTime.now();
+    await db.transaction((Transaction txn) async {
+      id = await dao.saveAsset(txn, record);
+      await dao.insertTrade(
+        txn,
+        AssetTradeRecord(
+          assetId: id,
+          direction: TradeDirection.buy,
+          occurredAt: now,
+          unitPrice: unitPrice,
+          quantity: quantity,
+          fee: fee,
+          amount: total,
+          createdAt: now,
+        ),
+      );
+    });
+    await ledger.refresh();
+    return id;
+  }
+
+  /// 名称 / 代码唯一的共用校验：表单即时拦一次，写库前再查一次，
+  /// 防两个弹层同时提交或以后别的入口绕过表单。
+  /// 空代码不查；软删的行不占用代码（与名称部分唯一索引同口径）。
+  Future<void> _checkAssetUnique(AssetRecord record) async {
     _requirePositive(record.cost, '买它一共花了多少');
     if (await dao.nameExists(
       db,
@@ -113,19 +169,11 @@ class AzWriteController {
     )) {
       throw ArgumentError('已经有同名的一项东西了，换个名字吧');
     }
-    // 表单里已经拦过一次，这里再查库：防两个弹层同时提交，或以后别的
-    // 入口绕过表单。空代码不查；软删的行不占用代码（与名称索引同口径）。
     final String code = record.code.trim();
     if (code.isNotEmpty &&
         await dao.codeExists(db, 'az_assets', code, exceptId: record.id)) {
       throw ArgumentError('这个代码已经登记过了');
     }
-    late int id;
-    await db.transaction((Transaction txn) async {
-      id = await dao.saveAsset(txn, record);
-    });
-    await ledger.refresh();
-    return id;
   }
 
   /// 「更新一下现在值多少」（6.4）：填一次价，留一次痕，历史不覆盖。

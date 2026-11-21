@@ -184,6 +184,50 @@ Future<void> showAzAssetSheet(
         createdAt: now,
         updatedAt: now,
       );
+
+  // 【6.3 通用字段 · 构造期】「用哪张卡买的」「这笔钱是借来买的吗」
+  // 两个下拉的可选项。只列未删除的；已关联但后来被删的记录补一个占位，
+  // 保证编辑时能回显旧值，不被下拉悄悄改成第一项（6.9 不静默改数）。
+  final int? linkedAccount = base.linkAccountId;
+  final int? linkedDebt = base.linkDebtId;
+  final List<_SelectOption> accountOptions = <_SelectOption>[
+    const _SelectOption('', '没记'),
+  ];
+  bool accountFound = linkedAccount == null;
+  for (final a in context.read<AccountController>().all) {
+    if (a.isDeleted || a.id == null) continue;
+    accountOptions.add(_SelectOption(a.id!.toString(), a.name));
+    if (a.id == linkedAccount) accountFound = true;
+  }
+  if (!accountFound && linkedAccount != null) {
+    accountOptions.add(
+      _SelectOption(linkedAccount.toString(), '原来那张卡已删除'),
+    );
+  }
+  final List<_SelectOption> debtOptions = <_SelectOption>[
+    const _SelectOption('', '没借'),
+  ];
+  bool debtFound = linkedDebt == null;
+  LiabilityRecord? linkedDebtRow;
+  for (final d in context.read<AzController>().data.activeLiabilities) {
+    if (d.isDeleted || d.id == null) continue;
+    debtOptions.add(_SelectOption(d.id!.toString(), d.name));
+    if (d.id == linkedDebt) {
+      debtFound = true;
+      linkedDebtRow = d;
+    }
+  }
+  if (!debtFound && linkedDebt != null) {
+    debtOptions.add(
+      _SelectOption(linkedDebt.toString(), '原来那笔债已删除'),
+    );
+  }
+  // 6.6「现在还欠多少」只读：表单是构造期静态，这里显示已关联负债的
+  // 当前剩余本金；实时值仍在详情页看，不在表单里做动态刷新。
+  final String? debtBalanceNote = linkedDebtRow == null
+      ? null
+      : '现在还欠 ${MoneyFormat.yuan0(linkedDebtRow!.principal)}，只读';
+
   await AppSheetShell.show<void>(
     context,
     header: _header(
@@ -195,13 +239,41 @@ Future<void> showAzAssetSheet(
       controller: ctl,
       submit: true,
       submitLabel: '保存',
-      items: _assetItems(cls, base, usedCodes),
+      items: _assetItems(
+        cls,
+        base,
+        usedCodes,
+        existing == null,
+        accountOptions,
+        debtOptions,
+        debtBalanceNote,
+      ),
       onSubmit: (SheetFormValues v) async {
         final Map<String, Object?> m = base.toMap()..['id'] = base.id;
         m['asset_class'] = cls.code;
         m['icon_key'] = cls.iconKey;
         if (v.contains('name')) m['name'] = v.text('name').trim();
         if (v.contains('cost')) m['cost'] = _num(v, 'cost', base.cost);
+        // 6.5.1：投资「新增」由首笔买入算出一共花了多少（含费用），
+        // 写进已有的 cost / unit_price / quantity 列，并生成首笔批次。
+        // 编辑档案时这三项不显示，v.contains 为 false，原值原样保留，
+        // 不会去改已经存在的买卖记录。
+        final bool firstBuy = cls.isInvestment &&
+            existing == null &&
+            v.contains('unit_price') &&
+            v.contains('quantity');
+        double firstPrice = 0;
+        double firstQty = 0;
+        double firstFee = 0;
+        if (firstBuy) {
+          firstPrice = _num(v, 'unit_price');
+          firstQty = _num(v, 'quantity');
+          firstFee = _num(v, 'trade_fee');
+          m['cost'] = firstPrice * firstQty + firstFee;
+          m['unit_price'] = firstPrice;
+          m['quantity'] = firstQty;
+          m['valuation_source'] = ValuationSource.cost.dbValue;
+        }
         if (v.contains('code')) m['code'] = v.text('code').trim();
         if (v.contains('latest_value')) {
           final double? latest =
@@ -243,9 +315,45 @@ Future<void> showAzAssetSheet(
           m['intention'] = v.text('intention').trim();
         }
         if (v.contains('note')) m['note'] = v.text('note').trim();
-        await context.read<AzWriteController>().saveAsset(
-              AssetRecord.fromMap(m),
-            );
+        // 6.3 通用字段：什么时候买的 / 用哪张卡买的 / 这笔钱是借来买的吗。
+        // 下拉用户没点时 get<String> 为 null，回退到原值，不静默清空（6.9）。
+        if (v.contains('buy_date')) {
+          final DateTime? d = _date(v.text('buy_date'));
+          m['created_at'] = (d ?? base.createdAt).millisecondsSinceEpoch;
+        }
+        if (v.contains('link_account_id')) {
+          final String? raw = v.get<String>('link_account_id');
+          if (raw == null) {
+            m['link_account_id'] = base.linkAccountId;
+          } else if (raw.isEmpty) {
+            m['link_account_id'] = null;
+          } else {
+            m['link_account_id'] = int.tryParse(raw) ?? base.linkAccountId;
+          }
+        }
+        if (v.contains('link_debt_id')) {
+          final String? raw = v.get<String>('link_debt_id');
+          if (raw == null) {
+            m['link_debt_id'] = base.linkDebtId;
+          } else if (raw.isEmpty) {
+            m['link_debt_id'] = null;
+          } else {
+            m['link_debt_id'] = int.tryParse(raw) ?? base.linkDebtId;
+          }
+        }
+        final AssetRecord row = AssetRecord.fromMap(m);
+        final AzWriteController write = context.read<AzWriteController>();
+        if (firstBuy) {
+          // 建档 + 首笔买入同一个事务，失败一起回滚，不会留下空标的。
+          await write.saveInvestmentWithFirstBuy(
+            record: row,
+            unitPrice: firstPrice,
+            quantity: firstQty,
+            fee: firstFee,
+          );
+        } else {
+          await write.saveAsset(row);
+        }
       },
     ),
   );
@@ -263,29 +371,40 @@ Liquidity _defaultLiquidity(AssetClass cls) => switch (cls) {
 
 /// 【资产大类 → 表单项】6.1「选完某一类，只展开这一类专属的几项」的落地表。
 ///
-/// 分两条字段链，依据是 6.2 的「由谁提供金额」，不是金额大小：
-///   · 收益不定的投资 A4/A5/A6：6.5 明确「由买卖记录自动算」，没有
-///     「每月给你多少钱 / 每月拿走多少钱」的概念。只填名字、成本、代码、
-///     赎回费、变现；估值按买入价，改价与买卖都在详情页操作。分红、
-///     手续费是已发生的事实，不在这里填「预计一年赚多少」。
-///   · 有约定 / 固定现金流的资产 A3/A7/A10：借出去的钱收利息、房子收租、
-///     生意分红，才显示月入与稳定性（6.3 / 6.6 / 6.7）；车、贵重物、其他
-///     显示各自的持有成本、折旧、计入开关。
-/// 两链共用 6.3 的名字 / 成本 / 变现 / 备注。不显示的字段靠 onSubmit 的
-/// `v.contains(key)` 保留原值，编辑老记录不丢数据。字段 key 全部沿用库里
-/// 已有的列，不新增表结构、不升 DB 版本；label 一律不超过 4 个字。
+/// 【先定规格再落地】九类逐项的「现实 → 设计原文 → 字段 → 落库列」见
+/// 《资产新增_全类型规格核对表.md》。本函数按那张表一次性实现，不再按
+/// 被点名的类型打补丁。依据：
+///   · 6.3 所有资产共用字段（含「什么时候买的 / 用哪张卡买的 / 这笔钱是
+///     借来买的吗 / 要不要算进总账」）—— 九类都要有，不是某几类专属；
+///   · 6.5.1 投资买入：名字+代码、哪天买的、单价/净值、股数/份数、
+///     另外交了多少钱、钱从哪张卡出、备注，一共花 = 单价×数量+费用；
+///   · 6.6 房产十字段（含关联房贷、现在还欠多少只读、证照、卖要扣）；
+///   · 6.7 车 / 贵重物 / 生意 / 借出款各自的专属字段（上牌年月、有没有
+///     凭证、去年分了多少、收回来多少、可能收不回）；
+///   · 6.2 大类构成决定子形态（A3 含应收退款/押金/待报销，A8 含电动车，
+///     A9 含数码设备，A6 含年金）；
+///   · 附二白话对照表、6.9 防错、10.9 准确性铁律。
 ///
-/// 【按类型细化】label 守住 4 字，容易填错的地方全放进 hint 与静态小字：
-/// 房产「成本」是落地总价、月出不含月供；车「成本」不是裸车价、年折旧
-/// 只是备注；金饰的工费卖时不算钱；投资「代码」只登记一次。
+/// 【界面短名按现实语义】现实里没有「成本 / 现值 / 月入」这种账本词：
+/// 借出款说「借了多少 / 还剩多少 / 每月收」，房子说「一共花 / 月租 /
+/// 每月交」，车说「落地价 / 月养 / 一年掉」。每个 label 都按类给白话短名，
+/// 一律 ≤ 4 字；细节进 hint 与静态小字。
 ///
-/// 【后续任务，本轮不做】投资类同一代码只登记一次后，「追加购买」入口
-/// 按需求设计放在该标的详情页（现在详情页已有通用「买入」），等账户
-/// 单写点联动时再收敛成投资专属入口。本轮不碰详情页，只在此登记。
+/// 【全部沿用已有列】created_at / link_account_id / link_debt_id /
+/// use_mode / depreciation_note / intention / counted 都是 az_assets 原本
+/// 就有的列，不升 DB 版本、不改 DDL。use_mode 与 depreciation_note 跨类
+/// 复用，因此详情页展示 label 同步按类改（见 asset_detail_screen.dart）。
+///
+/// 【追加购买，本轮不做】首次买入在新增里一次录完；后续追加才放详情页。
+/// 详情页的按钮一行未碰，等账户单写点联动时再收敛成投资专属入口。
 List<SheetFormItem> _assetItems(
   AssetClass cls,
   AssetRecord base,
   Set<String> usedCodes,
+  bool isNew,
+  List<_SelectOption> accountOptions,
+  List<_SelectOption> debtOptions,
+  String? debtBalanceNote,
 ) {
   final bool invest = cls.isInvestment;
   final bool property = cls == AssetClass.property;
@@ -293,12 +412,79 @@ List<SheetFormItem> _assetItems(
   final bool valuable = cls == AssetClass.valuable;
   final bool loan = cls == AssetClass.loan;
   final bool business = cls == AssetClass.business;
-  // 只有「有约定进账」的类别才问月入与稳不稳；投资不在此列。
+
+  // ── 逐类字段开关（对应规格核对表第 3 节矩阵，不再只照顾被点名的类）──
   final bool hasIncome = loan || property || business;
   final bool hasHoldCost = property || vehicle;
-  // 车补「退出费」：过户、违章处理也是变现摩擦（列已有，只改表单露出）。
   final bool hasExitCost =
       invest || property || vehicle || valuable || business;
+  final bool hasUseMode = loan || property;
+  final bool hasDepreciation = vehicle || valuable;
+  final bool hasDebtLink = property || vehicle;
+  // 6.3「所有资产共用的字段」：日期、付款卡、算不算、备注，九类全给；
+  // 投资类不手填 cost / latest_value / monthly_*，由买卖批次提供金额。
+  const bool hasDate = true;
+  const bool hasAccount = true;
+  const bool hasCounted = true;
+  final bool hasValue = !invest;
+  final bool hasIntention = !invest;
+
+  // ── 界面短名：按这一类在现实里怎么叫，不沿用通用账本词 ──────────
+  final String nameLabel = switch (cls) {
+    AssetClass.loan => '借给谁',
+    AssetClass.property => '哪套房',
+    AssetClass.vehicle => '哪辆车',
+    AssetClass.valuable => '什么东西',
+    AssetClass.business => '哪门生意',
+    _ => '名字',
+  };
+  final String costLabel = switch (cls) {
+    AssetClass.loan => '借了多少',
+    AssetClass.property => '一共花',
+    AssetClass.vehicle => '落地价',
+    AssetClass.valuable => '买时花',
+    AssetClass.business => '投了多少',
+    _ => '花了多少',
+  };
+  // 6.3「什么时候买的」按现实叫法：借出款是借出去那天，车是上牌日。
+  final String dateLabel = switch (cls) {
+    AssetClass.loan => '哪天借',
+    AssetClass.business => '哪天投',
+    AssetClass.vehicle => '上牌日',
+    AssetClass.property => '哪天买',
+    _ => '买入日',
+  };
+  final String valueLabel = loan ? '还剩多少' : '现在值';
+  final String incomeLabel = switch (cls) {
+    AssetClass.property => '月租',
+    AssetClass.business => '分红',
+    _ => '每月收',
+  };
+  final String outLabel = vehicle ? '月养' : '每月交';
+  final String exitLabel = switch (cls) {
+    AssetClass.stock => '赎回费',
+    AssetClass.fund => '赎回费',
+    AssetClass.otherInvest => '赎回费',
+    AssetClass.property => '卖要扣',
+    AssetClass.valuable => '卖要扣',
+    AssetClass.vehicle => '过户费',
+    AssetClass.business => '退股扣',
+    _ => '卖要扣',
+  };
+  final String liquidityLabel = switch (cls) {
+    AssetClass.loan => '多久还',
+    AssetClass.property => '多久卖',
+    AssetClass.vehicle => '多久卖',
+    AssetClass.valuable => '多久卖',
+    _ => '变现',
+  };
+  final String depreciationLabel =
+      valuable ? '凭证' : '一年掉';
+  final String debtLabel = property ? '房贷' : '车贷';
+  // 6.5.1：A4 单价/股数，A5 净值/份数，A6 按份额记。
+  final String priceLabel = cls == AssetClass.fund ? '净值' : '单价';
+  final String quantityLabel =
+      cls == AssetClass.stock ? '股数' : '份数';
 
   // 按大类给的白话提示：细节只进 hint / 静态小字，不撑长 label。
   final String nameHint = switch (cls) {
@@ -306,27 +492,34 @@ List<SheetFormItem> _assetItems(
     AssetClass.stock => '例如 贵州茅台',
     AssetClass.fund => '例如 沪深300',
     AssetClass.otherInvest => '例如 三年国债',
-    AssetClass.property => '出租的那套小房',
+    AssetClass.property => '出租的那套小房；车位单独写一条',
     AssetClass.vehicle => '家用车',
     AssetClass.valuable => '金条 100g',
     AssetClass.business => '和小李合开的店',
-    AssetClass.misc => '自己起个名',
+    _ => '自己起个名',
   };
   final String costHint = switch (cls) {
-    AssetClass.loan => '实际借出去的钱',
-    AssetClass.property => '含契税、中介、装修',
-    AssetClass.vehicle => '落地一共花的钱',
+    AssetClass.loan => '实际给出去的钱，不是借条面额',
+    AssetClass.property => '含首付、契税、中介、装修',
+    AssetClass.vehicle => '不是裸车价，是落地一共花的',
     AssetClass.valuable => '当时买花的钱',
     AssetClass.business => '投进去多少',
-    AssetClass.misc => _kAmountHint,
-    _ => '起始登记，买卖在详情记',
+    _ => _kAmountHint,
+  };
+  final String? valueHint = switch (cls) {
+    AssetClass.loan => '收回一部分就改这个数',
+    AssetClass.property => '一年改一次就行',
+    AssetClass.vehicle => '卖二手车大概能拿多少',
+    AssetClass.business => '自己填的，不是查来的',
+    AssetClass.valuable => '自己填的，不是查来的',
+    _ => null,
   };
   final String? noteHint = switch (cls) {
     AssetClass.loan => '借条、转账、利息约定写这儿',
     AssetClass.property => '产权、合同、交割写这儿',
-    AssetClass.vehicle => '发票、改装、事故写这儿',
-    AssetClass.valuable => '发票、证书、配件写这儿',
-    AssetClass.business => '协议、分红、账目写这儿',
+    AssetClass.vehicle => '发票、改装、事故、违章写这儿',
+    AssetClass.valuable => '发票、证书、克重、配件写这儿',
+    AssetClass.business => '协议、分红、账目、聊天记录写这儿',
     _ => null,
   };
   final String intentionLabel = switch (cls) {
@@ -342,106 +535,211 @@ List<SheetFormItem> _assetItems(
     AssetClass.property => '产权、共有、押证写一句',
     AssetClass.vehicle => '上牌、绿本、保单',
     AssetClass.valuable => '家里、保险箱',
-    AssetClass.business => '写个大概就行',
+    AssetClass.business => '写个大概就行，不做股权登记',
     _ => null,
   };
   final String monthlyInHint = switch (cls) {
     AssetClass.property => '每月到账；自住填 0',
-    AssetClass.business => '最近一次分红，不保证有',
-    _ => '每月到账，没利息填 0',
+    AssetClass.business => '最近一次分红折成每月，不保证有',
+    _ => '每月收多少；没约定利息就填 0',
   };
-  final String? latestValueHint = property ? '一年改一次就行' : null;
-  final String exitHint = invest
-      ? '卖出大概扣多少'
-      : (property
-          ? '中介费、税费估算'
-          : (vehicle ? '过户、违章处理' : '手续费'));
+  final String exitHint = switch (cls) {
+    AssetClass.stock => '卖出大概扣多少',
+    AssetClass.fund => '卖出大概扣多少',
+    AssetClass.otherInvest => '卖出大概扣多少',
+    AssetClass.property => '中介费、税费估算',
+    AssetClass.vehicle => '过户、违章处理',
+    AssetClass.valuable => '回收扣的手续费',
+    AssetClass.business => '退伙、转让的摩擦',
+    _ => '手续费',
+  };
+  final String depreciationHint = valuable
+      ? '发票、证书、原包装写一句'
+      : '例如 12%，只是备注，不参与计算';
+  final String? depreciationInitial =
+      hasDepreciation ? base.depreciationNote : null;
+
+  // A3 借出情形（6.2 的四类构成）；值直接存中文，详情页能白话回显。
+  // A7 沿用房贷原型里的 self/rent/empty/business 四档。
+  final String useModeLabel = loan ? '借出情形' : '用途';
+  final List<_SelectOption> useModeOptions = loan
+      ? const <_SelectOption>[
+          _SelectOption('', '熟人临时周转'),
+          _SelectOption('借条借款', '借条借款'),
+          _SelectOption('押金保证金', '押金保证金'),
+          _SelectOption('垫付待报销', '垫付待报销'),
+        ]
+      : const <_SelectOption>[
+          _SelectOption('', '自己住'),
+          _SelectOption('rent', '租给别人'),
+          _SelectOption('empty', '空着'),
+          _SelectOption('business', '做生意用'),
+        ];
+
+  // 每类 2~3 句白话：把这一类现实里最容易填错的地方讲清，静态小字。
+  // 不是「统一模板套一句」，内容按 6.2 / 6.5 / 6.6 / 6.7 逐类写。
+  final List<String> typeNotes = switch (cls) {
+    AssetClass.loan => <String>[
+        '没写利息，就先按没利息记',
+        '借出 − 还剩 = 已经收回来的',
+        '可能收不回，就把「算不算」关掉',
+      ],
+    AssetClass.stock => <String>[
+        '一共花 = 单价 × 股数 + 费用',
+        '按买入价；平时不算涨跌',
+        '买卖不写流水，暂不扣卡里的钱',
+      ],
+    AssetClass.fund => <String>[
+        '一共花 = 净值 × 份数 + 费用',
+        '份额可以填小数；确认净值以账单为准',
+        '按买入价；平时不算涨跌',
+      ],
+    AssetClass.otherInvest => <String>[
+        '一共花 = 单价 × 份数 + 费用',
+        '国债、年金有约定票息，暂不按月进账算',
+        '按买入价；平时不算涨跌',
+      ],
+    AssetClass.property => <String>[
+        '月供不用填在这儿，那笔在欠款里算过了',
+        '现在值一年改一次就行',
+        '真要卖，还要扣中介费和税费',
+      ],
+    AssetClass.vehicle => <String>[
+        '车一年比一年不值钱；软件不会自动改这里的数',
+        '落地价含购置税、保险、上牌',
+        '卖之前要过户、清违章',
+      ],
+    AssetClass.valuable => <String>[
+        '金饰的工费和牌子，卖的时候不算钱',
+        '默认不算进总账，你自己打开',
+      ],
+    AssetClass.business => <String>[
+        '投了多少是事实，现在值多少是自己填的',
+        '分红不保证有，先按「说不准」',
+      ],
+    _ => <String>['说不清的放这儿，不参与每月进出'],
+  };
 
   return <SheetFormItem>[
+    // ① 名字（6.2 / 6.3 / 6.7；按类叫「借给谁 / 哪套房 / 哪辆车」）
     SheetFormSingleLineTextItem(
       key: 'name',
-      label: '名称',
+      label: nameLabel,
       initialValue: base.name,
       hint: nameHint,
-      validator: (String v) => v.trim().isEmpty ? '请填名称' : null,
+      validator: (String v) => v.trim().isEmpty ? '请填$nameLabel' : null,
     ),
-    SheetFormSingleLineTextItem(
-      key: 'cost',
-      label: '成本',
-      initialValue: base.cost.toStringAsFixed(0),
-      hint: costHint,
-      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-      validator: (String v) {
-        final String e = _positive(v, '成本');
-        return e.isEmpty ? null : e;
-      },
-    ),
+    // ② 借出情形 / 用途（A3 按 6.2 的四类构成，A7 按 6.6 四档）
+    if (hasUseMode)
+      SheetFormCustomItem(
+        key: 'use_mode',
+        label: useModeLabel,
+        builder: (BuildContext ctx, ValueChanged<Object?> onChanged) =>
+            _InlineSelect(
+          options: useModeOptions,
+          initial: base.useMode,
+          onChanged: onChanged,
+        ),
+      ),
+    // ③ 一共花了多少（6.3；非投资手填，投资由首笔买入自动算）
+    if (!invest)
+      SheetFormSingleLineTextItem(
+        key: 'cost',
+        label: costLabel,
+        initialValue: base.cost.toStringAsFixed(0),
+        hint: costHint,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        validator: (String v) {
+          final String e = _positive(v, costLabel);
+          return e.isEmpty ? null : e;
+        },
+      ),
+    // ④ 6.5.1 首次买入：每个多少钱 / 买了多少 / 另外交了多少钱。
+    // 只在「新增」露出；编辑档案不重放首笔批次，避免改已有买卖记录。
+    if (invest && isNew) ...<SheetFormItem>[
+      SheetFormSingleLineTextItem(
+        key: 'unit_price',
+        label: priceLabel,
+        hint: cls == AssetClass.fund ? '每份多少钱' : '每个多少钱',
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        validator: (String v) {
+          final String e = _positive(v, priceLabel);
+          return e.isEmpty ? null : e;
+        },
+      ),
+      SheetFormSingleLineTextItem(
+        key: 'quantity',
+        label: quantityLabel,
+        hint: cls == AssetClass.fund
+            ? '份额，可以填小数'
+            : (cls == AssetClass.stock ? '股数' : '份数'),
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        validator: (String v) {
+          final String e = _positive(v, quantityLabel);
+          return e.isEmpty ? null : e;
+        },
+      ),
+      SheetFormSingleLineTextItem(
+        key: 'trade_fee',
+        label: '费用',
+        initialValue: '0',
+        hint: cls == AssetClass.fund
+            ? '申购费等，不填按 0'
+            : '佣金、过户费等，不填按 0',
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        validator: (String v) {
+          final String t = v.trim();
+          if (t.isEmpty) return null;
+          final double? f = double.tryParse(t);
+          return (f == null || f < 0) ? '费用不能是负数' : null;
+        },
+      ),
+    ],
+    // ⑤ 代码（用户硬需求：A4/A5/A6 同码禁止二次新增）
     if (invest)
       SheetFormSingleLineTextItem(
         key: 'code',
         label: '代码',
         initialValue: base.code,
         hint: '可不填；填了不能重复',
-        // 同一代码只登记一次（用户口径）。空代码放行；写侧还有一次
-        // 查库兜底，防止两个弹层同时提交绕过这里的即时校验。
         validator: (String v) {
           final String c = v.trim();
           if (c.isEmpty) return null;
           return usedCodes.contains(c) ? '这个代码已经登记过了' : null;
         },
       ),
-    if (!invest)
+    // ⑥ 什么时候买的（6.3 全类必填；A8 是上牌日、A3 是哪天借）
+    if (hasDate)
+      SheetFormSingleLineTextItem(
+        key: 'buy_date',
+        label: dateLabel,
+        initialValue: _ymd(base.createdAt),
+        hint: '例如 2026-11-22',
+        validator: (String v) =>
+            _date(v) == null ? '填 2026-11-22 这种日期' : null,
+      ),
+    // ⑦ 现在大概值多少（6.4 默认不填；A3 是「还剩多少」）
+    if (hasValue)
       SheetFormSingleLineTextItem(
         key: 'latest_value',
-        label: '现值',
+        label: valueLabel,
         initialValue: base.latestValue?.toStringAsFixed(0) ?? '',
-        hint: latestValueHint,
+        hint: valueHint,
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
       ),
+    // ⑧ 每月进 / 稳不稳（6.3；只有 A3/A7/A10 现实里有进账）
     if (hasIncome)
       SheetFormSingleLineTextItem(
         key: 'monthly_in',
-        label: property ? '月租' : '月入',
+        label: incomeLabel,
         initialValue: base.monthlyIn.toStringAsFixed(0),
         hint: monthlyInHint,
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
       ),
-    if (hasHoldCost)
-      SheetFormSingleLineTextItem(
-        key: 'monthly_out',
-        label: vehicle ? '月养' : '月出',
-        initialValue: base.monthlyOut.toStringAsFixed(0),
-        // 房产的月出只填自己的持有成本，月供在欠款里算，不重复扣。
-        hint: vehicle
-            ? '保险、油电、保养、停车摊月'
-            : '物业、供暖、保险、维修摊月；月供不填',
-        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-      ),
-    if (hasExitCost)
-      SheetFormSingleLineTextItem(
-        key: 'exit_cost',
-        label: invest ? '赎回费' : '退出费',
-        initialValue: base.exitCost.toStringAsFixed(0),
-        hint: exitHint,
-        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-      ),
-    SheetFormCustomItem(
-      key: 'liquidity',
-      label: '变现',
-      builder: (BuildContext ctx, ValueChanged<Object?> onChanged) =>
-          _InlineSelect(
-        options: <_SelectOption>[
-          for (final Liquidity l in Liquidity.values)
-            _SelectOption(l.dbValue.toString(), l.label)
-        ],
-        initial: base.liquidity.dbValue.toString(),
-        onChanged: onChanged,
-      ),
-    ),
     if (hasIncome)
       SheetFormCustomItem(
         key: 'stability',
-        label: '稳定性',
+        label: '稳不稳',
         builder: (BuildContext ctx, ValueChanged<Object?> onChanged) =>
             _InlineSelect(
           options: <_SelectOption>[
@@ -452,72 +750,113 @@ List<SheetFormItem> _assetItems(
           onChanged: onChanged,
         ),
       ),
-    if (property)
+    // ⑨ 每月出（6.3 / 6.6 / 6.7；房产不含月供，车是月养）
+    if (hasHoldCost)
+      SheetFormSingleLineTextItem(
+        key: 'monthly_out',
+        label: outLabel,
+        initialValue: base.monthlyOut.toStringAsFixed(0),
+        hint: vehicle
+            ? '保险、油电、保养、停车摊月'
+            : '物业、供暖、保险、维修摊月；月供不填',
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      ),
+    // ⑩ 提前取要扣多少（6.3 / 6.6 / 6.7，按类叫卖要扣 / 过户费 / 赎回费）
+    if (hasExitCost)
+      SheetFormSingleLineTextItem(
+        key: 'exit_cost',
+        label: exitLabel,
+        initialValue: base.exitCost.toStringAsFixed(0),
+        hint: exitHint,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      ),
+    // ⑪ 多久能变成现金（6.3 全类必填）
+    SheetFormCustomItem(
+      key: 'liquidity',
+      label: liquidityLabel,
+      builder: (BuildContext ctx, ValueChanged<Object?> onChanged) =>
+          _InlineSelect(
+        options: <_SelectOption>[
+          for (final Liquidity l in Liquidity.values)
+            _SelectOption(l.dbValue.toString(), l.label)
+        ],
+        initial: base.liquidity.dbValue.toString(),
+        onChanged: onChanged,
+      ),
+    ),
+    // ⑫ 这笔钱是借来买的吗（6.3 / 6.6 / 原型 linkDebt）+ 现在还欠多少只读
+    if (hasDebtLink)
       SheetFormCustomItem(
-        key: 'use_mode',
-        label: '用途',
+        key: 'link_debt_id',
+        label: debtLabel,
         builder: (BuildContext ctx, ValueChanged<Object?> onChanged) =>
             _InlineSelect(
-          options: const <_SelectOption>[
-            _SelectOption('', '自己住'),
-            _SelectOption('rent', '租给别人'),
-            _SelectOption('empty', '空着'),
-            _SelectOption('business', '做生意用'),
-          ],
-          initial: base.useMode,
+          options: debtOptions,
+          initial: base.linkDebtId?.toString() ?? '',
           onChanged: onChanged,
         ),
       ),
-    if (vehicle)
+    if (hasDebtLink && debtBalanceNote != null)
+      SheetFormNoteItem(
+        key: 'debt_balance',
+        text: debtBalanceNote!,
+        centered: true,
+      ),
+    // ⑬ 一年掉多少 / 有没有凭证（6.7；同一 TEXT 列按类复用）
+    if (hasDepreciation)
       SheetFormSingleLineTextItem(
         key: 'depreciation_note',
-        label: '年折旧',
-        initialValue: base.depreciationNote,
-        // 只是备注，不参与任何计算：软件不会每年自动把车价调小。
-        hint: '例如 12%，只是备注',
+        label: depreciationLabel,
+        initialValue: depreciationInitial ?? '',
+        hint: depreciationHint,
       ),
-    // 房产也允许「先不算进总账」（需求 5.2 变现组）；贵重物默认关。
-    if (vehicle || valuable || property || cls == AssetClass.misc)
-      SheetFormToggleItem(
-        key: 'counted',
-        label: '计入',
-        initialValue: base.counted,
-      ),
-    if (!invest)
+    // ⑭ 按类的一句话：约定还日 / 证照 / 手续 / 放在哪 / 占多少 / 用途
+    if (hasIntention)
       SheetFormSingleLineTextItem(
         key: 'intention',
         label: intentionLabel,
         hint: intentionHint,
         initialValue: base.intention,
       ),
+    // ⑮ 用哪张卡买的（6.3 全类；只记录，不改余额，见下方静态句）
+    if (hasAccount)
+      SheetFormCustomItem(
+        key: 'link_account_id',
+        label: '付款卡',
+        builder: (BuildContext ctx, ValueChanged<Object?> onChanged) =>
+            _InlineSelect(
+          options: accountOptions,
+          initial: base.linkAccountId?.toString() ?? '',
+          onChanged: onChanged,
+        ),
+      ),
+    // ⑯ 要不要算进总账（6.3 全类必填；6.7「可能收不回」由用户决定）
+    if (hasCounted)
+      SheetFormToggleItem(
+        key: 'counted',
+        label: '算不算',
+        initialValue: base.counted,
+      ),
+    // ⑰ 随便写（6.3 备注；照片/凭证无列，见说明里的待拍板项）
     SheetFormMultiLineTextItem(
       key: 'note',
-      label: '备注',
+      label: '随便写',
       hint: noteHint,
       initialValue: base.note,
       minLines: 2,
       maxLines: 3,
       showCounter: false,
     ),
-    if (invest)
-      const SheetFormNoteItem(
-        key: 'hint',
-        text: '按买入价',
-        centered: true,
-      ),
-    // 每类一句白话，把外行最容易填错的地方说清楚；不是新组件，只是
-    // 公共 [SheetFormNoteItem] 的一段静态小字，label 长度约束不适用。
-    if (!invest)
+    const SheetFormNoteItem(
+      key: 'account_hint',
+      text: '选哪张卡只是记下来，暂不改卡里的钱',
+      centered: true,
+    ),
+    // ⑱ 每类 2~3 句现实白话（按 6.2 / 6.5 / 6.6 / 6.7 逐类写，不是模板）
+    for (int i = 0; i < typeNotes.length; i++)
       SheetFormNoteItem(
-        key: 'type_hint',
-        text: switch (cls) {
-          AssetClass.loan => '没写利息，就先按没利息记',
-          AssetClass.property => '月供不用填在这儿，那笔在欠款里算过了',
-          AssetClass.vehicle => '车一年比一年不值钱；软件不会自动改这里的数',
-          AssetClass.valuable => '金饰的工费和牌子，卖的时候不算钱',
-          AssetClass.business => '投了多少是事实，现在值多少是自己填的',
-          _ => '说不清的放这儿，不参与每月进出',
-        },
+        key: 'type_note_$i',
+        text: typeNotes[i],
         centered: true,
       ),
   ];
@@ -1262,8 +1601,9 @@ IconData _classIcon(String key) => switch (key) {
       _ => AppIcons.other,
     };
 
-String _todayText() {
-  final DateTime d = DateTime.now();
-  return '${d.year}-${d.month.toString().padLeft(2, '0')}-'
-      '${d.day.toString().padLeft(2, '0')}';
-}
+/// 日期统一写成 yyyy-mm-dd：买入日 / 上牌日 / 哪天借的都用它回显。
+String _ymd(DateTime d) =>
+    '${d.year}-${d.month.toString().padLeft(2, '0')}-'
+    '${d.day.toString().padLeft(2, '0')}';
+
+String _todayText() => _ymd(DateTime.now());
