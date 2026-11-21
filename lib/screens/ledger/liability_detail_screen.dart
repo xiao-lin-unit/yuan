@@ -39,9 +39,9 @@ class LiabilityDetailScreen extends StatelessWidget {
     final LiabilityRecord? debt = az.liabilityById(debtId);
     if (debt == null) {
       return AppDetailPage(
-        title: '找不到这一笔',
+        title: '未找到',
         child: Center(
-          child: Text('它可能已经进了回收站。', style: context.appText.body),
+          child: Text('可能已删除', style: context.appText.body),
         ),
       );
     }
@@ -76,7 +76,7 @@ class LiabilityDetailScreen extends StatelessWidget {
       floating: AppFloatingActions(
         actions: <AppFloatingAction>[
           AppFloatingAction(
-            label: '记一笔还款',
+            label: '还款',
             icon: AppIcons.repay,
             emphasized: true,
             onPressed: () => unawaited(
@@ -84,12 +84,12 @@ class LiabilityDetailScreen extends StatelessWidget {
             ),
           ),
           AppFloatingAction(
-            label: '算一下提前还',
+            label: '提前还',
             icon: AppIcons.balanceAdjust,
             onPressed: () => unawaited(showAzPrepaySheet(context, debt)),
           ),
           AppFloatingAction(
-            label: '编辑这一笔',
+            label: '编辑',
             icon: AppIcons.edit,
             onPressed: () => unawaited(
               showAzLiabilitySheet(context, existing: debt),
@@ -101,14 +101,14 @@ class LiabilityDetailScreen extends StatelessWidget {
             onPressed: () => unawaited(
               showAzDeleteSheet(
                 context,
-                title: '把「${debt.name}」放进回收站？',
+                title: '删除「${debt.name}」？',
                 description:
                     '${plans.length} 期还款计划会保留，30 天内可恢复。',
                 onConfirm: () async {
                   await context.read<AzWriteController>().softDelete(
                         AzDb.liabilitiesTable,
                         debt.id!,
-                        '从负债详情页删除',
+                        '删除欠款',
                       );
                   if (context.mounted) context.pop();
                 },
@@ -122,7 +122,7 @@ class LiabilityDetailScreen extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
           AppSummaryHero(
-            label: '现在还欠多少',
+            label: '欠款',
             value: MoneyFormat.yuan0(debt.principal),
             caption: debt.totalTerms == 0
                 ? '${debt.repayMethod.label}：${debt.repayMethod.hint}'
@@ -132,11 +132,11 @@ class LiabilityDetailScreen extends StatelessWidget {
             progress: progress,
             secondary: <AppInfoItem>[
               AppInfoItem(
-                label: '这个月要还',
+                label: '本月还',
                 value: MoneyFormat.yuan0(debt.monthlyPay),
               ),
               AppInfoItem(
-                label: '这个月白给银行的',
+                label: '本月成本',
                 value: MoneyFormat.yuan0(debt.monthlyCost),
               ),
             ],
@@ -144,39 +144,39 @@ class LiabilityDetailScreen extends StatelessWidget {
           const SizedBox(height: AppLayout.sectionGap),
           AppInfoGrid(
             items: <AppInfoItem>[
-              AppInfoItem(label: '欠的什么钱', value: debt.type.label),
-              AppInfoItem(label: '借来干了什么', value: debt.purpose.label),
+              AppInfoItem(label: '类型', value: debt.type.label),
+              AppInfoItem(label: '用途', value: debt.purpose.label),
               AppInfoItem(
-                label: '实际一年要付多少',
+                label: '实际年化',
                 value: '${(realRate * 100).toStringAsFixed(1)}%',
               ),
               AppInfoItem(
-                label: '合同上写的那个数',
+                label: '合同利率',
                 value: '${(debt.rate * 100).toStringAsFixed(1)}%',
               ),
-              AppInfoItem(label: '利率会不会变', value: debt.rateType.label),
+              AppInfoItem(label: '利率型', value: debt.rateType.label),
               AppInfoItem(label: '怎么还', value: debt.repayMethod.label),
               AppInfoItem(
-                label: '其中本金',
+                label: '本金',
                 value: MoneyFormat.yuan0(debt.monthlyPrincipal),
               ),
               AppInfoItem(
-                label: '其中利息',
+                label: '利息',
                 value: MoneyFormat.yuan0(debt.monthlyInterest),
               ),
               AppInfoItem(
-                label: '其中手续费',
+                label: '手续费',
                 value: MoneyFormat.yuan0(debt.monthlyFee),
               ),
               AppInfoItem(
-                label: '每月几号还',
+                label: '还款日',
                 value: debt.payDay == null ? '—' : '${debt.payDay} 号',
               ),
-              AppInfoItem(label: '从哪张卡扣', value: accountName),
-              AppInfoItem(label: '这笔钱买来的东西', value: assetName),
+              AppInfoItem(label: '扣款卡', value: accountName),
+              AppInfoItem(label: '关联资产', value: assetName),
               AppInfoItem(label: '状态', value: debt.status.label),
               if (debt.feeNote.isNotEmpty)
-                AppInfoItem(label: '除了利息还交了什么', value: debt.feeNote),
+                AppInfoItem(label: '其他费用', value: debt.feeNote),
             ],
           ),
           const SizedBox(height: AppLayout.sectionGap),
@@ -197,8 +197,8 @@ class LiabilityDetailScreen extends StatelessWidget {
               ),
             ),
           AppFunctionSection(
-            title: '每一期要还多少',
-            actionLabel: '先还哪一笔最划算 ›',
+            title: '每期还款',
+            actionLabel: '还款顺序 ›',
             onAction: () => unawaited(showAzPayoffSheet(context)),
             child: plans.isEmpty
                 ? const AzSmallEmpty('暂无逐期计划')
@@ -276,7 +276,7 @@ class LiabilityDetailScreen extends StatelessWidget {
     for (final dynamic a in accounts.all) {
       if (a.id == id) return a.name as String;
     }
-    return '原来那张卡已删除';
+    return '原卡已删除';
   }
 
   static String _dateText(DateTime d) =>

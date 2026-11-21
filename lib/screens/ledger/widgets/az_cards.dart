@@ -174,21 +174,21 @@ class _AzNetWorthCardState extends State<AzNetWorthCard> {
       children: <Widget>[
         // 配色 A 方案：资债页这一张用主色表面，字走 onEmphasis（不是硬写白）。
         AppSummaryHero(
-          label: '真正属于你的钱',
+          label: '家底',
           value: MoneyFormat.yuan0(widget.netWorth),
           caption: widget.caption,
           emphasized: true,
           secondary: <AppInfoItem>[
             AppInfoItem(
-              label: '能马上拿出来的',
+              label: '可动用',
               value: MoneyFormat.yuan0(widget.cashNow),
             ),
             AppInfoItem(
-              label: '每月自动进来',
+              label: '月入',
               value: MoneyFormat.yuan0(widget.monthlyIn),
             ),
             AppInfoItem(
-              label: '每月自动出去',
+              label: '月出',
               value: MoneyFormat.yuan0(widget.monthlyOut),
             ),
           ],
@@ -209,7 +209,7 @@ class _AzNetWorthCardState extends State<AzNetWorthCard> {
                     children: <Widget>[
                       Expanded(
                         child: Text(
-                          '这笔数是怎么算出来的',
+                          '算法',
                           style: context.appText.menuTitle,
                         ),
                       ),
@@ -235,35 +235,35 @@ class _AzNetWorthCardState extends State<AzNetWorthCard> {
                     mainAxisSize: MainAxisSize.min,
                     children: <Widget>[
                       AzKeyValueRow(
-                        label: '① 你卡里和手上的钱',
+                        label: '① 卡里的钱',
                         value: MoneyFormat.yuan0(a1),
                       ),
                       AzKeyValueRow(
-                        label: '② 暂时动不了的钱',
+                        label: '② 动不了的',
                         value: MoneyFormat.yuan0(a2),
                       ),
                       AzKeyValueRow(
-                        label: '③ 除了钱以外的东西',
+                        label: '③ 其他东西',
                         value: MoneyFormat.yuan0(widget.selfAssets),
                       ),
                       AzHint(widget.valuationNote),
                       AzKeyValueRow(
-                        label: '东西一共值',
+                        label: '东西合计',
                         value: MoneyFormat.yuan0(widget.assetsTotal),
                         total: true,
                       ),
                       AzKeyValueRow(
-                        label: '减：你欠的钱',
+                        label: '减：欠款',
                         value: '−${MoneyFormat.yuan0(widget.debtsTotal)}',
                         minus: true,
                       ),
                       AzKeyValueRow(
-                        label: '减：万一要你还的钱',
+                        label: '减：待还',
                         value: '不计入（${widget.contingentCount} 笔）',
                         valueColor: context.appText.caption.color,
                       ),
                       AzKeyValueRow(
-                        label: '真正属于你的钱',
+                        label: '家底',
                         value: MoneyFormat.yuan0(widget.netWorth),
                         total: true,
                         valueColor: t.accentOnEmphasis,
@@ -402,7 +402,7 @@ class AzFlowCard extends StatelessWidget {
                   context,
                   '不上班也能剩',
                   MoneyFormat.yuan0(flow.passiveLeft),
-                  '进来的减出去的',
+                  '净变动',
                   flow.passiveLeft >= 0 ? t.income : t.expense,
                 ),
               ),
@@ -727,7 +727,7 @@ class AzDebtHero extends StatelessWidget {
                     Text(
                       incomeSet
                           ? '占每月到手 ${(ratio * 100).toStringAsFixed(0)}%'
-                          : '还没填每月到手的钱',
+                          : '未填月收入',
                       style: context.appText.caption,
                     ),
                   ],
@@ -795,7 +795,7 @@ class AzBurnCard extends StatelessWidget {
             Row(
               children: <Widget>[
                 Expanded(
-                  child: Text('这个月白给银行的', style: context.appText.caption),
+                  child: Text('本月成本', style: context.appText.caption),
                 ),
                 Text(
                   MoneyFormat.yuan0(cost),
@@ -931,7 +931,7 @@ class AzMiniGrid3 extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.xxs),
           Text(
-            onTap == null ? '只算会变的那些' : '点开看',
+            onTap == null ? '仅浮动' : '点开看',
             style: context.appText.caption,
           ),
         ],
@@ -1035,7 +1035,7 @@ class AzDueList extends StatelessWidget {
     if (debts.isEmpty) {
       return const Padding(
         padding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
-        child: AzSmallEmpty('未来 3 个月没有到期的'),
+        child: AzSmallEmpty('3 月内无到期'),
       );
     }
     return Padding(
@@ -1168,7 +1168,7 @@ class AzContingentList extends StatelessWidget {
             child: TextButton.icon(
               onPressed: onAdd,
               icon: const Icon(AppIcons.add, size: AppIconSize.small),
-              label: Text(insured ? '记一笔有人替我付' : '记一笔可能要我还'),
+              label: Text(insured ? '替我付' : '要我还'),
             ),
           ),
           Text(

@@ -8,6 +8,7 @@ import 'package:yuan/styles/app_typography.dart';
 import '../../database/account/account_record.dart';
 import '../../database/ledger/az_math.dart';
 import '../../database/ledger/az_record.dart';
+import '../../screens/commons/function/app_floating_actions.dart';
 import '../../screens/commons/function/app_function_layout.dart';
 import '../../screens/commons/home/app_home_page.dart';
 import '../../screens/commons/icons/app_icons.dart';
@@ -65,7 +66,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
   }
 
   /// 【新增两步：先选类型，再只填这一类专属字段】工作逻辑：
-  ///   ① 点右上角「新增资产 / 新增欠款」→ 弹一排图标（CategorySheetContent，
+  ///   ① 点右下角「新增资产 / 新增欠款」→ 弹一排图标（CategorySheetContent，
   ///      契约第 5 条）选一次大类 / 类型，6.1 与 7.2 要求「只选一次」；
   ///   ② 把选中的枚举传给表单的 presetClass / presetType，表单构造期就定死
   ///      items，运行期不换字段 —— 静态优先，没有第二套状态；
@@ -108,14 +109,14 @@ class _LedgerScreenState extends State<LedgerScreen> {
         .length;
 
     final String valuationNote = d.preferences.valuationMode == ValuationMode.cost
-        ? '按买入价算'
-        : '按你填的最新价算';
+        ? '按买入价'
+        : '按最新价';
     final String staleNote = stale.isEmpty
         ? ''
-        : '${stale.length} 样的价很久没更新，总数可能不准。';
+        : '${stale.length} 样价待更新。';
     final String caption = netWorth >= 0
-        ? '全部东西减掉欠款'
-        : '欠的比手上有的还多 ${MoneyFormat.yuan0(-netWorth)}';
+        ? '减掉欠款'
+        : '倒欠 ${MoneyFormat.yuan0(-netWorth)}';
 
     final AzViewData viewData = AzViewData(
       data: d,
@@ -135,21 +136,24 @@ class _LedgerScreenState extends State<LedgerScreen> {
         0,
         AppLayout.pageBottom,
       ),
+      // 新增入口固定在右下角：单按钮形态直接显示一枚正圆主色 FAB，
+      // 只画图标、名称走 tooltip（hover / 长按），不占顶部动作行、
+      // 不埋在滚动列表里。随 tab 换动作，仍是「一个功能一个入口」。
+      floating: AppFloatingActions(
+        actions: <AppFloatingAction>[
+          AppFloatingAction(
+            label: _tab == _AzTab.asset ? '新增资产' : '新增欠款',
+            icon: AppIcons.add,
+            emphasized: true,
+            onPressed: _tab == _AzTab.asset
+                ? viewActions.addAsset
+                : viewActions.addDebt,
+          ),
+        ],
+      ),
       actions: <Widget>[
-        // 【新增入口固定在首屏】原先藏在滚动列表中部（三个分组 / 欠的每一笔
-        // 之后），要滑过整屏才看得见。AppHomePage.actions 在滚动区之外、
-        // 恒定可见，且契约注释里本就写着「右上角动作（新增 / 更多）」。
-        // 用主色实心按钮 + 随 tab 切换的文案，比原来的描边文字按钮醒目；
-        // 两个视图里那两处 OutlinedButton 已删除，保持「一个功能一个入口」。
-        FilledButton.icon(
-          onPressed: _tab == _AzTab.asset
-              ? viewActions.addAsset
-              : viewActions.addDebt,
-          icon: const Icon(AppIcons.add, size: AppIconSize.small),
-          label: Text(_tab == _AzTab.asset ? '新增资产' : '新增欠款'),
-        ),
         IconButton(
-          tooltip: '搜资产、负债、类型、备注',
+          tooltip: '搜索',
           icon: const Icon(AppIcons.search),
           onPressed: () => setState(() {
             _searchVisible = !_searchVisible;
@@ -157,12 +161,12 @@ class _LedgerScreenState extends State<LedgerScreen> {
           }),
         ),
         IconButton(
-          tooltip: '几个要自己填的数',
+          tooltip: '设置',
           icon: const Icon(AppIcons.edit),
           onPressed: () => unawaited(showAzPreferenceSheet(context)),
         ),
         IconButton(
-          tooltip: '按月末存一次数',
+          tooltip: '存快照',
           icon: const Icon(AppIcons.calendarMonth),
           onPressed: () => unawaited(showAzSnapshotSheet(context)),
         ),
@@ -212,6 +216,10 @@ class _LedgerScreenState extends State<LedgerScreen> {
               AzLiabilityView(view: viewData, actions: viewActions),
           ] else
             _searchResults(context, keyword, d),
+          // 给右下角 FAB 让出高度，滚动到底时最后一行不被压住。
+          const SizedBox(
+            height: AppComponentSize.fabSize + AppSpacing.md * 2,
+          ),
         ],
       ),
     );
@@ -228,7 +236,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
           controller: _search,
           autofocus: true,
           decoration: InputDecoration(
-            hintText: '搜资产、负债、类型、备注',
+            hintText: '搜索',
             prefixIcon: const Icon(AppIcons.search, size: AppIconSize.medium),
             suffixIcon: IconButton(
               tooltip: '清空',
@@ -295,10 +303,10 @@ class _LedgerScreenState extends State<LedgerScreen> {
             AzDebtCard(
               debt: x,
               rateText:
-                  '实际一年 ${(AzMath.realAnnualRate(x) * 100).toStringAsFixed(1)}%',
+                  '年化 ${(AzMath.realAnnualRate(x) * 100).toStringAsFixed(1)}%',
               costText: x.monthlyCost > 0
-                  ? '每月白给 ${MoneyFormat.yuan0(x.monthlyCost)}'
-                  : '这个月不产生利息',
+                  ? '成本 ${MoneyFormat.yuan0(x.monthlyCost)}'
+                  : '无利息',
               leverageText: '',
               subText: x.purpose.label,
               onTap: () => a.openDebt(x),

@@ -46,7 +46,7 @@ Future<void> showAzValuationModeSheet(
   await AppSheetShell.show<ValuationMode>(
     context,
     header: const SheetHeader(
-      title: '总账按哪个价算',
+      title: '估值口径',
       centered: true,
       leading: SheetCancelAction(),
     ),
@@ -54,17 +54,17 @@ Future<void> showAzValuationModeSheet(
       options: const <SheetOption<ValuationMode>>[
         SheetOption<ValuationMode>(
           value: ValuationMode.cost,
-          label: '保守：按买入价（推荐）',
+          label: '买入价',
           icon: AppIcons.balanceAdjust,
         ),
         SheetOption<ValuationMode>(
           value: ValuationMode.latest,
-          label: '按我填的最新价',
+          label: '最新价',
           icon: AppIcons.investment,
         ),
       ],
       initialValue: current,
-      actionLabel: '就用这个口径',
+      actionLabel: '确定',
       onApplyAsync: (ValuationMode v) async {
         await context.read<AzWriteController>().setPreference(
               'valuation_mode',
@@ -83,7 +83,7 @@ Future<void> showAzDebtRatioSheet(
   await AppSheetShell.show<DebtRatioLevel>(
     context,
     header: const SheetHeader(
-      title: '每月要还的钱，多少算安全',
+      title: '偿债档位',
       centered: true,
       leading: SheetCancelAction(),
     ),
@@ -92,12 +92,12 @@ Future<void> showAzDebtRatioSheet(
         for (final DebtRatioLevel l in DebtRatioLevel.values)
           SheetOption<DebtRatioLevel>(
             value: l,
-            label: '${l.label}：月还款占月收入 ${(l.limit * 100).toStringAsFixed(0)}% 以内',
+            label: '${l.label}：≤ ${(l.limit * 100).toStringAsFixed(0)}%',
             icon: AppIcons.about,
           ),
       ],
       initialValue: current,
-      actionLabel: '就用这一档',
+      actionLabel: '确定',
       onApplyAsync: (DebtRatioLevel v) async {
         await context.read<AzWriteController>().setPreference(
               'debt_ratio_level',
@@ -118,8 +118,8 @@ Future<void> showAzPreferenceSheet(BuildContext context) async {
   await AppSheetShell.show<void>(
     context,
     header: SheetHeader(
-      title: '几个要自己填的数',
-      subtitle: '不填显示「—」',
+      title: '口径设置',
+      subtitle: '可跳过',
       centered: true,
       leading: const SheetCancelAction(),
       trailing: SheetTextAction(
@@ -135,42 +135,42 @@ Future<void> showAzPreferenceSheet(BuildContext context) async {
       items: <SheetFormItem>[
         SheetFormSingleLineTextItem(
           key: 'monthly_income',
-          label: '每月到手的钱',
+          label: '月收入',
           initialValue: p.monthlyIncome == 0 ? '' : p.monthlyIncome.toStringAsFixed(0),
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
         ),
         SheetFormSingleLineTextItem(
           key: 'must_cost',
-          label: '每月必须花的钱',
+          label: '月支出',
           initialValue: p.mustCost == 0 ? '' : p.mustCost.toStringAsFixed(0),
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
         ),
         SheetFormSingleLineTextItem(
           key: 'emergency_months',
-          label: '想留几个月急用的钱',
+          label: '备用月数',
           initialValue: p.emergencyMonths.toString(),
           keyboardType: TextInputType.number,
         ),
         SheetFormSingleLineTextItem(
           key: 'inflation_rate',
-          label: '东西一年大概贵百分之几（可跳过）',
+          label: '通胀率',
           initialValue: p.inflationRate == 0 ? '' : p.inflationRate.toStringAsFixed(1),
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
         ),
         SheetFormSingleLineTextItem(
           key: 'stale_days',
-          label: '多久没更新价就提醒（天）',
+          label: '提醒天数',
           initialValue: p.staleDays.toString(),
           keyboardType: TextInputType.number,
         ),
         SheetFormToggleItem(
           key: 'hide_zero',
-          label: '隐藏已经还清的欠款',
+          label: '隐藏还清',
           initialValue: p.hideZero,
         ),
         SheetFormToggleItem(
           key: 'include_debt_cost_in_expense',
-          label: '借钱的成本计入「这个月一共花了多少」',
+          label: '计入支出',
           initialValue: p.includeDebtCostInExpense,
         ),
       ],
@@ -221,13 +221,13 @@ Future<void> showAzSnapshotSheet(BuildContext context) async {
   await AppSheetShell.show<void>(
     context,
     header: const SheetHeader(
-      title: '按月末存一次数',
-      subtitle: '存下就锁定',
+      title: '存快照',
+      subtitle: '存快照',
       centered: true,
       leading: SheetCancelAction(),
     ),
     child: ConfirmSheetContent(
-      title: '把 $month 的数存下来？',
+      title: '存 $month？',
       description:
           '存下 $month 的数：卡里和动不了的 ${MoneyFormat.yuan0(accountTotal)}、'
           '除了钱以外的 ${MoneyFormat.yuan0(AzMath.selfAssets(d))}、'
@@ -246,7 +246,7 @@ Future<void> showAzSnapshotSheet(BuildContext context) async {
                 netWorth: assetTotal - debtTotal,
                 valuationMode: d.preferences.valuationMode,
                 snapshotAt: today,
-                note: '按月末存一次数',
+                note: '存快照',
               ),
             );
       },
@@ -271,7 +271,7 @@ Future<void> showAzLeverageSheet(BuildContext context) async {
   await AppSheetShell.show<void>(
     context,
     header: const SheetHeader(
-      title: '借钱买的东西划不划算',
+      title: '划不划算',
       centered: true,
       leading: SheetCancelAction(),
     ),
@@ -279,7 +279,7 @@ Future<void> showAzLeverageSheet(BuildContext context) async {
       builder: (BuildContext sheetContext) => OverviewSheetContent(
         metrics: list.isEmpty
             ? const <SheetMetric>[
-                SheetMetric(label: '连着东西的债', value: '0 笔'),
+                SheetMetric(label: '关联债', value: '0 笔'),
               ]
             : <SheetMetric>[
                 for (final AzLeverage l in list)
@@ -298,8 +298,8 @@ Future<void> showAzLeverageSheet(BuildContext context) async {
             ),
         ],
         updatedAt: list.isEmpty
-            ? '暂无连着东西的债。'
-            : '只算标了「每月都有」的进账。',
+            ? '无关联'
+            : '仅每月进账',
         actionLabel: '知道了',
         onAction: () => SheetActions.close(sheetContext),
       ),
@@ -328,16 +328,16 @@ Future<void> showAzGapSheet(BuildContext context) async {
   await AppSheetShell.show<void>(
     context,
     header: const SheetHeader(
-      title: '这个月要还的，那个月拿得出来吗',
-      subtitle: '未来 12 个月',
+      title: '偿债缺口',
+      subtitle: '12 个月',
       centered: true,
       leading: SheetCancelAction(),
     ),
     child: Builder(
       builder: (BuildContext sheetContext) => OverviewSheetContent(
         metrics: <SheetMetric>[
-          SheetMetric(label: '最紧张的是', value: worst.month),
-          SheetMetric(label: '那个月要还', value: MoneyFormat.yuan0(worst.pay)),
+          SheetMetric(label: '最紧月', value: worst.month),
+          SheetMetric(label: '当月还', value: MoneyFormat.yuan0(worst.pay)),
           SheetMetric(
             label: worst.gap > 0 ? '还差' : '都还得上',
             value: MoneyFormat.yuan0(worst.gap > 0 ? worst.gap : 0),
@@ -381,7 +381,7 @@ Future<void> showAzPayoffSheet(BuildContext context) async {
   await AppSheetShell.show<void>(
     context,
     header: const SheetHeader(
-      title: '先还哪一笔最划算',
+      title: '还款顺序',
       centered: true,
       leading: SheetCancelAction(),
     ),
@@ -389,13 +389,13 @@ Future<void> showAzPayoffSheet(BuildContext context) async {
       builder: (BuildContext sheetContext) => OverviewSheetContent(
         metrics: <SheetMetric>[
           SheetMetric(
-            label: order.isEmpty ? '现在没有欠款' : '先还：${order.first.name}',
+            label: order.isEmpty ? '无欠款' : '先还：${order.first.name}',
             value: order.isEmpty
                 ? '—'
                 : '${(topRate * 100).toStringAsFixed(1)}%',
           ),
-          SheetMetric(label: '一年大约能少付', value: MoneyFormat.yuan0(oneYearSave)),
-          SheetMetric(label: '一共几笔', value: '${order.length} 笔'),
+          SheetMetric(label: '年少付', value: MoneyFormat.yuan0(oneYearSave)),
+          SheetMetric(label: '笔数', value: '${order.length} 笔'),
         ],
         trend: <SheetTrendPoint>[
           for (final LiabilityRecord x in order)

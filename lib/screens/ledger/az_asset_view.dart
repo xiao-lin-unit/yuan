@@ -91,8 +91,8 @@ class AzAssetView extends StatelessWidget {
         _chips(context, all, pick, stale.length),
         // ── A1/A2 只读镜像 ──────────────────────────────────────
         AppFunctionSection(
-          title: '钱（记在账户页，这里只看）',
-          actionLabel: '去账户页改 ›',
+          title: '卡里的钱',
+          actionLabel: '去改 ›',
           onAction: actions.goAccounts,
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -104,16 +104,16 @@ class AzAssetView extends StatelessWidget {
         ),
         // ── 流向账 ──────────────────────────────────────────────
         const AppFunctionSection(
-          title: '每个月，它们是给你钱还是拿你钱',
+          title: '每月进出',
           child: SizedBox.shrink(),
         ),
         AzFlowCard(
           flow: flow,
           inSub: flow.occasional > 0
-              ? '每月都有（另有 ${MoneyFormat.yuan0(flow.occasional)} 偶尔才有，未计）'
+              ? '每月都有'
               : '每月都有',
           outSub:
-              '东西的开销 ${MoneyFormat.yuan0(flow.holdCost)} + 借款利息费用 ${MoneyFormat.yuan0(flow.interest + flow.fee)}',
+              '开销 ${MoneyFormat.yuan0(flow.holdCost)} + 利息 ${MoneyFormat.yuan0(flow.interest + flow.fee)}',
         ),
         // ── 三组折叠 ────────────────────────────────────────────
         _group(context, 'give', '在给你钱的', shown['give']!, debts, d),
@@ -122,7 +122,7 @@ class AzAssetView extends StatelessWidget {
         // ── 资产汇总 ────────────────────────────────────────────
         AppFunctionSection(
           title: '资产汇总',
-          actionLabel: '估值口径：${d.preferences.valuationMode.label} ▾',
+          actionLabel: '${d.preferences.valuationMode.label} ▾',
           onAction: actions.valuationMode,
           child: AzSummaryRows(
             rows: <AzKeyValueRow>[
@@ -133,16 +133,16 @@ class AzAssetView extends StatelessWidget {
                 ),
               if (uncounted > 0)
                 AzKeyValueRow(
-                  label: '不算进总账的',
+                  label: '不计入',
                   value: MoneyFormat.yuan0(uncounted),
                 ),
               AzKeyValueRow(
-                label: '除了钱以外的东西一共',
+                label: '其他资产',
                 value: MoneyFormat.yuan0(AzMath.selfAssets(d)),
                 total: true,
               ),
               AzKeyValueRow(
-                label: '加上卡里的和动不了的',
+                label: '总资产',
                 value: MoneyFormat.yuan0(total),
                 total: true,
               ),
@@ -151,13 +151,13 @@ class AzAssetView extends StatelessWidget {
         ),
         // ── 真要用钱能拿出多少 ──────────────────────────────────
         const AppFunctionSection(
-          title: '真要用钱，能拿出多少',
+          title: '能拿多少',
           child: SizedBox.shrink(),
         ),
         AzCashLayers(layers: layers, total: total <= 0 ? 1 : total),
-        AzHint('换成现金大概还要扣 ${MoneyFormat.yuan0(AzMath.exitCost(d))}（估算）。'),
+        AzHint('变现约扣 ${MoneyFormat.yuan0(AzMath.exitCost(d))}。'),
         if (stale.isNotEmpty)
-          AzHint('${stale.length} 样的价很久没更新，总数可能不准。'),
+          AzHint('${stale.length} 样价待更新。'),
         Text(
           '共 ${all.length} 项 · ${MoneyFormat.yuan0(total)}',
           style: context.appText.caption,
@@ -180,7 +180,7 @@ class AzAssetView extends StatelessWidget {
       <String>['take', '拿你钱', '${pick('take').length}'],
       <String>['A7', '房子', '${pick('A7').length}'],
       <String>['A4', '股票基金', '${pick('A4').length}'],
-      <String>['stale', '很久没更新价', '$staleCount'],
+      <String>['stale', '待更新', '$staleCount'],
     ];
     return Padding(
       padding: const EdgeInsets.symmetric(

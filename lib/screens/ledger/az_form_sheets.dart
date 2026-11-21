@@ -38,8 +38,8 @@ import '../commons/icons/app_icons.dart';
 /// 「打开弹层 + 把表单值写库」的函数。唯一一处自定义控件 [_InlineSelect]
 /// 是私有 StatefulWidget，工作逻辑写在它紧邻的注释里。
 
-const String _kAmountHint = '只填数字，例如 12000';
-const String _kDateHint = '可不填，例如 2027-03-15';
+const String _kAmountHint = '例如 12000';
+const String _kDateHint = '例如 2027-03-15';
 
 /// 表单内联下拉的私有控件（不是新 Sheet 内容组件）。
 ///
@@ -170,7 +170,7 @@ Future<void> showAzAssetSheet(
   await AppSheetShell.show<void>(
     context,
     header: _header(
-      existing == null ? '新增一项东西' : '编辑这项东西',
+      existing == null ? '新增资产' : '编辑资产',
       ctl,
       subtitle: cls.label,
     ),
@@ -264,64 +264,64 @@ List<SheetFormItem> _assetItems(AssetClass cls, AssetRecord base) {
   return <SheetFormItem>[
     SheetFormSingleLineTextItem(
       key: 'name',
-      label: '给它起个名',
+          label: '名称',
       initialValue: base.name,
       hint: loan
           ? '借给老张的钱'
-          : (property ? '出租的那套小房' : null),
-      validator: (String v) => v.trim().isEmpty ? '还差一个名字' : null,
+          : (property ? '小房' : null),
+          validator: (String v) => v.trim().isEmpty ? '请填名称' : null,
     ),
     SheetFormSingleLineTextItem(
       key: 'cost',
-      label: '买它一共花了多少',
+          label: '成本',
       initialValue: base.cost.toStringAsFixed(0),
       hint: _kAmountHint,
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
       validator: (String v) {
-        final String e = _positive(v, '买它一共花了多少');
+            final String e = _positive(v, '成本');
         return e.isEmpty ? null : e;
       },
     ),
     if (invest)
       SheetFormSingleLineTextItem(
         key: 'code',
-        label: '代码 / 编号（可不填）',
+          label: '代码',
         initialValue: base.code,
       ),
     if (!invest)
       SheetFormSingleLineTextItem(
         key: 'latest_value',
-        label: '现在大概值多少（可不填）',
+          label: '现值',
         initialValue: base.latestValue?.toStringAsFixed(0) ?? '',
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
       ),
     if (hasIncome)
       SheetFormSingleLineTextItem(
         key: 'monthly_in',
-        label: property ? '每个月租金多少' : '它每个月给你多少钱',
+        label: property ? '月租' : '月入',
         initialValue: base.monthlyIn.toStringAsFixed(0),
-        hint: '租金、利息、分红',
+          hint: '月收入',
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
       ),
     if (hasHoldCost)
       SheetFormSingleLineTextItem(
         key: 'monthly_out',
-        label: vehicle ? '每个月养车花多少' : '它每个月要你花多少钱',
+        label: vehicle ? '月养' : '月出',
         initialValue: base.monthlyOut.toStringAsFixed(0),
-        hint: '物业、保险、保养',
+          hint: '持有费',
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
       ),
     if (hasExitCost)
       SheetFormSingleLineTextItem(
         key: 'exit_cost',
-        label: '提前拿会不会扣钱',
+          label: '退出费',
         initialValue: base.exitCost.toStringAsFixed(0),
-        hint: '手续费、税费估算',
+          hint: '手续费',
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
       ),
     SheetFormCustomItem(
       key: 'liquidity',
-      label: '多久能变成现金',
+          label: '变现',
       builder: (BuildContext ctx, ValueChanged<Object?> onChanged) =>
           _InlineSelect(
         options: <_SelectOption>[
@@ -335,7 +335,7 @@ List<SheetFormItem> _assetItems(AssetClass cls, AssetRecord base) {
     if (hasIncome)
       SheetFormCustomItem(
         key: 'stability',
-        label: '这笔进账稳不稳',
+          label: '稳定性',
         builder: (BuildContext ctx, ValueChanged<Object?> onChanged) =>
             _InlineSelect(
           options: <_SelectOption>[
@@ -349,7 +349,7 @@ List<SheetFormItem> _assetItems(AssetClass cls, AssetRecord base) {
     if (property)
       SheetFormCustomItem(
         key: 'use_mode',
-        label: '现在怎么用',
+        label: '用途',
         builder: (BuildContext ctx, ValueChanged<Object?> onChanged) =>
             _InlineSelect(
           options: const <_SelectOption>[
@@ -365,24 +365,24 @@ List<SheetFormItem> _assetItems(AssetClass cls, AssetRecord base) {
     if (vehicle)
       SheetFormSingleLineTextItem(
         key: 'depreciation_note',
-        label: '每年大概掉多少价（可不填）',
+        label: '年折旧',
         initialValue: base.depreciationNote,
-        hint: '例如 每年大概掉 12%',
+        hint: '例如 12%',
       ),
     if (vehicle || valuable || cls == AssetClass.misc)
       SheetFormToggleItem(
         key: 'counted',
-        label: '算不算进「真正属于你的钱」',
+          label: '计入',
         initialValue: base.counted,
       ),
     SheetFormSingleLineTextItem(
       key: 'intention',
-      label: loan ? '说好什么时候还（可不填）' : '以后打算拿它做什么（可不填）',
+      label: loan ? '约定还日' : '用途',
       initialValue: base.intention,
     ),
     SheetFormMultiLineTextItem(
       key: 'note',
-      label: '备注（可不填）',
+          label: '备注',
       initialValue: base.note,
       minLines: 2,
       maxLines: 3,
@@ -427,7 +427,7 @@ Future<void> showAzLiabilitySheet(
   await AppSheetShell.show<void>(
     context,
     header: _header(
-      existing == null ? '新增一笔欠款' : '编辑这笔欠款',
+      existing == null ? '新增欠款' : '编辑欠款',
       ctl,
       subtitle: type.label,
     ),
@@ -517,14 +517,14 @@ List<SheetFormItem> _liabilityItems(LiabilityType t, LiabilityRecord base) {
   return <SheetFormItem>[
     SheetFormSingleLineTextItem(
       key: 'name',
-      label: '欠谁 / 起个名',
+          label: '名称',
       initialValue: base.name,
-      hint: 'XX 银行房贷',
-      validator: (String v) => v.trim().isEmpty ? '还差一个名字' : null,
+          hint: '如：房贷',
+          validator: (String v) => v.trim().isEmpty ? '请填名称' : null,
     ),
     SheetFormCustomItem(
       key: 'purpose',
-      label: '这钱借来干了什么',
+          label: '用途',
       builder: (BuildContext ctx, ValueChanged<Object?> onChanged) =>
           _InlineSelect(
         options: <_SelectOption>[
@@ -537,33 +537,33 @@ List<SheetFormItem> _liabilityItems(LiabilityType t, LiabilityRecord base) {
     ),
     SheetFormSingleLineTextItem(
       key: 'principal',
-      label: '现在还欠多少',
+          label: '欠款',
       initialValue: base.principal.toStringAsFixed(0),
       hint: _kAmountHint,
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
       validator: (String v) {
-        final String e = _positive(v, '现在还欠多少');
+            final String e = _positive(v, '欠款');
         return e.isEmpty ? null : e;
       },
     ),
     if (t == LiabilityType.personal)
       SheetFormToggleItem(
         key: 'interest_on',
-        label: '要不要算利息',
+        label: '计息',
         initialValue: base.interestOn,
       ),
     SheetFormSingleLineTextItem(
       key: 'rate',
       label: t == LiabilityType.personal
-          ? '要算利息的话，年利率（%）'
-          : '合同上写的利率（%）',
+          ? '年利率'
+          : '利率',
       initialValue: (base.rate * 100).toStringAsFixed(2),
-      hint: '例如 3.10 表示 3.1%',
+          hint: '如 3.10',
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
     ),
     SheetFormCustomItem(
       key: 'rate_type',
-      label: '利率会不会变',
+          label: '利率型',
       builder: (BuildContext ctx, ValueChanged<Object?> onChanged) =>
           _InlineSelect(
         options: <_SelectOption>[
@@ -577,25 +577,25 @@ List<SheetFormItem> _liabilityItems(LiabilityType t, LiabilityRecord base) {
     if (!revolving) ...<SheetFormItem>[
       SheetFormSingleLineTextItem(
         key: 'monthly_pay',
-        label: '每期一共还多少',
+          label: '月供',
         initialValue: base.monthlyPay.toStringAsFixed(0),
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
       ),
       SheetFormSingleLineTextItem(
         key: 'monthly_interest',
-        label: '其中利息',
+          label: '利息',
         initialValue: base.monthlyInterest.toStringAsFixed(0),
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
       ),
       SheetFormSingleLineTextItem(
         key: 'monthly_fee',
-        label: '其中手续费',
+          label: '手续费',
         initialValue: base.monthlyFee.toStringAsFixed(0),
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
       ),
       SheetFormCustomItem(
         key: 'repay_method',
-        label: '怎么还',
+          label: '方式',
         builder: (BuildContext ctx, ValueChanged<Object?> onChanged) =>
             _InlineSelect(
           options: <_SelectOption>[
@@ -608,25 +608,25 @@ List<SheetFormItem> _liabilityItems(LiabilityType t, LiabilityRecord base) {
       ),
       SheetFormSingleLineTextItem(
         key: 'pay_day',
-        label: '每月几号还（可不填）',
+          label: '还款日',
         initialValue: base.payDay?.toString() ?? '',
         keyboardType: TextInputType.number,
       ),
       SheetFormSingleLineTextItem(
         key: 'total_terms',
-        label: '一共几期（可不填）',
+          label: '期数',
         initialValue: base.totalTerms.toString(),
         keyboardType: TextInputType.number,
       ),
       SheetFormSingleLineTextItem(
         key: 'paid_terms',
-        label: '已经还了几期',
+          label: '已还',
         initialValue: base.paidTerms.toString(),
         keyboardType: TextInputType.number,
       ),
       SheetFormSingleLineTextItem(
         key: 'end_date',
-        label: '什么时候到期',
+          label: '到期',
         initialValue: base.endDate == null
             ? ''
             : '${base.endDate!.year}-${base.endDate!.month.toString().padLeft(2, '0')}-${base.endDate!.day.toString().padLeft(2, '0')}',
@@ -635,7 +635,7 @@ List<SheetFormItem> _liabilityItems(LiabilityType t, LiabilityRecord base) {
     ],
     SheetFormMultiLineTextItem(
       key: 'note',
-      label: '备注（可不填）',
+          label: '备注',
       initialValue: base.note,
       minLines: 2,
       maxLines: 3,
@@ -643,7 +643,7 @@ List<SheetFormItem> _liabilityItems(LiabilityType t, LiabilityRecord base) {
     ),
     const SheetFormNoteItem(
       key: 'hint',
-      text: '按你填的数估算，以账单为准；本金不算花掉的钱。',
+          text: '估算',
       centered: true,
     ),
   ];
@@ -670,7 +670,7 @@ Future<void> showAzContingentSheet(
   await AppSheetShell.show<void>(
     context,
     header: _header(
-      existing == null ? '记一笔' : '编辑这一笔',
+      existing == null ? '记一笔' : '编辑',
       ctl,
     ),
     child: FormSheetContent(
@@ -680,13 +680,13 @@ Future<void> showAzContingentSheet(
       items: <SheetFormItem>[
         SheetFormSingleLineTextItem(
           key: 'title',
-          label: kind == ContingentKind.contingent ? '替谁担的 / 什么事' : '保了什么',
+          label: kind == ContingentKind.contingent ? '事项' : '险种',
           initialValue: base.title,
-          validator: (String v) => v.trim().isEmpty ? '还差一个名字' : null,
+          validator: (String v) => v.trim().isEmpty ? '请填名称' : null,
         ),
         SheetFormSingleLineTextItem(
           key: 'max_amount',
-          label: '最多可能要还 / 最多替你付',
+          label: '上限',
           initialValue: base.maxAmount.toStringAsFixed(0),
           hint: _kAmountHint,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -694,19 +694,19 @@ Future<void> showAzContingentSheet(
         SheetFormSingleLineTextItem(
           key: 'condition_text',
           label: kind == ContingentKind.contingent
-              ? '什么情况下会轮到我还'
-              : '什么情况不赔',
+              ? '触发条件'
+              : '免责条件',
           initialValue: base.conditionText,
         ),
         SheetFormSingleLineTextItem(
           key: 'eta',
-          label: '大概什么时候 / 保到哪天',
+          label: '日期',
           initialValue: base.eta,
           hint: _kDateHint,
         ),
         SheetFormMultiLineTextItem(
           key: 'note',
-          label: '备注（可不填）',
+          label: '备注',
           initialValue: base.note,
           minLines: 2,
           maxLines: 3,
@@ -715,14 +715,14 @@ Future<void> showAzContingentSheet(
         if (existing != null && kind == ContingentKind.contingent)
           const SheetFormToggleItem(
             key: 'convert',
-            label: '转成我欠的钱',
+            label: '转欠款',
             initialValue: false,
           ),
         SheetFormNoteItem(
           key: 'hint',
           text: kind == ContingentKind.contingent
-              ? '默认不计入总账，转成欠款后才计入。'
-              : '不计入资产，也不抵扣欠款。',
+              ? '默认不计入'
+              : '不抵扣欠款',
           centered: true,
         ),
       ],
@@ -763,26 +763,26 @@ Future<void> showAzValuationSheet(
   final FormSheetController ctl = FormSheetController();
   await AppSheetShell.show<void>(
     context,
-    header: _header('更新一下现在值多少', ctl),
+    header: _header('更新价格', ctl),
     child: FormSheetContent(
       controller: ctl,
       submit: true,
-      submitLabel: '记下这个价',
+      submitLabel: '存下',
       items: <SheetFormItem>[
         SheetFormSingleLineTextItem(
           key: 'value',
-          label: '现在大概值多少',
+          label: '现值',
           initialValue: asset.latestValue?.toStringAsFixed(0) ?? '',
           hint: _kAmountHint,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           validator: (String v) {
-            final String e = _positive(v, '现在大概值多少');
+            final String e = _positive(v, '现值');
             return e.isEmpty ? null : e;
           },
         ),
         SheetFormNoteItem(
           key: 'hint',
-          text: '买入价 ${MoneyFormat.yuan0(asset.cost)}；更新留痕，历史不覆盖。',
+          text: '买入价 ${MoneyFormat.yuan0(asset.cost)}。',
           centered: true,
         ),
       ],
@@ -806,15 +806,15 @@ Future<void> showAzTradeSheet(
   final bool buy = direction == TradeDirection.buy;
   await AppSheetShell.show<void>(
     context,
-    header: _header(buy ? '记一笔买入' : '记一笔卖出', ctl),
+    header: _header(buy ? '买入' : '卖出', ctl),
     child: FormSheetContent(
       controller: ctl,
       submit: true,
-      submitLabel: buy ? '一共从卡里出去这些，对吗？' : '这次到手这些，对吗？',
+      submitLabel: buy ? '确认买入' : '确认卖出',
       items: <SheetFormItem>[
         SheetFormSingleLineTextItem(
           key: 'unit_price',
-          label: '每个多少钱',
+          label: '单价',
           hint: _kAmountHint,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           validator: (String v) {
@@ -824,34 +824,34 @@ Future<void> showAzTradeSheet(
         ),
         SheetFormSingleLineTextItem(
           key: 'quantity',
-          label: buy ? '买了多少' : '卖了多少',
-          hint: '股数 / 份数',
+          label: buy ? '买入量' : '卖出量',
+          hint: '数量',
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           validator: (String v) {
-            final String e = _positive(v, buy ? '买了多少' : '卖了多少');
+            final String e = _positive(v, buy ? '买入量' : '卖出量');
             return e.isEmpty ? null : e;
           },
         ),
         SheetFormSingleLineTextItem(
           key: 'fee',
-          label: buy ? '另外交了多少钱' : '另外扣了多少钱',
+          label: buy ? '附加费' : '扣费',
           initialValue: '0',
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
         ),
         SheetFormSingleLineTextItem(
           key: 'occurred_at',
-          label: '哪天买卖的',
+          label: '日期',
           initialValue: _todayText(),
           hint: _kDateHint,
         ),
         const SheetFormNoteItem(
           key: 'hint',
-          text: '买入不算支出，卖出不算收入；卖出时结算赚亏。',
+          text: '买入不算支出，卖出不算收入。',
           centered: true,
         ),
         const SheetFormNoteItem(
           key: 'boundary',
-          text: '暂不写账户流水。',
+          text: '暂不写流水。',
           centered: true,
         ),
       ],
@@ -879,16 +879,16 @@ Future<void> showAzRepaySheet(
   final FormSheetController ctl = FormSheetController();
   await AppSheetShell.show<void>(
     context,
-    header: _header('记一笔还款', ctl),
+    header: _header('还款', ctl),
     child: FormSheetContent(
       controller: ctl,
       submit: true,
-      submitLabel: '记下这一期',
+      submitLabel: '存下',
       items: <SheetFormItem>[
         if (plans.isNotEmpty)
           SheetFormCustomItem(
             key: 'plan_id',
-            label: '还的是哪一期',
+            label: '期次',
             builder: (BuildContext ctx, ValueChanged<Object?> onChanged) =>
                 _InlineSelect(
               options: <_SelectOption>[
@@ -904,7 +904,7 @@ Future<void> showAzRepaySheet(
           ),
         SheetFormSingleLineTextItem(
           key: 'amount',
-          label: '这次还了多少',
+          label: '金额',
           initialValue: debt.monthlyPay.toStringAsFixed(0),
           hint: _kAmountHint,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -915,13 +915,13 @@ Future<void> showAzRepaySheet(
         ),
         SheetFormSingleLineTextItem(
           key: 'reason',
-          label: '备注 / 这次怎么还的',
-          hint: '全额 / 最低 / 分期 / 部分 / 提前',
+          label: '备注',
+          hint: '方式',
         ),
       ],
       onSubmit: (SheetFormValues v) async {
         if (plans.isEmpty) {
-          throw ArgumentError('这一笔还没有逐期计划，先去编辑里填上期数');
+          throw ArgumentError('请先填期数');
         }
         final String picked = v.get<String>('plan_id') ?? '${plans.first.id}';
         await context.read<AzWriteController>().markPlanPaid(
@@ -962,11 +962,11 @@ Future<void> showAzPrepaySheet(
       items: <SheetFormItem>[
         SheetFormSingleLineTextItem(
           key: 'amount',
-          label: '打算提前还多少',
-          hint: '还剩 ${MoneyFormat.yuan0(debt.principal)} 没还',
+          label: '金额',
+          hint: '还剩 ${MoneyFormat.yuan0(debt.principal)}',
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           validator: (String v) {
-            final String e = _positive(v, '打算提前还多少');
+            final String e = _positive(v, '提前还额');
             return e.isEmpty ? null : e;
           },
         ),
@@ -987,16 +987,16 @@ Future<void> showAzPrepaySheet(
   await AppSheetShell.show<void>(
     context,
     header: SheetHeader(
-      title: '提前还，要看四件事',
+      title: '提前还',
       centered: true,
       leading: const SheetCancelAction(),
     ),
     child: Builder(
       builder: (BuildContext sheetContext) => OverviewSheetContent(
         metrics: <SheetMetric>[
-          SheetMetric(label: '① 能省多少利息', value: MoneyFormat.yuan0(p.saveInterest)),
-          SheetMetric(label: '② 违约金 / 剩余手续费', value: MoneyFormat.yuan0(p.penalty)),
-          SheetMetric(label: '扣完实际净省', value: MoneyFormat.yuan0(p.netSave)),
+          SheetMetric(label: '省利息', value: MoneyFormat.yuan0(p.saveInterest)),
+          SheetMetric(label: '违约金', value: MoneyFormat.yuan0(p.penalty)),
+          SheetMetric(label: '净省', value: MoneyFormat.yuan0(p.netSave)),
         ],
         changeLabel: p.safe ? '可以还' : '先别急',
         updatedAt:
@@ -1020,21 +1020,21 @@ Future<void> showAzCountedSheet(
   await AppSheetShell.show<String>(
     context,
     header: const SheetHeader(
-      title: '算不算进「真正属于你的钱」',
+      title: '计入总账',
       centered: true,
       leading: SheetCancelAction(),
     ),
     child: SelectSheetContent<String>(
       options: const <SheetOption<String>>[
-        SheetOption<String>(value: 'yes', label: '算进总账', icon: AppIcons.check),
-        SheetOption<String>(value: 'no', label: '不算进总账', icon: AppIcons.block),
+        SheetOption<String>(value: 'yes', label: '计入', icon: AppIcons.check),
+        SheetOption<String>(value: 'no', label: '不计入', icon: AppIcons.block),
       ],
       initialValue: asset.counted ? 'yes' : 'no',
-      actionLabel: '就这么定',
+      actionLabel: '确定',
       onApplyAsync: (String value) async {
         final Map<String, Object?> m = asset.toMap()..['id'] = asset.id;
         m['counted'] = value == 'yes' ? 1 : 0;
-        m['counted_reason'] = value == 'yes' ? '' : '你自己关掉了「算进总账」';
+        m['counted_reason'] = value == 'yes' ? '' : '手动关闭';
         await context.read<AzWriteController>().saveAsset(
               AssetRecord.fromMap(m),
             );
@@ -1053,7 +1053,7 @@ Future<void> showAzDeleteSheet(
   await AppSheetShell.show<void>(
     context,
     header: const SheetHeader(
-      title: '放进回收站',
+      title: '回收站',
       centered: true,
       leading: SheetCancelAction(),
     ),
@@ -1063,7 +1063,7 @@ Future<void> showAzDeleteSheet(
       secondaryLabel: '再想想',
       primaryLabel: '确认删除',
       intent: SheetIntent.danger,
-      footnote: '30 天内可恢复',
+      footnote: '可恢复',
       onPrimaryAsync: onConfirm,
     ),
   );
@@ -1078,7 +1078,7 @@ Future<AssetClass?> showAzAssetClassSheet(BuildContext context) =>
       // 只有右侧关闭按钮、没有左侧取消，居中会把标题推偏；与主题选择
       // 弹层一致用左对齐（centered 默认 false）。
       header: const SheetHeader(
-        title: '你新增的是什么？',
+        title: '选类型',
         trailing: SheetCloseButton(),
       ),
       child: CategorySheetContent<AssetClass>(
@@ -1099,7 +1099,7 @@ Future<LiabilityType?> showAzLiabilityTypeSheet(BuildContext context) =>
     AppSheetShell.show<LiabilityType>(
       context,
       header: const SheetHeader(
-        title: '你新增的是哪种欠款？',
+        title: '选类型',
         trailing: SheetCloseButton(),
       ),
       child: CategorySheetContent<LiabilityType>(

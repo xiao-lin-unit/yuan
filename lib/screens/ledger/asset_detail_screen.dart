@@ -42,9 +42,9 @@ class AssetDetailScreen extends StatelessWidget {
     final AssetRecord? asset = az.assetById(assetId);
     if (asset == null) {
       return AppDetailPage(
-        title: '找不到这一项',
+        title: '未找到',
         child: Center(
-          child: Text('它可能已经进了回收站。', style: context.appText.body),
+          child: Text('可能已删除', style: context.appText.body),
         ),
       );
     }
@@ -75,27 +75,27 @@ class AssetDetailScreen extends StatelessWidget {
       floating: AppFloatingActions(
         actions: <AppFloatingAction>[
           AppFloatingAction(
-            label: '更新一下现在值多少',
+            label: '更新估值',
             icon: AppIcons.edit,
             emphasized: true,
             onPressed: () => unawaited(showAzValuationSheet(context, asset)),
           ),
           AppFloatingAction(
-            label: '记一笔买入',
+            label: '买入',
             icon: AppIcons.add,
             onPressed: () => unawaited(
               showAzTradeSheet(context, asset, TradeDirection.buy),
             ),
           ),
           AppFloatingAction(
-            label: '记一笔卖出',
+            label: '卖出',
             icon: AppIcons.secondHand,
             onPressed: () => unawaited(
               showAzTradeSheet(context, asset, TradeDirection.sell),
             ),
           ),
           AppFloatingAction(
-            label: '算不算进总账',
+            label: '计入总账',
             icon: AppIcons.balanceAdjust,
             onPressed: () => unawaited(showAzCountedSheet(context, asset)),
           ),
@@ -105,14 +105,14 @@ class AssetDetailScreen extends StatelessWidget {
             onPressed: () => unawaited(
               showAzDeleteSheet(
                 context,
-                title: '把「${asset.name}」放进回收站？',
+                title: '删除「${asset.name}」？',
                 description:
                     '${trades.length} 笔买卖记录会保留，30 天内可恢复。',
                 onConfirm: () async {
                   await context.read<AzWriteController>().softDelete(
                         AzDb.assetsTable,
                         asset.id!,
-                        '从资产详情页删除',
+                        '删除资产',
                       );
                   if (context.mounted) context.pop();
                 },
@@ -126,7 +126,7 @@ class AssetDetailScreen extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
           AppSummaryHero(
-            label: asset.counted ? '现在按什么价算' : '这一项不算进总账',
+            label: asset.counted ? '估值口径' : '不计入',
             value: asset.counted ? MoneyFormat.yuan0(value) : '不算进总账',
             caption: staleDays < 0
                 ? '按买入价算'
@@ -134,12 +134,12 @@ class AssetDetailScreen extends StatelessWidget {
             accent: tag.bad ? context.tokens.expense : null,
             secondary: <AppInfoItem>[
               AppInfoItem(
-                label: '买它一共花了',
+                label: '成本',
                 value: MoneyFormat.yuan0(asset.cost),
               ),
               if (asset.latestValue != null)
                 AppInfoItem(
-                  label: '你填的最新价',
+                  label: '最新价',
                   value: MoneyFormat.yuan0(asset.latestValue!),
                 ),
             ],
@@ -148,26 +148,26 @@ class AssetDetailScreen extends StatelessWidget {
           AppInfoGrid(
             items: <AppInfoItem>[
               AppInfoItem(label: '属于哪类', value: asset.assetClass.label),
-              AppInfoItem(label: '多久能变成现金', value: asset.liquidity.label),
-              AppInfoItem(label: '这笔进账稳不稳', value: asset.stability.label),
-              AppInfoItem(label: '它每月给你', value: MoneyFormat.yuan0(asset.monthlyIn)),
-              AppInfoItem(label: '它每月要你花', value: MoneyFormat.yuan0(asset.monthlyOut)),
+              AppInfoItem(label: '变现', value: asset.liquidity.label),
+              AppInfoItem(label: '稳定性', value: asset.stability.label),
+              AppInfoItem(label: '月入', value: MoneyFormat.yuan0(asset.monthlyIn)),
+              AppInfoItem(label: '月出', value: MoneyFormat.yuan0(asset.monthlyOut)),
               AppInfoItem(label: '净流向', value: tag.text),
-              AppInfoItem(label: '提前拿会扣', value: MoneyFormat.yuan0(asset.exitCost)),
-              AppInfoItem(label: '算不算进总账', value: asset.counted ? '算' : '不算'),
-              AppInfoItem(label: '钱从哪张卡出去的', value: accountName),
-              AppInfoItem(label: '跟哪笔债有关', value: debtName),
-              AppInfoItem(label: '值怎么来的', value: asset.valuationSource.label),
-              AppInfoItem(label: '什么时候买的', value: _dateText(asset.createdAt)),
+              AppInfoItem(label: '退出费', value: MoneyFormat.yuan0(asset.exitCost)),
+              AppInfoItem(label: '计入', value: asset.counted ? '算' : '不算'),
+              AppInfoItem(label: '付款卡', value: accountName),
+              AppInfoItem(label: '关联债', value: debtName),
+              AppInfoItem(label: '估值来源', value: asset.valuationSource.label),
+              AppInfoItem(label: '买入日', value: _dateText(asset.createdAt)),
               if (asset.quantity != null)
                 AppInfoItem(
                   label: '持有数量',
                   value: '${asset.quantity!.toStringAsFixed(2)} 份',
                 ),
               if (asset.useMode.isNotEmpty)
-                AppInfoItem(label: '自己住还是出租', value: asset.useMode),
+                AppInfoItem(label: '用途', value: asset.useMode),
               if (asset.depreciationNote.isNotEmpty)
-                AppInfoItem(label: '这东西一年比一年不值钱', value: asset.depreciationNote),
+                AppInfoItem(label: '年折旧', value: asset.depreciationNote),
             ],
           ),
           const SizedBox(height: AppLayout.sectionGap),
@@ -189,15 +189,15 @@ class AssetDetailScreen extends StatelessWidget {
           AppStatBar(
             items: <AppStatItem>[
               AppStatItem(
-                label: '已经落袋的赚亏',
+                label: '已实现',
                 value: MoneyFormat.yuan0(summary.realized),
               ),
               AppStatItem(
-                label: '还没卖的，本钱',
+                label: '持仓成本',
                 value: MoneyFormat.yuan0(summary.holdingCost),
               ),
               AppStatItem(
-                label: '还没卖的数量',
+                label: '持仓量',
                 value: summary.holdingQuantity.toStringAsFixed(2),
               ),
             ],
@@ -259,7 +259,7 @@ class AssetDetailScreen extends StatelessWidget {
     for (final dynamic a in accounts.all) {
       if (a.id == id) return a.name as String;
     }
-    return '原来那张卡已删除';
+    return '原卡已删除';
   }
 
   static String _dateText(DateTime d) =>

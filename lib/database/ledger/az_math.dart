@@ -229,13 +229,13 @@ abstract final class AzMath {
     return <AzAccountMirror>[
       AzAccountMirror(
         a1: true,
-        label: '卡里和手上的钱',
+        label: '卡里的钱',
         amount: a1,
         accountCount: n1,
       ),
       AzAccountMirror(
         a1: false,
-        label: '暂时动不了的钱',
+        label: '动不了',
         amount: a2,
         accountCount: n2,
       ),
@@ -328,10 +328,10 @@ abstract final class AzMath {
   ) {
     final List<AzAccountMirror> ms = mirrors(accounts);
     final List<AzCashLayer> layers = <AzCashLayer>[
-      const AzCashLayer(label: '随时能拿出来', amount: 0, note: '卡里和手上的钱、随时能卖的'),
-      const AzCashLayer(label: '几天能凑出来', amount: 0, note: '基金、金条这类'),
-      const AzCashLayer(label: '几个月才卖得掉', amount: 0, note: '房子、车、借出去的钱'),
-      const AzCashLayer(label: '动不了', amount: 0, note: '公积金、医保这类，有条件的才能动'),
+      const AzCashLayer(label: '随时取', amount: 0, note: '现金与易变现'),
+      const AzCashLayer(label: '数日', amount: 0, note: '基金、金条'),
+      const AzCashLayer(label: '数月', amount: 0, note: '房车、借出款'),
+      const AzCashLayer(label: '动不了', amount: 0, note: '公积金、医保'),
     ];
     final List<double> values = <double>[0, 0, 0, 0];
     values[0] += ms.isEmpty ? 0 : ms[0].amount;

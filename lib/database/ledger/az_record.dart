@@ -7,7 +7,7 @@ import 'package:flutter/foundation.dart';
 /// az_dao.dart，三者互不串职责。
 ///
 /// 【界面文案】设计文档 2.1 / 附二要求界面永不出现专业词，所以枚举的
-/// [label] 一律是白话：「借出去、还没收回来的钱」而不是「应收款」，
+/// [label] 一律是白话：「借出的钱」而不是「应收款」，
 /// 「这笔钱实际一年要付多少」而不是「年化综合成本」。
 /// 原型 tab 上的「资产 / 负债」是模块名，保留；解释句全部用白话。
 
@@ -30,14 +30,14 @@ DateTime _date(Object? v) => v == null
 /// 只列「资产模块登记」的 A3~A11；[iconKey] 由 UI 层查表解析成 IconData，
 /// 数据库只存语义 key，不存字体码点 / emoji / 颜色。
 enum AssetClass {
-  loan('A3', '借出去、还没收回来的钱', 'finance'),
+  loan('A3', '借出的钱', 'finance'),
   stock('A4', '股票', 'investment'),
   fund('A5', '基金', 'investment'),
   otherInvest('A6', '别的投资', 'investment'),
-  property('A7', '房子、车位、商铺', 'housing'),
-  vehicle('A8', '车和交通工具', 'car'),
-  valuable('A9', '值钱的物件', 'gift'),
-  business('A10', '生意和股份', 'finance'),
+  property('A7', '房产', 'housing'),
+  vehicle('A8', '车辆', 'car'),
+  valuable('A9', '贵重物', 'gift'),
+  business('A10', '生意', 'finance'),
   misc('A11', '其他', 'other');
 
   const AssetClass(this.code, this.label, this.iconKey);
@@ -60,10 +60,10 @@ enum AssetClass {
 
 /// 「多久能变成现金」（6.3 / 6.8 / 13.6）。0..4 与原型 az.js 一致。
 enum Liquidity {
-  now(0, '随时能拿出来'),
-  days(1, '几天能凑出来'),
-  months(2, '几个月才卖得掉'),
-  hard(3, '很难变成现金'),
+  now(0, '随时'),
+  days(1, '几天'),
+  months(2, '几个月'),
+  hard(3, '很难'),
   stuck(4, '动不了');
 
   const Liquidity(this.dbValue, this.label);
@@ -99,7 +99,7 @@ enum AzStability {
 /// 估值口径（6.4）。cost = 保守按买入价；latest = 按用户填的最新价。
 enum ValuationMode {
   cost('cost', '按买入价'),
-  latest('latest', '按我填的最新价');
+  latest('latest', '按最新价');
 
   const ValuationMode(this.dbValue, this.label);
   final String dbValue;
@@ -111,9 +111,9 @@ enum ValuationMode {
 
 /// 值怎么来的（6.4 切换留痕）。
 enum ValuationSource {
-  cost('cost', '按买入时算，没算涨跌'),
-  trade('trade', '按上次买卖价'),
-  manual('manual', '你自己填的价');
+  cost('cost', '按买入价'),
+  trade('trade', '按成交价'),
+  manual('manual', '自填价');
 
   const ValuationSource(this.dbValue, this.label);
   final String dbValue;
@@ -137,7 +137,7 @@ enum LiabilityType {
   online('online', '网贷', 'finance'),
   installment('installment', '电商分期', 'basket'),
   rentInstallment('rent_installment', '租金分期', 'rent'),
-  personal('personal', '借的亲友钱', 'gift'),
+  personal('personal', '亲友钱', 'gift'),
   other('other', '其他', 'other');
 
   const LiabilityType(this.dbValue, this.label, this.iconKey);
@@ -164,10 +164,10 @@ enum LiabilityType {
 enum DebtPurpose {
   t1('T1', '买房买地'),
   t2('T2', '买车'),
-  t3('T3', '做生意 / 买了能生钱的东西'),
-  t4('T4', '先花了再还'),
+  t3('T3', '做生意'),
+  t4('T4', '先花后还'),
   t5('T5', '应急借的'),
-  t6('T6', '替别人担的'),
+  t6('T6', '替人担'),
   t7('T7', '亲友之间');
 
   const DebtPurpose(this.dbValue, this.label);
@@ -189,7 +189,7 @@ enum DebtPurpose {
 enum RateType {
   fixed('fixed', '一直不变'),
   float('float', '会跟着变'),
-  given('given', '以账单上写的为准');
+  given('given', '按账单');
 
   const RateType(this.dbValue, this.label);
   final String dbValue;
@@ -204,10 +204,10 @@ enum RateType {
 
 /// 怎么还（7.3），各带一句白话解释。
 enum RepayMethod {
-  equalPayment('equal_payment', '等额本息', '每期还一样的钱'),
-  equalPrincipal('equal_principal', '等额本金', '每期还的本金一样，越还越少'),
-  revolving('revolving', '随借随还', '有钱就还，没还的按天算'),
-  interestFirst('interest_first', '先息后本', '先只还利息，到期一次还本金');
+  equalPayment('equal_payment', '等额本息', '每期一样'),
+  equalPrincipal('equal_principal', '等额本金', '本金固定'),
+  revolving('revolving', '随借随还', '按天计息'),
+  interestFirst('interest_first', '先息后本', '到期还本');
 
   const RepayMethod(this.dbValue, this.label, this.hint);
   final String dbValue;
@@ -281,8 +281,8 @@ enum PlanStatus {
 }
 
 enum ContingentKind {
-  contingent('contingent', '万一要我还的钱'),
-  insured('insured', '万一出事，有人替我付吗');
+  contingent('contingent', '可能要还'),
+  insured('insured', '有人替付');
 
   const ContingentKind(this.dbValue, this.label);
   final String dbValue;

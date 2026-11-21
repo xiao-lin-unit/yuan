@@ -51,6 +51,7 @@ class AppHomePage extends StatelessWidget {
     this.hero,
     this.actions,
     this.bottom,
+    this.floating,
     this.scrollable = true,
     this.padding,
   });
@@ -68,6 +69,11 @@ class AppHomePage extends StatelessWidget {
   /// 固定底部区（快捷记一笔等）。位于滚动区之外，键盘弹出时随
   /// 外层唯一 Scaffold 的 resize 一起上移。
   final Widget? bottom;
+
+  /// 右下角悬浮层（`AppFloatingActions` 之类）。由本组件的 Stack +
+  /// Positioned 定位，组件自己不定位；与 [bottom] 不要同时传。
+  /// 为 null 时布局与改造前逐像素一致。
+  final Widget? floating;
 
   final bool scrollable;
   final EdgeInsetsGeometry? padding;
@@ -106,22 +112,39 @@ class AppHomePage extends StatelessWidget {
       ),
     );
 
+    // Stack 只为把 [floating] 叠到右下角；主体用 Positioned.fill 拿 tight
+    // 约束，Column 里的 Expanded 才有确定高度。不传 floating 时 Stack 里
+    // 只有一个 Positioned.fill(Column)，与改造前逐像素一致，其它 Home 页零影响。
     return ColoredBox(
       color: Theme.of(context).colorScheme.surface,
       child: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+        child: Stack(
           children: <Widget>[
-            if (actions != null && actions!.isNotEmpty)
-              _HomeActionRow(actions: actions!),
-            Expanded(child: content),
-            if (bottom != null)
-              Align(
-                alignment: Alignment.bottomCenter,
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(maxWidth: maxWidth),
-                  child: bottom!,
-                ),
+            Positioned.fill(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  if (actions != null && actions!.isNotEmpty)
+                    _HomeActionRow(actions: actions!),
+                  Expanded(child: content),
+                  if (bottom != null)
+                    Align(
+                      alignment: Alignment.bottomCenter,
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(maxWidth: maxWidth),
+                        child: bottom!,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            // 右下角悬浮层：与 AppPageScaffold 同一套定位，不读 viewInsets、
+            // 不做第二层键盘避让。与 [bottom] 不要同时传，会重叠。
+            if (floating != null)
+              Positioned(
+                right: AppSpacing.md,
+                bottom: AppSpacing.md,
+                child: floating!,
               ),
           ],
         ),

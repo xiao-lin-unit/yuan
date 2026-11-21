@@ -37,12 +37,10 @@ class AzLiabilityView extends StatelessWidget {
     final double limit = level.limit;
 
     final String safeText = !incomeSet
-        ? '先填「每月到手的钱」'
+        ? '先填月收入'
         : (stats.payIncomeRatio > limit
-            ? '月还款占收入 ${(stats.payIncomeRatio * 100).toStringAsFixed(0)}%，'
-                '超过 ${(limit * 100).toStringAsFixed(0)}%'
-            : '月还款占收入 ${(stats.payIncomeRatio * 100).toStringAsFixed(0)}%'
-                '（${(limit * 100).toStringAsFixed(0)}% 以内）');
+            ? '占收入 ${(stats.payIncomeRatio * 100).toStringAsFixed(0)}%（超 ${(limit * 100).toStringAsFixed(0)}%）'
+            : '占收入 ${(stats.payIncomeRatio * 100).toStringAsFixed(0)}%');
 
     final List<LiabilityRecord> ordered = AzMath.payoffOrder(d);
     final List<LiabilityRecord> shown = _filter(debts, view.filter, d, view.today);
@@ -60,7 +58,7 @@ class AzLiabilityView extends StatelessWidget {
       children: <Widget>[
         _chips(context, debts, d, view.today),
         const AppFunctionSection(
-          title: '一共欠多少、贵不贵',
+          title: '欠款概览',
           child: SizedBox.shrink(),
         ),
         AzDebtHero(
@@ -76,7 +74,7 @@ class AzLiabilityView extends StatelessWidget {
           fee: flow.fee,
           pay: stats.monthPay,
           ratioText: stats.monthPay == 0
-              ? '这个月没有要还的分期'
+              ? '本月无分期'
               : '占这个月还款 ${(stats.interestRatio * 100).toStringAsFixed(0)}%'
                   '${incomeSet ? ' · 占月收入 ${(stats.monthCost / d.preferences.monthlyIncome * 100).toStringAsFixed(0)}%' : ''}',
         ),
@@ -90,8 +88,8 @@ class AzLiabilityView extends StatelessWidget {
         ),
         // ── 欠的每一笔 ──────────────────────────────────────────
         AppFunctionSection(
-          title: '欠的每一笔',
-          actionLabel: '先还哪一笔最划算 ›',
+          title: '每笔欠款',
+          actionLabel: '还款顺序 ›',
           onAction: actions.payoff,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
@@ -104,11 +102,11 @@ class AzLiabilityView extends StatelessWidget {
                         AzDebtCard(
                           debt: x,
                           rateText:
-                              '实际一年 ${(AzMath.realAnnualRate(x) * 100).toStringAsFixed(1)}%'
+                              '年化 ${(AzMath.realAnnualRate(x) * 100).toStringAsFixed(1)}%'
                               '${x.rateType == RateType.float ? '（会变）' : ''}',
                           costText: x.monthlyCost > 0
-                              ? '每月白给 ${MoneyFormat.yuan0(x.monthlyCost)}'
-                              : '这个月不产生利息',
+                              ? '成本 ${MoneyFormat.yuan0(x.monthlyCost)}'
+                              : '无利息',
                           leverageText: _leverageLine(d, x),
                           subText: _sub(x),
                           onTap: () => actions.openDebt(x),
@@ -131,7 +129,7 @@ class AzLiabilityView extends StatelessWidget {
         ),
         // ── 两张成对清单 ────────────────────────────────────────
         const AppFunctionSection(
-          title: '万一要我还的钱',
+          title: '可能要还',
           child: SizedBox.shrink(),
         ),
         AzContingentList(
@@ -141,7 +139,7 @@ class AzLiabilityView extends StatelessWidget {
           onTap: actions.openContingent,
         ),
         const AppFunctionSection(
-          title: '万一出事，有人替我付吗',
+          title: '有人替付',
           child: SizedBox.shrink(),
         ),
         AzContingentList(
@@ -153,7 +151,7 @@ class AzLiabilityView extends StatelessWidget {
         // ── 负债汇总 ────────────────────────────────────────────
         AppFunctionSection(
           title: '负债汇总',
-          actionLabel: '偿债口径：${level.label} ▾',
+          actionLabel: '${level.label} ▾',
           onAction: actions.ratioLevel,
           child: AzSummaryRows(
             rows: <AzKeyValueRow>[
@@ -163,22 +161,22 @@ class AzLiabilityView extends StatelessWidget {
                   value: MoneyFormat.yuan0(s.sum),
                 ),
               AzKeyValueRow(
-                label: '一共欠多少',
+                label: '总欠款',
                 value: MoneyFormat.yuan0(stats.total),
                 valueColor: t.expense,
                 total: true,
               ),
               AzKeyValueRow(
-                label: '其中这个月要还',
+                label: '本月还',
                 value: MoneyFormat.yuan0(stats.monthPay),
               ),
               AzKeyValueRow(
-                label: '这个月白给银行的',
+                label: '本月成本',
                 value: MoneyFormat.yuan0(stats.monthCost),
                 valueColor: t.expense,
               ),
               AzKeyValueRow(
-                label: '还完债还剩（月收入−必须花的）÷月还款',
+                label: '偿债余力',
                 value: (!incomeSet || !mustCostSet || stats.monthPay == 0)
                     ? '—'
                     : '${stats.afterDebt.toStringAsFixed(1)} 倍',
@@ -277,7 +275,7 @@ class AzLiabilityView extends StatelessWidget {
         x.purpose.label,
         x.repayMethod.label,
         if (x.leftTerms > 0) '还剩 ${x.leftTerms} 期',
-        if (x.payDay != null) '每月 ${x.payDay} 号还',
+        if (x.payDay != null) '每月 ${x.payDay} 号',
         if (x.status != LiabilityStatus.normal) x.status.label,
       ].join(' · ');
 
@@ -285,8 +283,8 @@ class AzLiabilityView extends StatelessWidget {
     final AzLeverage? lev = AzMath.leverageOf(x, d.activeAssets);
     if (lev != null) {
       return lev.net >= 0
-          ? '它替你付了利息，还多留 ${MoneyFormat.yuan0(lev.net)}'
-          : '它每月从你口袋拿走 ${MoneyFormat.yuan0(-lev.net)}';
+          ? '多留 ${MoneyFormat.yuan0(lev.net)}'
+          : '每月拿走 ${MoneyFormat.yuan0(-lev.net)}';
     }
     if (x.purpose == DebtPurpose.t4) return '先花后还';
     if (x.purpose == DebtPurpose.t5) return '应急借的';
@@ -299,7 +297,7 @@ class AzLiabilityView extends StatelessWidget {
         if (AzMath.leverageOf(x, d.activeAssets) != null)
           AzMath.leverageOf(x, d.activeAssets)!,
     ];
-    if (list.isEmpty) return '没有借钱买东西';
+    if (list.isEmpty) return '无关联';
     list.sort((AzLeverage a, AzLeverage b) => a.net.compareTo(b.net));
     return list.first.net >= 0 ? '划得来' : '不划算';
   }
