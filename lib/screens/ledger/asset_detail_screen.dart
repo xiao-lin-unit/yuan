@@ -169,9 +169,9 @@ class AssetDetailScreen extends StatelessWidget {
                   label: '持有数量',
                   value: '${asset.quantity!.toStringAsFixed(2)} 份',
                 ),
-              // 新增表单按类复用 use_mode / depreciation_note 两列：
-              // A3 存借出情形、A7 存用途；A8 存「一年掉」、A9 存「凭证」。
-              // 这里按类回显，避免新增存了「凭证」、详情却显示「年折旧」。
+              // 新增只录数据；这里把旧记录按类回显，避免列名对不上。
+              // depreciation_note 按类放的是：A3 说好利息 / A6 说好票息 /
+              // A8 一年掉 / A9 凭证 —— 都是备注文本，不是状态。
               if (asset.useMode.isNotEmpty)
                 AppInfoItem(
                   label: asset.assetClass == AssetClass.loan ? '借出情形' : '用途',
@@ -179,9 +179,13 @@ class AssetDetailScreen extends StatelessWidget {
                 ),
               if (asset.depreciationNote.isNotEmpty)
                 AppInfoItem(
-                  label: asset.assetClass == AssetClass.valuable
-                      ? '凭证'
-                      : '一年掉',
+                  label: switch (asset.assetClass) {
+                    AssetClass.loan => '说好利息',
+                    AssetClass.otherInvest => '说好票息',
+                    AssetClass.valuable => '凭证',
+                    AssetClass.vehicle => '一年掉',
+                    _ => '备注',
+                  },
                   value: asset.depreciationNote,
                 ),
             ],
