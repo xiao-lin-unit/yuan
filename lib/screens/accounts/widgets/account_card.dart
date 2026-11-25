@@ -30,6 +30,9 @@ IconData accountTypeIcon(AccountType type) => switch (type) {
       AccountType.housingFund => AppIcons.accountHousing,
       AccountType.giftCard => AppIcons.accountGiftCard,
       AccountType.frozen => AppIcons.accountFrozen,
+      // 契-14：K4 投资账户唯一形态，图标走已有的 investment 矢量，
+      // 不新增图标资产。穷尽 switch 必须列出，否则加形态就编译不过。
+      AccountType.stockAccount => AppIcons.investment,
       AccountType.other => AppIcons.accountOther,
     };
 

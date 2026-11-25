@@ -55,6 +55,7 @@ class SavingsAccountController {
     required AccountType type,
     required String name,
     double initialBalance = 0,
+    double? openingTransferIn,
     String note = '',
     bool? isLiquid,
     bool? includeInNetWorth,
@@ -105,6 +106,11 @@ class SavingsAccountController {
       dueDay: null,
       repayAccountId: null,
       minPaymentRate: 0.1,
+      // 【本轮】K4 期初：填了「转入金额」用填入值，没填则用期初可用金额。
+      // K1/K3 不带这个次表列。
+      netTransferIn: kind == AccountKind.investment
+          ? (openingTransferIn ?? initialBalance)
+          : null,
       note: note,
       isLiquid: liquid,
       includeInNetWorth: inNetWorth,
@@ -122,6 +128,9 @@ class SavingsAccountController {
       if (id == null) {
         savedId = await dao.insert(txn, record);
         if (savedId <= 0) throw StateError('账户写入未生效');
+        // 【全局约定 7 / 本轮】K1/K3/K4 新建都写第一条 opening 流水：
+        // 投资账户录的「可用金额」是用户已在使用的账户里真实存在的钱，
+        // 属有意的期初事实录入，与「历史持仓补录」（契-14，不写流水）不同。
         final double opening = record.initialBalance;
         if (opening > 0) {
           await entryDao.append(
@@ -194,6 +203,7 @@ class SavingsAccountController {
           counterpartyAccountId: toId,
           transferGroupId: group,
           note: note,
+          refType: 'transfer',
           createdAt: DateTime.now(),
         ),
         rule: _rule,
@@ -210,6 +220,7 @@ class SavingsAccountController {
           counterpartyAccountId: fromId,
           transferGroupId: group,
           note: note,
+          refType: 'transfer',
           createdAt: DateTime.now(),
         ),
         rule: _rule,
@@ -251,6 +262,7 @@ class SavingsAccountController {
           entryType: AccountEntryType.adjustment,
           occurredAt: at,
           reason: reason.trim(),
+          refType: 'adjustment',
           createdAt: DateTime.now(),
         ),
         rule: _rule,

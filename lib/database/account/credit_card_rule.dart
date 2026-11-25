@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 
+import '../../utils/money.dart';
+
 /// 信用卡「章程」：3.4 新增的十项规则，按**这张卡自己的章程**填，
 /// 不是全国统一的数。
 ///
@@ -52,19 +54,19 @@ abstract final class CreditCardRuleDb {
       min_payment_rule           TEXT    NOT NULL DEFAULT '',
       daily_rate                 REAL    CHECK (daily_rate IS NULL OR
                                    (daily_rate >= 0 AND daily_rate < 1)),
-      interest_method            TEXT    NOT NULL DEFAULT ''
-                                 CHECK (interest_method IN ('','full','unpaid')),
+      interest_method            TEXT    NOT NULL DEFAULT '',  -- 枚举不写 CHECK
       monthly_compound           INTEGER NOT NULL DEFAULT 0
                                  CHECK (monthly_compound IN (0,1)),
       grace_period_days          INTEGER NOT NULL DEFAULT 0
                                  CHECK (grace_period_days >= 0),
-      grace_amount               REAL    NOT NULL DEFAULT 0
-                                 CHECK (grace_amount >= 0),
+      grace_amount               TEXT    NOT NULL DEFAULT '0'
+                                 CHECK (CAST(grace_amount AS REAL) >= 0),
       cash_advance_interest_free INTEGER NOT NULL DEFAULT 0
                                  CHECK (cash_advance_interest_free IN (0,1)),
       installment_fee_rule       TEXT    NOT NULL DEFAULT '',
       late_fee_rule              TEXT    NOT NULL DEFAULT '',
       note                       TEXT    NOT NULL DEFAULT '',
+      created_at                 INTEGER NOT NULL,
       updated_at                 INTEGER NOT NULL,
       revision                   INTEGER NOT NULL DEFAULT 1
     )
@@ -156,7 +158,7 @@ class CreditCardRule {
         ),
         monthlyCompound: (m['monthly_compound'] as int?) == 1,
         gracePeriodDays: (m['grace_period_days'] as int?) ?? 0,
-        graceAmount: (m['grace_amount'] as num?)?.toDouble() ?? 0,
+        graceAmount: Money.yuan(m['grace_amount'] as String?),
         cashAdvanceInterestFree:
             (m['cash_advance_interest_free'] as int?) == 1,
         installmentFeeRule: (m['installment_fee_rule'] as String?) ?? '',
@@ -177,7 +179,7 @@ class CreditCardRule {
         'interest_method': interestMethod.dbValue,
         'monthly_compound': monthlyCompound ? 1 : 0,
         'grace_period_days': gracePeriodDays,
-        'grace_amount': graceAmount,
+        'grace_amount': Money.fromYuan(graceAmount),
         'cash_advance_interest_free': cashAdvanceInterestFree ? 1 : 0,
         'installment_fee_rule': installmentFeeRule,
         'late_fee_rule': lateFeeRule,
@@ -238,9 +240,26 @@ class CreditCardRuleDao {
     final int previous = old.isEmpty
         ? 0
         : (old.first['revision'] as num?)?.toInt() ?? 0;
+    // B15：conflictAlgorithm.replace 会整行覆盖，必须把 created_at 补回去，
+    // 否则新增的创建时间每次保存都被冲掉。
+    final int now = DateTime.now().millisecondsSinceEpoch;
+    int createdAt = now;
+    if (old.isNotEmpty) {
+      final List<Map<String, dynamic>> prev = await db.query(
+        table,
+        columns: <String>['created_at'],
+        where: 'account_id = ?',
+        whereArgs: <Object?>[rule.accountId],
+        limit: 1,
+      );
+      if (prev.isNotEmpty) {
+        createdAt = (prev.first['created_at'] as num?)?.toInt() ?? now;
+      }
+    }
     final Map<String, dynamic> values = rule.toMap()
       ..['revision'] = previous + 1
-      ..['updated_at'] = DateTime.now().millisecondsSinceEpoch;
+      ..['updated_at'] = now
+      ..['created_at'] = createdAt;
     await db.insert(
       table,
       values,

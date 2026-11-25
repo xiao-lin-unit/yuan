@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 
+import '../../utils/money.dart';
+
 /// 账户三大类（《软件设计想法》3.2）。
 ///
 /// 一张 `accounts` 表用 [AccountKind] 区分，不拆成「储蓄卡表 / 信用卡表」。
@@ -9,7 +11,8 @@ import 'package:flutter/foundation.dart';
 enum AccountKind {
   liquid('liquid', '流动资金账户', '可自由支配'),
   credit('credit', '信用卡账户', '先消费后还款'),
-  restricted('restricted', '其他资金账户', '限定用途');
+  restricted('restricted', '其他资金账户', '限定用途'),
+  investment('investment', '投资账户', '券商资金账户');
 
   const AccountKind(this.dbValue, this.label, this.hint);
 
@@ -17,10 +20,14 @@ enum AccountKind {
   final String label;
   final String hint;
 
+  /// B3：禁止 `_ => liquid` 兜底，否则新建的 K4 一读回来变回 K1。
   static AccountKind fromDb(String? value) => switch (value) {
+        'liquid' => liquid,
         'credit' => credit,
         'restricted' => restricted,
-        _ => liquid,
+        'investment' => investment,
+        null || '' => liquid,
+        _ => throw ArgumentError('未知账户类别: $value'),
       };
 
   /// 首页的分区顺序，也是列表默认排序的分组依据。
@@ -28,6 +35,7 @@ enum AccountKind {
         AccountKind.liquid => 0,
         AccountKind.credit => 1,
         AccountKind.restricted => 2,
+        AccountKind.investment => 3,
       };
 }
 
@@ -90,6 +98,8 @@ enum AccountType {
   giftCard('gift_card', '礼品卡'),
   frozen('frozen', '冻结存款'),
 
+  stockAccount('stock_account', '股票账户'),  // K4 唯一形态
+
   other('other', '其他');
 
   const AccountType(this.dbValue, this.label);
@@ -108,8 +118,10 @@ enum AccountType {
         'housing_fund' => housingFund,
         'gift_card' => giftCard,
         'frozen' => frozen,
+        'stock_account' => stockAccount,
         'other' => other,
-        _ => bank,
+        'bank' || null || '' => bank,
+        _ => throw ArgumentError('未知账户形态: $value'),
       };
 
   /// 3.5：社保 / 公积金「流动资金」强制为否且不可改。
@@ -135,6 +147,7 @@ enum AccountType {
         AccountKind.restricted => const <AccountType>[
           socialSecurity, housingFund, giftCard, frozen, other,
         ],
+        AccountKind.investment => const <AccountType>[stockAccount],
       };
 
   /// 该类别的默认形态（表单未改动类型时的兜底值）。显式 switch 而非
@@ -143,6 +156,7 @@ enum AccountType {
         AccountKind.liquid => AccountType.bank,
         AccountKind.credit => AccountType.creditCard,
         AccountKind.restricted => AccountType.other,
+        AccountKind.investment => AccountType.stockAccount,
       };
 }
 
@@ -205,6 +219,14 @@ enum AccountBalanceRule {
         AccountBalanceRule.savings => direction.sign * amount,
         AccountBalanceRule.credit => -direction.sign * amount,
       };
+
+  /// append 走整数分：与 [delta] 同符号，内部不含浮点。
+  int deltaCents(AccountDirection direction, int amountCents) => switch (this) {
+        AccountBalanceRule.savings =>
+          direction == AccountDirection.inbound ? amountCents : -amountCents,
+        AccountBalanceRule.credit =>
+          direction == AccountDirection.outbound ? amountCents : -amountCents,
+      };
 }
 
 /// 资金变动的业务种类。一次变动只产生一条流水，转账产生两条（见
@@ -217,7 +239,10 @@ enum AccountEntryType {
   transferIn('transfer_in', '转入'),
   adjustment('adjustment', '余额调整'),
   creditSpend('credit_spend', '信用卡消费'),
-  creditRepay('credit_repay', '信用卡还款');
+  creditRepay('credit_repay', '信用卡还款'),
+  assetBuy('asset_buy', '投资买入'),
+  assetSell('asset_sell', '卖到账'),
+  interest('interest', '账单息费');
 
   const AccountEntryType(this.dbValue, this.label);
 
@@ -232,7 +257,11 @@ enum AccountEntryType {
         'adjustment' => adjustment,
         'credit_spend' => creditSpend,
         'credit_repay' => creditRepay,
-        _ => opening,
+        'asset_buy' => assetBuy,
+        'asset_sell' => assetSell,
+        'interest' => interest,
+        'opening' || null || '' => opening,
+        _ => throw ArgumentError('未知流水类型: $value'),
       };
 }
 
@@ -255,6 +284,7 @@ class AccountRecord {
     this.dueDay,
     this.repayAccountId,
     this.minPaymentRate = 0.1,
+    this.netTransferIn,
     this.note = '',
     this.isLiquid = true,
     this.includeInNetWorth = true,
@@ -298,6 +328,11 @@ class AccountRecord {
   /// 最低还款比例，原型「最低还款 ¥680」由可用额度 × 此比例算出。
   final double minPaymentRate;
 
+  /// 【本轮】仅 K4 有意义：净转入额。新建投资账户时由表单给出初值
+  /// （未填「转入金额」时等于期初可用金额），之后由 append 同事务维护。
+  /// 不是第二份余额，不与 [balance] 相加（契-15）。
+  final double? netTransferIn;
+
   final String note;
 
   /// 是否计入「现在能花的钱」。liquid 恒 true、credit 恒 false；
@@ -330,6 +365,8 @@ class AccountRecord {
         AccountKind.restricted =>
           note.isEmpty ? '仅限绑定用途使用' : note,
         AccountKind.liquid => note.isEmpty ? type.label : note,
+        AccountKind.investment =>
+          '可用 ${balance.toStringAsFixed(0)} · 股票账户',
       };
 
   static DateTime _date(Object? v) => v == null
@@ -342,13 +379,19 @@ class AccountRecord {
         kind: AccountKind.fromDb(m['kind'] as String?),
         type: AccountType.fromDb(m['type'] as String?),
         name: (m['name'] as String?) ?? '',
-        balance: (m['balance'] as num?)?.toDouble() ?? 0,
-        initialBalance: (m['initial_balance'] as num?)?.toDouble() ?? 0,
-        creditLimit: (m['credit_limit'] as num?)?.toDouble(),
+        // 草案全局约定 2：落库 TEXT，边界统一走 Money（不再 as num.toDouble）
+        balance: Money.yuan(m['balance'] as String?),
+        initialBalance: Money.yuan(m['initial_balance'] as String?),
+        creditLimit: m['credit_limit'] == null
+            ? null
+            : Money.yuan(m['credit_limit'] as String?),
         statementDay: m['statement_day'] as int?,
         dueDay: m['due_day'] as int?,
         repayAccountId: m['repay_account_id'] as int?,
         minPaymentRate: (m['min_payment_rate'] as num?)?.toDouble() ?? 0.1,
+        netTransferIn: m['net_transfer_in'] == null
+            ? null
+            : Money.yuan(m['net_transfer_in'] as String?),
         note: (m['note'] as String?) ?? '',
         isLiquid: (m['is_liquid'] as int?) == 1,
         includeInNetWorth: (m['include_in_net_worth'] as int?) == 1,
@@ -367,9 +410,11 @@ class AccountRecord {
         'kind': kind.dbValue,
         'type': type.dbValue,
         'name': name,
-        'balance': balance,
-        'initial_balance': initialBalance,
-        'credit_limit': creditLimit,
+        'balance': Money.fromYuan(balance),
+        'initial_balance': Money.fromYuan(initialBalance),
+        'credit_limit': creditLimit == null
+            ? null
+            : Money.fromYuan(creditLimit!),
         'statement_day': statementDay,
         'due_day': dueDay,
         'repay_account_id': repayAccountId,
@@ -550,10 +595,11 @@ class AccountEntryRecord {
         bookId: (m['book_id'] as String?) ?? 'default',
         accountId: (m['account_id'] as int?) ?? 0,
         direction: AccountDirection.fromDb(m['direction'] as String?),
-        amount: (m['amount'] as num?)?.toDouble() ?? 0,
-        balanceAfter: (m['balance_after'] as num?)?.toDouble() ?? 0,
-        creditLimitAfter:
-            (m['credit_limit_after'] as num?)?.toDouble(),
+        amount: Money.yuan(m['amount'] as String?),
+        balanceAfter: Money.yuan(m['balance_after'] as String?),
+        creditLimitAfter: m['credit_limit_after'] == null
+            ? null
+            : Money.yuan(m['credit_limit_after'] as String?),
         entryType: AccountEntryType.fromDb(m['entry_type'] as String?),
         occurredAt: _date(m['occurred_at']),
         counterpartyAccountId: m['counterparty_account_id'] as int?,
@@ -574,9 +620,11 @@ class AccountEntryRecord {
         'book_id': bookId,
         'account_id': accountId,
         'direction': direction.dbValue,
-        'amount': amount,
-        'balance_after': balanceAfter,
-        'credit_limit_after': creditLimitAfter,
+        'amount': Money.fromYuan(amount),
+        'balance_after': Money.fromYuan(balanceAfter),
+        'credit_limit_after': creditLimitAfter == null
+            ? null
+            : Money.fromYuan(creditLimitAfter!),
         'entry_type': entryType.dbValue,
         'occurred_at': occurredAt.millisecondsSinceEpoch,
         'counterparty_account_id': counterpartyAccountId,
@@ -614,6 +662,7 @@ class AccountStats {
     required this.spendable,
     required this.owedToBank,
     required this.restrictedTotal,
+    required this.investmentTotal,
     required this.accountCount,
     required this.creditCount,
   });
@@ -626,6 +675,10 @@ class AccountStats {
 
   /// 其他（受限）账户余额合计，只进「真正属于你的钱」，不进「能花的钱」。
   final double restrictedTotal;
+
+  /// 契-7：K4 投资账户里的真钱单列。计入「真正属于你的钱」，
+  /// 不进「能花的钱」；股票市值由资产侧算，这里不重复计。
+  final double investmentTotal;
 
   final int accountCount;
   final int creditCount;
@@ -673,4 +726,25 @@ class AccountEntrySummary {
   final double outbound;
   double get net => inbound - outbound;
   final double balanceAfter;
+}
+
+
+/// 【全局约定 10】三个统计视图的结果。金额按收付实现制取 `amount` 全额，
+/// 不分本金利息；`assetOffset` 是 `actualExpense` 的子集，同源不重复写数。
+@immutable
+class AccountExpenseStats {
+  const AccountExpenseStats({
+    required this.livingCost,
+    required this.actualExpense,
+    required this.assetOffset,
+  });
+
+  /// 生活成本 = 消费类出账（`expense`）。
+  final double livingCost;
+
+  /// 实际支出 = 消费类 + 还款类出账。
+  final double actualExpense;
+
+  /// 资产抵消 = 还款类出账（`credit_repay` 中 `direction='out'` 那条）。
+  final double assetOffset;
 }

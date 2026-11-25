@@ -2,6 +2,7 @@ import 'package:sqflite/sqflite.dart';
 
 import '../database/account/account_dao.dart';
 import '../database/account/account_entry_dao.dart';
+import '../database/account/account_db.dart';
 import '../database/account/account_record.dart';
 import '../database/account/credit_card_rule.dart';
 import 'account_controller.dart';
@@ -172,6 +173,11 @@ class CreditCardAccountController {
 
   /// 立即还款：**独立实现，不调用 SavingsAccountController.transfer**。
   ///
+  /// 【C9-c 口径变更】还款恒定 **2 条等值流水**：还款总额
+  /// `X = 本金 + 利息 + 费用综合`，来源储蓄卡一条出账、信用卡一条入账，
+  /// 金额严格相等；`interest=0` 不退化。本息费在**账单出账**时由
+  /// [rollStatement] 一次性记为 `debt_cost`，还款不重复记支出。
+  ///
   /// ══════════════════════════════════════════════════════════════
   /// 【3.7 / 7.12 本金与利息必须分开 —— 这是正确性问题，不是文案】
   /// ══════════════════════════════════════════════════════════════
@@ -218,6 +224,7 @@ class CreditCardAccountController {
     if (interest >= amount) {
       throw ArgumentError('利息金额需小于还款金额（本金必须大于 0）');
     }
+    // principal 只用于「本金不超过已用额度」的上限校验，不再拆成多条流水。
     final double principal = amount - interest;
     final AccountRecord? card = await dao.byId(db, creditCardId);
     final AccountRecord? from = await dao.byId(db, fromAccountId);
@@ -236,60 +243,47 @@ class CreditCardAccountController {
     final String group =
         'repay_${at.microsecondsSinceEpoch}_${fromAccountId}_$creditCardId';
     await db.transaction((txn) async {
-      // ① 来源账户：只按本金出账。
+      // ① 来源账户：按本息费综合出账（C9-c）。
       await entryDao.append(
         txn,
         AccountEntryRecord(
           accountId: fromAccountId,
           direction: AccountDirection.outbound,
-          amount: principal,
+          amount: amount,
           balanceAfter: 0,
           entryType: AccountEntryType.creditRepay,
           occurredAt: at,
           counterpartyAccountId: creditCardId,
           transferGroupId: group,
           note: note,
+          // 全局约定 11：还款类出账指债务模块还款记录；信用卡账单还款
+          // 无负债侧行，ref_id 可空（未来按账单周期回填）。
+          refType: 'liability_repay',
           createdAt: DateTime.now(),
         ),
         rule: AccountBalanceRule.savings,
       );
-      // ② 信用卡：只按本金入账（已用额度减少）。
+      // ② 信用卡：等值入账（已用额度减少同样的钱）。
       await entryDao.append(
         txn,
         AccountEntryRecord(
           accountId: creditCardId,
           direction: AccountDirection.inbound,
-          amount: principal,
+          amount: amount,
           balanceAfter: 0,
           entryType: AccountEntryType.creditRepay,
           occurredAt: at,
           counterpartyAccountId: fromAccountId,
           transferGroupId: group,
           note: note,
+          // 配对腿共指同一条还款记录；这条只减欠款，不进统计视图。
+          refType: 'liability_repay',
           createdAt: DateTime.now(),
         ),
         rule: _rule,
       );
-      // ③ 利息：单独一条「借钱的成本」支出，不再从信用卡额度里扣。
-      if (interest > 0) {
-        await entryDao.append(
-          txn,
-          AccountEntryRecord(
-            accountId: fromAccountId,
-            direction: AccountDirection.outbound,
-            amount: interest,
-            balanceAfter: 0,
-            entryType: AccountEntryType.expense,
-            occurredAt: at,
-            counterpartyAccountId: creditCardId,
-            transferGroupId: group,
-            note: note.isEmpty ? '借钱的成本（还款利息）' : note,
-            refType: 'debt_cost',
-            createdAt: DateTime.now(),
-          ),
-          rule: AccountBalanceRule.savings,
-        );
-      }
+      // ③ 已删除：息费只由 [rollStatement] 在账单出账时记一次，
+      //    还款不重复记「借钱的成本」（契-12 / 硬-16）。
     });
     await catalog.refresh(touched: <int>{fromAccountId, creditCardId});
   }
@@ -385,5 +379,65 @@ class CreditCardAccountController {
       await CreditCardRuleDao().upsert(txn, rule);
     });
     await catalog.refresh(touched: <int>{accountId});
+  }
+
+  /// 【契-13 账单出账动作】打开 / 操作时按 `last_period_key` 判跨账单日：
+  /// 先归零方案 A 两列、再进新周期；同一时刻把本期息费 I+F 写成**一次**
+  /// `interest + debt_cost` 出账流水（打开时只算展示值，不逐日生成流水）。
+  ///
+  /// 【边界，如实写明】7.7 六种计息算法归信用卡计息模块，本方法不替银行
+  /// 算数：`interestAndFees` 由调用方按章程给出（当前默认 0 = 只归零、
+  /// 不写流水），软件不编数、不生成假利息流水。信用卡不进负债表，
+  /// 故这条流水无负债侧 `ref_id` 可对齐。
+  Future<void> rollStatement(
+    int creditCardId, {
+    double interestAndFees = 0,
+    DateTime? at,
+  }) async {
+    final AccountRecord? card = await dao.byId(db, creditCardId);
+    if (card == null || card.kind != AccountKind.credit) {
+      throw StateError('仅信用卡账户支持账单出账');
+    }
+    final DateTime now = at ?? DateTime.now();
+    final String period =
+        '${now.year}-${now.month.toString().padLeft(2, '0')}';
+    final List<Map<String, Object?>> sub = await db.query(
+      AccountDb.creditTable,
+      columns: <String>['last_period_key', 'statement_day'],
+      where: 'account_id = ?',
+      whereArgs: <Object?>[creditCardId],
+      limit: 1,
+    );
+    if (sub.isEmpty) return;
+    if (sub.first['last_period_key'] == period) return;  // 本周期已滚动
+
+    final int stamp = now.millisecondsSinceEpoch;
+    await db.transaction((txn) async {
+      await txn.rawUpdate(
+        'UPDATE ${AccountDb.creditTable} SET current_period_spent = ?, '
+        'period_installed_amount = ?, last_period_key = ?, '
+        'updated_at = ?, revision = revision + 1 WHERE account_id = ?',
+        <Object?>['0', '0', period, stamp, creditCardId],
+      );
+      if (interestAndFees > 0) {
+        await entryDao.append(
+          txn,
+          AccountEntryRecord(
+            accountId: creditCardId,
+            direction: AccountDirection.outbound,
+            amount: interestAndFees,
+            balanceAfter: 0,
+            entryType: AccountEntryType.interest,
+            occurredAt: now,
+            note: '账单息费',
+            refType: 'debt_cost',
+            createdAt: now,
+          ),
+          rule: _rule,
+          recordSource: 'auto',
+        );
+      }
+    });
+    await catalog.refresh(touched: <int>{creditCardId});
   }
 }

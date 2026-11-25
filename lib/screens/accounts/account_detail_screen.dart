@@ -490,6 +490,9 @@ IconData _entryIcon(AccountEntryType type) => switch (type) {
       AccountEntryType.adjustment => AppIcons.balanceAdjust,
       AccountEntryType.creditSpend => AppIcons.accountCreditCard,
       AccountEntryType.creditRepay => AppIcons.repay,
+      AccountEntryType.assetBuy => AppIcons.repay,
+      AccountEntryType.assetSell => AppIcons.accountCreditCard,
+      AccountEntryType.interest => AppIcons.balanceAdjust,
     };
 
 /// ★ 操作配置：按账户类型分派到**各自的业务处理器**。
@@ -529,6 +532,33 @@ List<AppFloatingAction> _floatingActions(
         ),
         AppFloatingAction(
           label: '余额调整',
+          icon: AppIcons.balanceAdjust,
+          onPressed: () => unawaited(
+            showAccountAdjustSheet(
+              context,
+              savings: savings,
+              account: account,
+            ),
+          ),
+        ),
+      ],
+      // 【本轮 / 契-15】K4：转账与「可用金额调整」都会同步增减净转入额
+      // （append 同事务维护），两个入口都复用通用弹层。
+      if (account.kind == AccountKind.investment) ...<AppFloatingAction>[
+        AppFloatingAction(
+          label: '账户转账',
+          icon: AppIcons.transfer,
+          onPressed: () => unawaited(
+            showAccountTransferSheet(
+              context,
+              catalog: catalog,
+              savings: savings,
+              fromId: account.id,
+            ),
+          ),
+        ),
+        AppFloatingAction(
+          label: '可用调整',
           icon: AppIcons.balanceAdjust,
           onPressed: () => unawaited(
             showAccountAdjustSheet(

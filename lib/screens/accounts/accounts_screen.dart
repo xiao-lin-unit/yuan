@@ -59,22 +59,24 @@ const String _kReminderDisclaimer = '估算，按你填的日利率粗算，以�
 /// 类型快筛标签。**只按账户类型分**，不含原型的「常用」：
 /// 本轮需求只覆盖类型快筛，「常用」的排序规则（手动置顶 or 按使用频率）
 /// 还没定，先不做半截功能；规则确定后该加的字段正常加。
-enum _AccountFilter { all, liquid, credit, restricted }
+enum _AccountFilter { all, liquid, credit, restricted, investment }
 
 /// 可折叠的段。段键只用于记录「哪几段被收起」，不写库、不跨页面。
-enum _AccountGroup { liquid, credit, restricted, archived, search }
+enum _AccountGroup { liquid, credit, restricted, investment, archived, search }
 
 AccountKind? _kindOf(_AccountFilter f) => switch (f) {
       _AccountFilter.all => null,
       _AccountFilter.liquid => AccountKind.liquid,
       _AccountFilter.credit => AccountKind.credit,
       _AccountFilter.restricted => AccountKind.restricted,
+      _AccountFilter.investment => AccountKind.investment,
     };
 
 _AccountGroup _groupOf(AccountKind kind) => switch (kind) {
       AccountKind.liquid => _AccountGroup.liquid,
       AccountKind.credit => _AccountGroup.credit,
       AccountKind.restricted => _AccountGroup.restricted,
+      AccountKind.investment => _AccountGroup.investment,
     };
 
 String _filterLabel(_AccountFilter f) => switch (f) {
@@ -82,6 +84,7 @@ String _filterLabel(_AccountFilter f) => switch (f) {
       _AccountFilter.liquid => '流动资金',
       _AccountFilter.credit => '信用卡',
       _AccountFilter.restricted => '其他资金',
+      _AccountFilter.investment => '投资'
     };
 
 IconData _filterIcon(_AccountFilter f) => switch (f) {
@@ -89,6 +92,7 @@ IconData _filterIcon(_AccountFilter f) => switch (f) {
       _AccountFilter.liquid => AppIcons.accountCash,
       _AccountFilter.credit => AppIcons.accountCreditCard,
       _AccountFilter.restricted => AppIcons.locked,
+      _AccountFilter.investment => AppIcons.accountCash,
     };
 
 /// 【账户】= 底导直接打开的 5 个 Home 页之一。
@@ -384,6 +388,25 @@ class _AccountsScreenState extends State<AccountsScreen> {
           secondary: <AppInfoItem>[
             AppInfoItem(label: '账户数', value: '${stats.accountCount} 个'),
             const AppInfoItem(label: '这笔钱', value: '算进总账'),
+          ],
+        ),
+      // 契-7：K4 投资账户在看板单列，只显示剩余可用额；股票市值由资产侧算，
+      // 这里不重复计。scoped 已按筛选标签收窄，与 availableCredit 同源。
+      _AccountFilter.investment => AppSummaryHero(
+          label: '投资账户',
+          value: MoneyFormat.yuan0(scoped
+              .where((AccountRecord r) => r.kind == AccountKind.investment)
+              .fold<double>(
+                0,
+                (double v, AccountRecord r) => v + r.balance,
+              )),
+          caption: '券商资金账户里的钱，可转出到储蓄卡。',
+          secondary: <AppInfoItem>[
+            AppInfoItem(
+              label: '账户数',
+              value: '${scoped.where((AccountRecord r) => r.kind == AccountKind.investment).length} 个',
+            ),
+            const AppInfoItem(label: '股票市值', value: '资产侧'),
           ],
         ),
     };

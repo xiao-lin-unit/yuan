@@ -4,6 +4,7 @@ import '../../components.dart';
 import 'account_dao.dart';
 import 'account_db.dart';
 import 'account_record.dart';
+import '../../utils/money.dart';
 
 /// 出入流水的纯 SQL 层，也是**账户累计值的唯一写入点**。
 ///
@@ -53,42 +54,99 @@ class AccountEntryDao implements BaseDao {
     DatabaseExecutor txn,
     AccountEntryRecord entry, {
     required AccountBalanceRule rule,
+    String recordSource = 'user',
   }) async {
-    final rows = await txn.query(
-      accountsTable,
-      columns: <String>['balance', 'credit_limit'],
-      where: 'id = ? AND deleted_at IS NULL',
-      whereArgs: <Object?>[entry.accountId],
-      limit: 1,
-    );
+    // 【B2 阻断级】credit_limit 已下放 account_credit 次表：按 rule 分路
+    // JOIN 取额度，不再从主表读；同时取 book_id（B15）与本期消费额。
+    final bool isCredit = rule == AccountBalanceRule.credit;
+    final List<Map<String, Object?>> rows = isCredit
+        ? await txn.rawQuery(
+            'SELECT a.balance AS balance, a.book_id AS book_id, '
+            ' c.credit_limit AS credit_limit, '
+            ' c.current_period_spent AS current_period_spent '
+            ' FROM $accountsTable a '
+            ' LEFT JOIN ${AccountDb.creditTable} c ON c.account_id = a.id '
+            ' WHERE a.id = ? AND a.deleted_at IS NULL LIMIT 1',
+            <Object?>[entry.accountId],
+          )
+        : await txn.rawQuery(
+            'SELECT a.balance AS balance, a.book_id AS book_id, '
+            ' i.net_transfer_in AS net_transfer_in '
+            ' FROM $accountsTable a '
+            ' LEFT JOIN ${AccountDb.investmentTable} i ON i.account_id = a.id '
+            ' WHERE a.id = ? AND a.deleted_at IS NULL LIMIT 1',
+            <Object?>[entry.accountId],
+          );
     if (rows.isEmpty) {
       throw StateError('账户不存在或已删除，不能记流水');
     }
-    final double before = (rows.first['balance'] as num?)?.toDouble() ?? 0;
-    final double after = before + rule.delta(entry.direction, entry.amount);
-    // 只有信用卡规则写额度快照；储蓄类留 null。用 rule 而不是读账户
-    // kind 判断，保持「DAO 不解释账户类别、规则由调用方显式给」的约定。
-    final double? limitAfter = rule == AccountBalanceRule.credit
-        ? (rows.first['credit_limit'] as num?)?.toDouble()
-        : null;
+    // 【全局约定 2】DB 是 TEXT、累加全程 int 分，绝不走 double。
+    final int before = Money.parse(rows.first['balance'] as String?);
+    final int after = before +
+        rule.deltaCents(entry.direction, Money.centsOf(entry.amount));
+    final String? limitAfter =
+        isCredit ? rows.first['credit_limit'] as String? : null;
 
+    // 【契-15 / 本轮】K4 净转入额在「储蓄↔投资转入 / 转出」与「余额调整」
+    // 两个时机同步增减，增量符号与 balance 完全一致（in 加 / out 减，
+    // 由 rule.deltaCents 给出，不再按 entryType 手写正负号）。
+    // 买入扣款 / 卖出到账 / 开户 opening 都不改这一列：
+    // 开户期初值由新建账户事务直接落 account_investment（表单给初值）。
+    // K1/K3 没有 investment 行、K2 走 isCredit 分支，都天然跳过。
+    final String? netTransferIn =
+        isCredit ? null : rows.first['net_transfer_in'] as String?;
+    final bool netTransferChanged =
+        entry.entryType == AccountEntryType.transferIn ||
+            entry.entryType == AccountEntryType.transferOut ||
+            entry.entryType == AccountEntryType.adjustment;
+    if (netTransferIn != null && netTransferChanged) {
+      final int signedDelta =
+          rule.deltaCents(entry.direction, Money.centsOf(entry.amount));
+      final int net = Money.parse(netTransferIn) + signedDelta;
+      await txn.rawUpdate(
+        'UPDATE ${AccountDb.investmentTable} SET net_transfer_in = ?, '
+        'updated_at = ?, revision = revision + 1 WHERE account_id = ?',
+        <Object?>[
+          Money.format(net),
+          DateTime.now().millisecondsSinceEpoch,
+          entry.accountId,
+        ],
+      );
+    }
+
+    // 【方案 A】本期消费额与流水同事务累加；列是当期缓存，不是第二真源。
+    // 账单出账归零由 CreditCardAccountController.rollStatement 负责。
+    if (isCredit && entry.entryType == AccountEntryType.creditSpend) {
+      final int spent =
+          Money.parse(rows.first['current_period_spent'] as String?);
+      await txn.rawUpdate(
+        'UPDATE ${AccountDb.creditTable} SET current_period_spent = ?, '
+        'updated_at = ?, revision = revision + 1 WHERE account_id = ?',
+        <Object?>[
+          Money.format(spent + Money.centsOf(entry.amount)),
+          DateTime.now().millisecondsSinceEpoch,
+          entry.accountId,
+        ],
+      );
+    }
+
+    final int now = DateTime.now().millisecondsSinceEpoch;
     final Map<String, dynamic> values = entry.toMap()
-      ..['balance_after'] = after
-      ..['credit_limit_after'] = limitAfter;
+      ..['balance_after'] = Money.format(after)
+      ..['credit_limit_after'] = limitAfter
+      ..['book_id'] = (rows.first['book_id'] as String?) ?? 'default'
+      ..['record_source'] = recordSource
+      ..['updated_at'] = now;
     final int id = await txn.insert(table, values);
     if (id <= 0) throw StateError('流水写入未生效');
 
     final int affected = await txn.rawUpdate(
       'UPDATE $accountsTable SET balance = ?, updated_at = ?, '
       'revision = revision + 1 WHERE id = ? AND deleted_at IS NULL',
-      <Object?>[
-        after,
-        DateTime.now().millisecondsSinceEpoch,
-        entry.accountId,
-      ],
+      <Object?>[Money.format(after), now, entry.accountId],
     );
     if (affected == 0) throw StateError('账户余额同步未生效');
-    return after;
+    return Money.toYuan(after);
   }
 
   /// 某账户的流水（按交易时间倒序，附录 C）。
@@ -180,8 +238,8 @@ class AccountEntryDao implements BaseDao {
     final String clause = where.join(' AND ');
     final rows = await db.rawQuery(
       'SELECT '
-      " COALESCE(SUM(CASE WHEN direction = 'in' THEN amount ELSE 0 END), 0) AS inc,"
-      " COALESCE(SUM(CASE WHEN direction = 'out' THEN amount ELSE 0 END), 0) AS out"
+      " COALESCE(SUM(CASE WHEN direction = 'in' THEN CAST(amount AS REAL) ELSE 0 END), 0) AS inc,"
+      " COALESCE(SUM(CASE WHEN direction = 'out' THEN CAST(amount AS REAL) ELSE 0 END), 0) AS out"
       ' FROM $table WHERE $clause',
       args,
     );
@@ -241,6 +299,56 @@ class AccountEntryDao implements BaseDao {
           ),
         ),
     ];
+  }
+
+  /// 【全局约定 10】三个统计视图取数：生活成本 / 实际支出 / 资产抵消。
+  ///
+  /// 【工作逻辑】先限定「非 K2 存储账户 + direction='out' + 未软删账户」，
+  /// 再按 `entry_type` 分两组：消费类 `expense`、还款类 `credit_repay`。
+  /// 金额取 `amount` 全额、不分本金利息；`assetOffset` 是 `actualExpense`
+  /// 的子集，同源不重复写数。K2 的 `credit_spend` / `interest` 动的是额度
+  /// 与欠款，不进视图；账单出账息费也不另计（已含在还款金额里）。
+  /// **取数不依赖 `ref_type`**：支出 / 收入模块未开工、ref_id 全空也能算。
+  Future<AccountExpenseStats> expenseStats(
+    Database db, {
+    String bookId = 'default',
+    DateTime? from,
+    DateTime? to,
+  }) async {
+    final List<String> where = <String>[
+      'e.direction = ?',
+      "a.kind <> 'credit'",
+      'a.deleted_at IS NULL',
+      'e.book_id = ?',
+    ];
+    final List<Object?> args = <Object?>['out', bookId];
+    if (from != null) {
+      where.add('e.occurred_at >= ?');
+      args.add(from.millisecondsSinceEpoch);
+    }
+    if (to != null) {
+      where.add('e.occurred_at < ?');
+      args.add(to.millisecondsSinceEpoch);
+    }
+    final List<Map<String, Object?>> rows = await db.rawQuery(
+      'SELECT '
+      " COALESCE(SUM(CASE WHEN e.entry_type = 'expense' "
+      '   THEN CAST(e.amount AS REAL) ELSE 0 END), 0) AS direct,'
+      " COALESCE(SUM(CASE WHEN e.entry_type = 'credit_repay' "
+      '   THEN CAST(e.amount AS REAL) ELSE 0 END), 0) AS indirect'
+      ' FROM $table e JOIN $accountsTable a ON a.id = e.account_id'
+      ' WHERE ${where.join(' AND ')}',
+      args,
+    );
+    final double direct =
+        (rows.first['direct'] as num?)?.toDouble() ?? 0;
+    final double indirect =
+        (rows.first['indirect'] as num?)?.toDouble() ?? 0;
+    return AccountExpenseStats(
+      livingCost: direct,
+      actualExpense: direct + indirect,
+      assetOffset: indirect,
+    );
   }
 
   /// 恒等式审计（10.9）：返回「按规则算出的应有累计值 − 实际 balance」，

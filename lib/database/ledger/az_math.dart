@@ -210,10 +210,16 @@ abstract final class AzMath {
     int n2 = 0;
     for (final AccountRecord a in accounts) {
       if (a.isDeleted || a.archived) continue;
+      // 契-7：总资产按 include_in_net_worth 聚合，K4 投资账户里的真钱
+      // 并入 A1 镜像（看板「投资账户单列」待 UI 接入），不再只认 liquid。
+      if (a.kind == AccountKind.credit || !a.includeInNetWorth) continue;
       if (a.kind == AccountKind.liquid && a.isLiquid) {
         a1 += a.balance;
         n1++;
-      } else if (a.kind == AccountKind.restricted && a.includeInNetWorth) {
+      } else if (a.kind == AccountKind.investment) {
+        a1 += a.balance;
+        n1++;
+      } else if (a.kind == AccountKind.restricted) {
         a2 += a.balance;
         n2++;
       }

@@ -97,6 +97,11 @@ Future<AccountKind?> showAccountKindPicker(BuildContext context) =>
             label: AccountKind.restricted.label,
             icon: AppIcons.locked,
           ),
+          SheetCategory<AccountKind>(
+            value: AccountKind.investment,
+            label: AccountKind.investment.label,
+            icon: AppIcons.accountCash,
+          ),
         ],
         allLabel: '全部类型',
         hint: '选择后仍可修改名称与图标。',
@@ -182,21 +187,42 @@ Future<void> showAccountEditorSheet(
           hint: '例如：工资入账账户 / 房租储蓄',
         ),
 
-        // ── 储蓄类专属：开户余额、受限账户开关与绑定用途 ────────────
+        // ── 储蓄类专属：开户余额 / 投资账户期初、受限开关与绑定用途 ──
+        // 【本轮】K4 新增时录「可用金额」（用户此前已在使用的账户里真实
+        // 有多少钱）+ 可选「转入金额」；两者都只在新建时出现，编辑态不显示，
+        // 避免破坏「期初 + Σ流水 = 余额」恒等式。
         if (kind != AccountKind.credit) ...<SheetFormItem>[
-          // 3.8：只有开户时允许填初始余额；编辑时不显示，
-          // 避免改了期初值破坏「期初 + Σ流水 = 余额」恒等式。
-          if (editing == null)
+          if (editing == null) ...<SheetFormItem>[
             SheetFormSingleLineTextItem(
               key: 'initial',
-              label: '余额',
+              label: kind == AccountKind.investment ? '可用金额' : '余额',
+              hint: kind == AccountKind.investment
+                  ? '账户里现有的钱，作为可用金额'
+                  : '开户时的余额',
               initialValue: '0',
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               validator: (String value) =>
                   (double.tryParse(value.trim()) ?? -1) < 0
-                      ? '余额不得为负数'
+                      ? '金额不得为负数'
                       : null,
             ),
+            // 契-15：不填则净转入额 = 可用金额；填了就用填入值。
+            if (kind == AccountKind.investment)
+              SheetFormSingleLineTextItem(
+                key: 'transferIn',
+                label: '转入金额',
+                hint: '选填；不填则与可用金额相同',
+                initialValue: '',
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                validator: (String value) {
+                  final String t = value.trim();
+                  if (t.isEmpty) return null;
+                  final double? v = double.tryParse(t);
+                  return (v == null || v < 0) ? '转入金额不得为负数' : null;
+                },
+              ),
+          ],
           if (kind == AccountKind.restricted) ...<SheetFormItem>[
             SheetFormToggleItem(
               key: 'isLiquid',
@@ -515,7 +541,9 @@ Future<void> showAccountAdjustSheet(
   await AppSheetShell.show<SheetFormValues>(
     context,
     header: SheetHeader(
-      title: '余额调整',
+      title: account.kind == AccountKind.investment
+          ? '可用金额调整'
+          : '余额调整',
       centered: true,
       leading: const SheetCancelAction(),
       trailing: SheetTextAction(
@@ -535,7 +563,9 @@ Future<void> showAccountAdjustSheet(
       items: <SheetFormItem>[
         SheetFormNoteItem(
           key: 'current',
-          text: '当前余额：${MoneyFormat.yuan(account.balance)}',
+          text: account.kind == AccountKind.investment
+              ? '当前可用金额：${MoneyFormat.yuan(account.balance)}'
+              : '当前余额：${MoneyFormat.yuan(account.balance)}',
           align: TextAlign.start,
         ),
         SheetFormSingleLineTextItem(
@@ -971,10 +1001,17 @@ Future<void> _saveSavings({
   required SheetFormValues values,
   required AccountType type,
 }) async {
+  // 【本轮】K1/K3/K4 都读「期初金额」；K4 另有可选「转入金额」，
+  // 留空时由 Controller 用期初可用金额兜底。
   final double initial =
       double.tryParse(values.text('initial').trim()) ??
           editing?.initialBalance ??
           0;
+  final String transferInText = values.text('transferIn').trim();
+  final double? openingTransferIn =
+      kind == AccountKind.investment && editing == null
+          ? (transferInText.isEmpty ? null : double.tryParse(transferInText))
+          : null;
   final bool isLiquid = type.liquidLocked
       ? false
       : (values.contains('isLiquid')
@@ -987,6 +1024,7 @@ Future<void> _saveSavings({
     type: type,
     name: values.text('name'),
     initialBalance: initial,
+    openingTransferIn: openingTransferIn,
     note: values.text('note'),
     isLiquid: isLiquid,
     includeInNetWorth: editing?.includeInNetWorth ?? true,

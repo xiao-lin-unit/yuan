@@ -289,6 +289,8 @@ class AccountController extends ChangeNotifier {
     return _all
         .where((AccountRecord r) {
           if (r.isDeleted || r.archived) return false;
+          // A8：K4 投资账户不是付款账户，不进记支出的下拉。
+          if (r.kind == AccountKind.investment) return false;
           if (r.kind == AccountKind.liquid ||
               r.kind == AccountKind.credit) {
             return true;
@@ -401,6 +403,7 @@ class AccountController extends ChangeNotifier {
     double spendable = 0;
     double owed = 0;
     double restricted = 0;
+    double investment = 0;
     int creditCount = 0;
     int count = 0;
     for (final AccountRecord r in rows) {
@@ -414,12 +417,17 @@ class AccountController extends ChangeNotifier {
           creditCount += 1;
         case AccountKind.restricted:
           if (r.includeInNetWorth) restricted += r.balance;
+        case AccountKind.investment:
+          // 契-7：K4 真钱按 include_in_net_worth 单列进投资块，
+          // 与 AzMath.mirrors 的 A1 镜像同源；不进 spendable / restricted。
+          if (r.includeInNetWorth) investment += r.balance;
       }
     }
     return AccountStats(
       spendable: spendable,
       owedToBank: owed,
       restrictedTotal: restricted,
+      investmentTotal: investment,
       accountCount: count,
       creditCount: creditCount,
     );
@@ -431,8 +439,10 @@ class AccountController extends ChangeNotifier {
   /// 「真正属于你的钱」当前只算账户口径（3.6 完整公式还要加资产估值、
   /// 借出/借入，那些模块在第二阶段）。页面显示时附带一句说明，
   /// 不把一个不完整的数字伪装成最终答案。
-  double get netWorthSoFar =>
-      stats.spendable + stats.restrictedTotal - stats.owedToBank;
+  double get netWorthSoFar => stats.spendable +
+      stats.restrictedTotal +
+      stats.investmentTotal -
+      stats.owedToBank;
 
   AccountRecord? byId(int id) {
     for (final AccountRecord r in _all) {

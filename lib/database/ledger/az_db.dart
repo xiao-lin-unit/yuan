@@ -33,11 +33,11 @@ import '../db_module.dart';
 /// 约束非空或数值范围，取值合法性交给 Dart 枚举与 Controller 校验；
 /// 以后加资产大类、加负债类型只改 Dart，不升版本。
 ///
-/// 【B 延后期间纪律 ①】新表必须同时登记两处：
-///   全新安装 → DatabaseService._modules 里的 AzDb.onCreate；
-///   开发期老库 → _onUpgrade 的 `oldV < 9` 补建段。
-/// 两边都调 [create]（DDL 单一真源、IF NOT EXISTS 幂等），漏一处就会出现
-/// 「新装正常、开发机老库缺表」。v9 无数据迁移、无重建。
+/// 【建表装配已收口】七张表只由 DatabaseService._onCreate 遍历模块清单
+/// 时调用 [create] 建立；`_onUpgrade` 不再有 `oldV < 9` 补建段，也不写
+/// 任何 create。DDL 单一真源、IF NOT EXISTS 幂等。开发期旧库靠
+/// onDowngrade 删库重建，重建同样走完整的 _onCreate。
+/// 新增表只登记进本模块的 [create]，不再往升级路径补分支。
 class AzDb implements DbModule {
   static const String assetsTable = 'az_assets';
   static const String liabilitiesTable = 'az_liabilities';
@@ -51,7 +51,7 @@ class AzDb implements DbModule {
   String get name => 'ledger';
 
   /// 唯一 DDL 真源。参数用 [DatabaseExecutor]：`_onCreate` 传事务里的
-  /// Transaction、`_onUpgrade` 传 Database，两者都能收。不自建事务。
+  /// Transaction。不自建事务；升级路径不调用本方法。
   static Future<void> create(DatabaseExecutor db) async {
     // ── ① 自登记资产（A3~A11，6.3 / 6.4 / 6.6 / 6.7）──────────────
     // cost = 买它一共花了多少（含税费，10.6 正数）；

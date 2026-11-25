@@ -4,38 +4,47 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:yuan/database/account/account_db.dart';
 import 'package:yuan/database/ledger/az_db.dart';
-import 'package:yuan/database/account/credit_card_rule.dart';
 import 'package:yuan/database/db_module.dart';
 import 'package:yuan/database/category/category_db.dart';
 import 'package:yuan/database/user/user_db.dart';
-import 'package:yuan/service/image/image_migration.dart';
 
-/// 数据库服务：只负责建库建表，不存任何业务表
+/// 数据库服务：只负责建库建表，不存任何业务表。
+///
+/// ══════════════════════════════════════════════════════════════════
+/// 【建表装配：只走 onCreate，不走 update】
+/// ══════════════════════════════════════════════════════════════════
+/// 此前每加一张新业务表都要在 `_onUpgrade` 手写一段逐版本补建，
+/// 那条路径有四个问题：两条真源会漂移、发布后全是死代码、建表/灌种子/
+/// 改结构/修数据口径挤在一个方法里、种子被重复执行。开发期靠它复用历史
+/// 数据合理，但**不是最终方案**。
+///
+/// 现在收口成一条规则：
+///   · **全新安装**：`_onCreate` 遍历 [_modules]，一次建完全部表 + 种子，
+///     这是所有表的唯一建表路径；
+///   · **升级**：`_onUpgrade` 里**没有任何 create / 补建**，只留发布之后
+///     需要追加的真实数据迁移脚本（当前为空）；
+///   · 新增表只登记进对应模块的 `onCreate`，不再往 `_onUpgrade` 补分支。
+///
+/// 【发布基线】`_dbVersion = 1`。开发机上 v1~v9 的旧库没有真实用户数据，
+/// 通过 `onDowngrade: onDatabaseDowngradeDelete` 自动删库重建，重建走的
+/// 依旧是完整的 `_onCreate`。两份草案都要求「旧表全删、不做迁移、
+/// 全库一次性重建」，所以这里不再保留逐版本迁移链。
+///
+/// 【硬约束】`az_assets.link_account_id` / `az_liabilities.link_account_id`
+/// 单向指向 `accounts.id`，因此**全库一次性重建**，禁止分模块先后执行。
+/// 一旦有真实用户，立即切换纪律：已发布迁移脚本只读、只追加，禁止压平。
 class DatabaseService {
   DatabaseService._internal();
   static final DatabaseService instance = DatabaseService._internal();
 
   static const _dbName = 'yuan.db';
-  // v1: 头像存 base64；v2: 统一图片引用（ImageRef），由 ImageMigration 收编旧数据；
-  // v3: 新增 categories（收支分类，一张表 + 41 条预设种子）；
-  // v4: 新增 accounts（三类账户共用一张主表）+ account_category_bindings
-  //     （受限账户绑定用途）+ account_entries（账户出入流水）。
-  // v5: accounts 主表重建：DDL 不再把具体形态写死在 CHECK 里，
-  //     形态合法性交给 Dart 枚举（以后加「花呗 / 借呗」这类形态不升版本）。
-  // v6: 信用卡流水 direction 翻转（消费 → 出账、还款 → 入账）。
-  //     DDL 与列结构不变，只做一次幂等 UPDATE；balance_after 原样保留。
-  // v7: account_entries 新增 credit_limit_after（每笔流水当时的总额度），
-  //     用于精确还原历史流水的可用额度；历史数据按当前额度回填兜底。
-  // v8: 新增 credit_card_rules（3.4 信用卡章程十项，一对一附属表）。
-  //     只补建一张新表，无数据迁移、无重建，accounts / entries 的 DDL
-  //     一字节不动；章程由用户自己填，旧数据按「没填过」兼容。
-  // v9: 新增资债模块七张表（AzDb.create）：az_assets /
-  //     az_liabilities / az_repay_plans / az_asset_trades /
-  //     az_contingents / az_preferences / az_monthly_snapshots。
-  //     全是新业务表，不碰 accounts / categories 的任何列；无数据迁移。
-  static const _dbVersion = 9;
+
+  /// 发布基线：所有表由 `_onCreate` 一次建齐，之后每个版本只追加迁移。
+  static const _dbVersion = 1;
   Database? _db;
 
+  /// 全新安装的**唯一 Schema 清单**。新增模块只需登记在这里，
+  /// 并让它的 `onCreate` 建好自己全部的表与种子。
   final List<DbModule> _modules = <DbModule>[
     UserDb(),
     CategoryDb(),
@@ -52,23 +61,27 @@ class DatabaseService {
   Future<Database> _open() async {
     final dbPath = join(await getDatabasesPath(), _dbName);
     debugPrint('📱 DB PATH = $dbPath');
-    final exists = await databaseFactory.databaseExists(dbPath);
+    final bool exists = await databaseFactory.databaseExists(dbPath);
     debugPrint('📱 DB EXISTS = $exists');
     return await openDatabase(
       dbPath,
       version: _dbVersion,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
+      // 开发期 v1~v9 旧库（版本号高于发布基线）直接删库重建：
+      // 重建仍走完整的 _onCreate，升级路径不会补建任何表。
+      onDowngrade: onDatabaseDowngradeDelete,
     );
   }
 
+  /// 全新安装：一个事务里按模块清单建全部表 + 种子。
   Future<void> _onCreate(Database db, int version) async {
     try {
       await db.transaction((txn) async {
-            for(final module in _modules) {
-              await module.onCreate(txn);
-            }
-          });
+        for (final DbModule module in _modules) {
+          await module.onCreate(txn);
+        }
+      });
     } catch (e, st) {
       debugPrint('❌ 数据库初始化失败: $e');
       debugPrint(st.toString());
@@ -76,88 +89,12 @@ class DatabaseService {
     }
   }
 
+  /// 升级：**不建表、不补建、不灌种子**。
+  /// 当前发布基线为 v1，尚无需要保留的真实用户数据，故为空。
+  /// 发布之后若需要 `ALTER` / 重建 / 数据订正，只在这里按版本追加脚本，
+  /// 并且永远不要调用任何 `DbModule.onCreate`。
   Future<void> _onUpgrade(Database db, int oldV, int newV) async {
-    if (oldV < 2) {
-      // 统一图片迁移：任何表的旧图片列都走同一套逻辑
-      await ImageMigration.run(db);
-    }
-    if (oldV < 3) {
-      // categories 表 + 索引 + 预设种子。CategoryDb.onCreate 是幂等的
-      // （IF NOT EXISTS / INSERT OR IGNORE），全新安装与 v2→v3 升级共用。
-      await CategoryDb().onCreate(db);
-    }
-    // 【分支工作逻辑，为什么是 if / else if 而不是两个独立 if】
-    //   · oldV < 4（全新安装或 v1~v3）：accounts 还不存在，onCreate 用
-    //     v5 的 DDL 一次性建好三张表，不需要重建；
-    //   · oldV == 4：accounts 已按 v4 的旧 CHECK 建好，CREATE TABLE
-    //     IF NOT EXISTS 不会改结构，必须走重建迁移；
-    // 若写成两个独立 if，老用户在同一次升级里会「刚建好又重建」一遍。
-    // openDatabase 的 onUpgrade 整体已在一个事务内，迁移方法不自建事务。
-    if (oldV < 4) {
-      // accounts / 绑定 / 流水三张表 + 索引。AccountDb.onCreate 幂等，
-      // 全新安装与 v1~v3 升级共用；不插演示账户，用户账本保持干净。
-      await AccountDb().onCreate(db);
-    } else if (oldV == 4) {
-      // v4 → v5：按列名全量拷贝 → DROP → RENAME → 重建索引。
-      // 绑定表与流水表不动，id 原样保留。
-      await AccountDb.migrateV4ToV5(db);
-    }
-    // v5 → v6 与上面的建表 / 重建**顺序执行、互不排斥**：
-    //   · oldV == 4 的用户先重建主表，再翻转旧流水方向；
-    //   · oldV == 5 的用户直接翻转；
-    //   · oldV < 4 的用户表是空的，UPDATE 影响 0 行。
-    // 写成独立 if 而不是 else if，是因为它属于「数据口径修正」，
-    // 与「表结构建立 / 重建」是两件事，任何起点都要过这一遍。
-    if (oldV < 6) {
-      await AccountDb.migrateV5ToV6(db);
-    }
-    // v6 → v7：加列 + 回填。与上面的建表 / 重建**顺序执行、互不排斥**：
-    //   · oldV < 4 的用户，onCreate 已建成含新列的表，迁移方法靠
-    //     PRAGMA 判列跳过 ALTER，UPDATE 影响 0 行；
-    //   · oldV == 4 / 5 / 6 的用户，entries 表是旧结构，正常 ALTER + 回填。
-    // 写成独立 if，是因为「加列」与「建表 / 翻方向」是不同事项，
-    // 任何起点都要过这一遍。
-    if (oldV < 7) {
-      await AccountDb.migrateV6ToV7(db);
-    }
-    // v7 → v8：补建 credit_card_rules（新业务表，不是改已有表结构）。
-    //
-    // 【B 延后期间纪律 ① 的落点】开发阶段每加一张新表，必须**同时**
-    // 登记两处：全新安装走 _onCreate → AccountDb.onCreate → 本方法；
-    // 老库升级走这里。两处调同一个 CreditCardRuleDb.create（DDL 单一
-    // 真源、IF NOT EXISTS 幂等），漏一处就会出现「新装正常、开发机老库
-    // 缺表」，而这种 bug 在一直在用的开发机上永远复现不出来。
-    //
-    // 【为什么写成独立 if，4 种起点都过一遍】
-    //   · oldV < 4：上面的 AccountDb.onCreate 已建过，本段幂等跳过；
-    //   · oldV == 4 / 5 / 6：走完各自迁移后在这里补建；
-    //   · oldV == 7：只补建这一张表；
-    //   · 全新安装：不走 onUpgrade，由 _onCreate 建。
-    // 与「建表 / 翻方向 / 加列」是不同事项，不写成 else if。
-    // 无数据迁移（用户还没填过章程），因此不需要 vN → vN+1 的数据订正。
-    // 【事务边界】openDatabase.onUpgrade 整体已在事务内，不自建事务。
-    if (oldV < 8) {
-      await CreditCardRuleDb.create(db);
-    }
-    // v8 → v9：补建资债七张表（新业务表，不是改已有表结构）。
-    //
-    // 【B 延后期间纪律 ① 的落点，与 v8 完全同一套】每加新表必须
-    // **同时**登记两处：全新安装走 _onCreate → AzDb.onCreate；
-    // 老库升级走这里。两处调同一个 AzDb.create（DDL 单一
-    // 真源、IF NOT EXISTS 幂等），漏一处就会出现「新装正常、开发机老库
-    // 缺表」，而这种 bug 在一直在用的开发机上永远复现不出来。
-    //
-    // 【为什么是独立 if，5 种起点都过一遍】
-    //   · oldV < 4：上面的 AccountDb.onCreate 已建过账户表，这里补资债表；
-    //   · oldV == 4 / 5 / 6 / 7：走完各自迁移后在这里补建；
-    //   · oldV == 8：只补建这批表；
-    //   · 全新安装：不走 onUpgrade，由 _onCreate 的模块清单建。
-    // 与「建表 / 翻方向 / 加列 / 补章程」是不同事项，不写成 else if。
-    // 无数据迁移（用户还没填过资产与负债），因此不需要数据订正。
-    // 【事务边界】openDatabase.onUpgrade 整体已在事务内，不自建事务。
-    if (oldV < 9) {
-      await AzDb.create(db);
-    }
+    // 逐版本迁移脚本在此追加（只做 ALTER / 重建 / 数据订正，绝不建表）。
   }
 
   Future<void> close() async {
