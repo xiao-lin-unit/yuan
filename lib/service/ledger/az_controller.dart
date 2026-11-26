@@ -324,6 +324,11 @@ class AzWriteController {
   /// 供 [AzRepaymentService] 把「债务状态更新」和「账户出账」放进同一个
   /// [UnitOfWork.run]：出账失败 → 本方法已执行的 UPDATE 一并回滚，
   /// 不会出现「债务已记已还、卡里的钱没扣」。单独调用请走 [markPlanPaid]。
+  /// 【所属模块】service/ledger · 债务处理（供跨模块编排调用）
+  /// 【实现功能】把一期还款计划标记为已还并写回实还金额；收 txn、不自建事务，供 AzRepaymentService 与账户出账接口放进同一个事务。
+  /// 【使用限制】只改计划状态与实还金额，不改负债剩余本金、不动账户余额；必须由外层 UnitOfWork.run 传入 txn，单独调用不会开事务；公开 markPlanPaid 仍保留给原负债页入口。
+  /// 【入参与结果】txn 必填；planId / actualAmount / reason 必填。返回 Future<void>，调用方必须 await；刷新由外层 afterCommit 统一做，本方法不通知页面。
+  /// 【异常与调用方处理】计划不存在 / 状态不合法 / DAO 异常原样上抛；外层事务会因此整体回滚（含账户出账）。调用方需自行 try/catch 提示用户，不要吞掉异常后继续刷新。
   Future<void> markPlanPaidIn(
     DatabaseExecutor txn, {
     required int planId,

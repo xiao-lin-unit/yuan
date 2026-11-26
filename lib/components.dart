@@ -40,6 +40,11 @@ abstract class BaseDao {
 ///     UI 不需要重写任何功能。
 ///   · 账户侧与资债侧拿的是**同一个** [UnitOfWork] 和 [AccountLedger]，
 ///     因此「债务处理 + 账户出账」能放进同一个事务，后者失败回滚前者。
+///
+/// 【契约】本装配点是《项目规范与契约.md》的执行点：架构三条（要-17 ~ 要-19 /
+/// 硬-17 ~ 硬-19 / 契-16 ~ 契-18）与接口注释标准（要-20 / 硬-20 / 契-19）。
+/// 新增模块 / 换页面前先读该文 2.4 / 2.5 / 三-D / 三-E / 4.3 / 4.4；
+/// 本文件必须为 8 个功能接口各建且只建一份实例，否则即违约。
 class Services {
   /// 页面一律 `context.read<XxxController>()` 取用。
   static Future<List<SingleChildWidget>> initServices(Database db) async {
