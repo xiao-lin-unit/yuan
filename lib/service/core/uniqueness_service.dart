@@ -120,7 +120,6 @@ class UniquenessService {
         EntityKind.category => '分类',
         EntityKind.asset => '一项东西',
         EntityKind.liability => '一笔欠款',
-        EntityKind.contingent => '一笔或有项',
         _ => '记录',
       };
 }

@@ -31,7 +31,8 @@ import 'package:yuan/database/user/user_db.dart';
 /// 全库一次性重建」，所以这里不再保留逐版本迁移链。
 ///
 /// 【硬约束】`az_assets.link_account_id` / `az_liabilities.link_account_id`
-/// 单向指向 `accounts.id`，因此**全库一次性重建**，禁止分模块先后执行。
+/// 单向指向 `accounts.id`，资债侧现按《资产表结构草案.md》共 32 张表一次建齐，
+/// 因此**全库一次性重建**，禁止分模块先后执行。
 /// 一旦有真实用户，立即切换纪律：已发布迁移脚本只读、只追加，禁止压平。
 class DatabaseService {
   DatabaseService._internal();

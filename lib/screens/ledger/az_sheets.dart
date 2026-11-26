@@ -1,241 +1,246 @@
-import 'dart:async';
-
 import 'package:material_ui/material_ui.dart';
-import 'package:provider/provider.dart';
 
-import '../../database/account/account_record.dart';
-import '../../database/ledger/az_math.dart';
 import '../../database/ledger/az_record.dart';
-import '../../screens/commons/sheet/app_sheet_shell.dart';
-import '../../screens/commons/sheet/contents/overview_sheet_content.dart';
-import '../../screens/commons/sheet/contents/select_sheet_content.dart';
-import '../../screens/commons/sheet/parts/sheet_primitives.dart';
-import '../../screens/commons/sheet/sheet_models.dart';
-import '../../service/account_controller.dart';
-import '../../service/ledger/az_controller.dart';
-import '../../utils/money_format.dart';
-import '../commons/icons/app_icons.dart';
+import '../../database/ledger/az_schema.dart';
 
-/// 表单类入口统一从这里导出：页面只 `import 'az_sheets.dart'` 一处。
-export 'az_form_sheets.dart';
+/// 一次新增 / 编辑提交上来的字段值。
+/// 【所属模块】screens/ledger · 新增表单
+/// 【实现功能】承载动态表单填出的主表字段与次表字段，交给 AzWriteController 写库。
+/// 【使用限制】不可变；键必须来自 AzSchema.editableColumns；金额一律 String。
+/// 【入参与结果】构造收 mainValues / subValues；消费方只读字段。
+/// 【异常与调用方处理】不抛异常；空 Map 表示没有可编辑字段，调用方按「只建主表」处理。
+class AzEntryDraft {
+  const AzEntryDraft({required this.mainValues, required this.subValues});
 
-/// 资债模块的**展示类 Sheet**。
-///
-/// 【职责边界】资债只做记录：月收入、每月必须花的钱、应急金月数、
-/// 物价假设、偿债档位等是情境设计（8.2 / 13.2）与分析（7.9）的输入，
-/// 月末快照属分析（8.1.3 / 13.12），都不在本模块录入或直接展示。
-/// 本文件只留基于**已记录数据**的只读展示，以及估值口径这一记录口径
-/// （6.4，放资产汇总行的下拉，不单开设置弹层）。
-///
-/// 【契约】全部走 `AppSheetShell.show` 唯一外壳 + 既有内容组件：
-///   · 估值口径 → [SelectSheetContent]（未指定选择）；
-///   · 划不划算 / 逐月缺口 / 先还哪一笔 → [OverviewSheetContent]（仅展示）。
-/// **没有新建任何 XxxSheetContent，也没有第二套弹层外壳。**
-///
-/// 【关闭按钮怎么拿到渲染时 context】[OverviewSheetContent.onAction] 是
-/// 不带 context 的 VoidCallback。这里统一用 `Builder` 包一层：Builder 的
-/// context 在 SheetScope **内部**，所以 `SheetActions.close(sheetContext)`
-/// 既能查到「我在 Sheet 内」的标记，也一定 pop 的是弹层而不是页面。
-/// 这与 SheetCancelAction 用自己 build 里的 context 是同一条规矩。
+  final Map<String, Object?> mainValues;
+  final Map<String, Object?> subValues;
+}
 
-/// ① 估值口径（6.4）。切到「按我填的最新价」时给一句白话提醒，
-/// 不冒充实时行情；切换留痕走 setPreference 的 revision。
-Future<void> showAzValuationModeSheet(
+/// 先选类型（按类型组列出），再进动态表单。
+/// 【所属模块】screens/ledger · 新增表单
+/// 【实现功能】弹出按 AzSchema.groups 归好组的类型选择框，返回用户选中的 AzTypeSpec；取消返回 null。
+/// 【使用限制】side 只能是 'asset' / 'liability'；页面拿到 null 时不得继续新增流程。
+/// 【入参与结果】收 context 与 side；返回 Future<AzTypeSpec?>，调用方必须 await 并判 mounted。
+/// 【异常与调用方处理】不抛异常；弹层被系统关闭返回 null；调用方需自行判空、判 mounted。
+Future<AzTypeSpec?> showAzTypeSheet(BuildContext context, {required String side}) {
+  return showDialog<AzTypeSpec>(
+    context: context,
+    builder: (BuildContext ctx) {
+      final List<Widget> items = <Widget>[];
+      for (final AzTypeGroup g in AzSchema.groups) {
+        if (g.side != side) continue;
+        items.add(Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+          child: Text(g.label, style: const TextStyle(fontWeight: FontWeight.w700)),
+        ));
+        for (final AzTypeSpec t in AzSchema.typesOfGroup(g.key)) {
+          items.add(SimpleDialogOption(
+            onPressed: () => Navigator.of(ctx).pop(t),
+            child: Text('${t.code}（${t.label}）'),
+          ));
+        }
+      }
+      return SimpleDialog(
+        title: Text(side == 'asset' ? '新增资产：先选类型' : '新增负债：先选类型'),
+        children: <Widget>[
+          SizedBox(
+            width: double.maxFinite,
+            child: SingleChildScrollView(child: Column(children: items)),
+          ),
+        ],
+      );
+    },
+  );
+}
+
+/// 按 AzSchema 列元数据生成主表 + 次表的动态表单。
+/// 【所属模块】screens/ledger · 新增表单
+/// 【实现功能】为选中的类型渲染主表与对应次表的全部可录入列（文本 / 整数 / 金额 / 枚举），提交时转成 AzEntryDraft；编辑时带出已有值。
+/// 【使用限制】判别列、系统列、软件计算列不出现；金额按 TEXT 字符串提交，空金额写 '0'；不得在表单里写库。
+/// 【入参与结果】收 context / spec / 可选 initialData 与 editId；返回 Future<AzEntryDraft?>，取消或名称为空时返回 null（名称为空会留在弹层并提示）。
+/// 【异常与调用方处理】不抛异常；调用方必须判 null 与 mounted；写库异常由 AzWriteController 上抛，表单不吞。
+Future<AzEntryDraft?> showAzEntrySheet(
   BuildContext context,
-  ValuationMode current,
-) async {
-  await AppSheetShell.show<ValuationMode>(
-    context,
-    header: const SheetHeader(
-      title: '估值口径',
-      centered: true,
-      leading: SheetCancelAction(),
+  AzTypeSpec spec, {
+  AzData? initialData,
+  int? editId,
+}) {
+  return showDialog<AzEntryDraft>(
+    context: context,
+    builder: (BuildContext ctx) => _AzEntryDialog(
+      spec: spec,
+      initialData: initialData,
+      editId: editId,
     ),
-    child: SelectSheetContent<ValuationMode>(
-      options: const <SheetOption<ValuationMode>>[
-        SheetOption<ValuationMode>(
-          value: ValuationMode.cost,
-          label: '买入价',
-          icon: AppIcons.balanceAdjust,
+  );
+}
+
+class _AzEntryDialog extends StatefulWidget {
+  const _AzEntryDialog({required this.spec, this.initialData, this.editId});
+
+  final AzTypeSpec spec;
+  final AzData? initialData;
+  final int? editId;
+
+  @override
+  State<_AzEntryDialog> createState() => _AzEntryDialogState();
+}
+
+class _AzEntryDialogState extends State<_AzEntryDialog> {
+  final Map<String, TextEditingController> _controllers = <String, TextEditingController>{};
+  final Map<String, String> _choices = <String, String>{};
+  final Map<String, String> _enumDefault = <String, String>{
+    'status': 'normal',
+    'state': 'pending',
+    'record_source': 'user',
+    'repay_method': 'equal_principal',
+    'term_unit': 'month',
+    'direction': 'out',
+  };
+  String _error = '';
+
+  late final List<AzColumn> _mainCols;
+  late final List<AzColumn> _subCols;
+
+  @override
+  void initState() {
+    super.initState();
+    _mainCols = AzSchema.editableColumns(widget.spec.mainTable);
+    _subCols = AzSchema.editableColumns(widget.spec.subTable);
+    final AzData? d = widget.initialData;
+    final AzRecord? main = d == null || widget.editId == null
+        ? null
+        : _findMain(d, widget.editId!);
+    final AzRecord? sub = d == null || widget.editId == null
+        ? null
+        : d.subFor(widget.editId!, widget.spec.subTable);
+    for (final List<AzColumn> group in <List<AzColumn>>[_mainCols, _subCols]) {
+      for (final AzColumn c in group) {
+        final AzRecord? src = group == _mainCols ? main : sub;
+        final String initial = src == null ? '' : src.text(c.name);
+        if (c.kind == AzInputKind.choice) {
+          _choices[c.name] = initial.isNotEmpty && c.options.contains(initial)
+              ? initial
+              : (_enumDefault[c.name] ?? (c.options.isEmpty ? '' : c.options.first));
+        } else {
+          _controllers[c.name] = TextEditingController(text: initial);
+        }
+      }
+    }
+  }
+
+  AzRecord? _findMain(AzData d, int id) {
+    final List<AzRecord> all = widget.spec.side == 'asset' ? d.assets : d.liabilities;
+    for (final AzRecord r in all) {
+      if (r.id == id) return r;
+    }
+    return null;
+  }
+
+  @override
+  void dispose() {
+    for (final TextEditingController c in _controllers.values) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  Object? _valueOf(AzColumn c) {
+    switch (c.kind) {
+      case AzInputKind.choice:
+        return _choices[c.name] ?? '';
+      case AzInputKind.integer:
+        final String s = _controllers[c.name]?.text.trim() ?? '';
+        return int.tryParse(s) ?? 0;
+      case AzInputKind.money:
+        final String s = _controllers[c.name]?.text.trim() ?? '';
+        return s.isEmpty ? '0' : s;
+      case AzInputKind.text:
+        return _controllers[c.name]?.text ?? '';
+    }
+  }
+
+  Map<String, Object?> _collect(List<AzColumn> cols) => <String, Object?>{
+        for (final AzColumn c in cols) c.name: _valueOf(c),
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    final List<Widget> fields = <Widget>[
+      Text('${widget.spec.code}（${widget.spec.label}）· 主表',
+          style: const TextStyle(fontWeight: FontWeight.w700)),
+      ..._mainCols.map((AzColumn c) => _field(c)),
+      const SizedBox(height: 12),
+      Text('${widget.spec.label} · 次表',
+          style: const TextStyle(fontWeight: FontWeight.w700)),
+      ..._subCols.map((AzColumn c) => _field(c)),
+      if (_error.isNotEmpty)
+        Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Text(_error, style: const TextStyle(color: Colors.red)),
         ),
-        SheetOption<ValuationMode>(
-          value: ValuationMode.latest,
-          label: '最新价',
-          icon: AppIcons.investment,
+    ];
+    return AlertDialog(
+      title: Text(widget.editId == null ? '新增${widget.spec.label}' : '编辑${widget.spec.label}'),
+      content: SizedBox(
+        width: 420,
+        child: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: fields)),
+      ),
+      actions: <Widget>[
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('取消'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            final Map<String, Object?> main = _collect(_mainCols);
+            if ((main['name'] ?? '').toString().trim().isEmpty) {
+              setState(() => _error = '名称必填');
+              return;
+            }
+            Navigator.of(context).pop(AzEntryDraft(
+              mainValues: main,
+              subValues: _collect(_subCols),
+            ));
+          },
+          child: const Text('保存'),
         ),
       ],
-      initialValue: current,
-      actionLabel: '确定',
-      onApplyAsync: (ValuationMode v) async {
-        await context.read<AzWriteController>().setPreference(
-              'valuation_mode',
-              v.dbValue,
-            );
-      },
-    ),
-  );
-}
-
-/// ⑤ 借钱买的东西划不划算（13.5）：逐笔「稳稳每月进 − 当月利息费用」。
-/// 只展示，不评价消费行为；T5 应急借的单独说明。
-Future<void> showAzLeverageSheet(BuildContext context) async {
-  final AzController az = context.read<AzController>();
-  final AzData d = az.data;
-  final List<AzLeverage> list = <AzLeverage>[
-    for (final LiabilityRecord x in d.activeLiabilities)
-      if (AzMath.leverageOf(x, d.activeAssets) != null)
-        AzMath.leverageOf(x, d.activeAssets)!,
-  ];
-  double maxAbs = 1;
-  for (final AzLeverage l in list) {
-    if (l.net.abs() > maxAbs) maxAbs = l.net.abs();
+    );
   }
-  await AppSheetShell.show<void>(
-    context,
-    header: const SheetHeader(
-      title: '划不划算',
-      centered: true,
-      leading: SheetCancelAction(),
-    ),
-    child: Builder(
-      builder: (BuildContext sheetContext) => OverviewSheetContent(
-        metrics: list.isEmpty
-            ? const <SheetMetric>[
-                SheetMetric(label: '关联债', value: '0 笔'),
-              ]
-            : <SheetMetric>[
-                for (final AzLeverage l in list)
-                  SheetMetric(
-                    label: l.asset.name,
-                    value: MoneyFormat.yuan0(l.net.abs()),
-                    unit: l.net >= 0 ? '多留' : '拿走',
-                  ),
+
+  Widget _field(AzColumn c) {
+    if (c.kind == AzInputKind.choice) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: InputDecorator(
+          decoration: InputDecoration(labelText: c.label, border: const OutlineInputBorder()),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: _choices[c.name],
+              isExpanded: true,
+              items: <DropdownMenuItem<String>>[
+                for (final String o in c.options)
+                  DropdownMenuItem<String>(value: o, child: Text(o)),
               ],
-        trend: <SheetTrendPoint>[
-          for (final AzLeverage l in list)
-            SheetTrendPoint(
-              label: l.debt.name,
-              value: (l.net.abs() / maxAbs).clamp(0.0, 1.0).toDouble(),
-              highlighted: l.net < 0,
+              onChanged: (String? v) => setState(() => _choices[c.name] = v ?? ''),
             ),
-        ],
-        updatedAt: list.isEmpty
-            ? '无关联'
-            : '仅每月进账',
-        actionLabel: '知道了',
-        onAction: () => SheetActions.close(sheetContext),
-      ),
-    ),
-  );
-}
-
-/// ⑥ 逐月缺口表（7.9 / 13.6）：未来 12 个月「这个月要还 / 那个月能拿出 / 差多少」。
-/// 别拿今天的钱去除明年的债；资产按「多久能变成现金」排到能到手的月份。
-Future<void> showAzGapSheet(BuildContext context) async {
-  final AzController az = context.read<AzController>();
-  final AzData d = az.data;
-  final List<AccountRecord> accounts = context.read<AccountController>().all;
-  final List<AzGapRow> gaps =
-      AzMath.gapTable(d, accounts, az.today);
-  AzGapRow worst = gaps.isEmpty
-      ? const AzGapRow(month: '—', pay: 0, available: 0, gap: 0)
-      : gaps.first;
-  for (final AzGapRow g in gaps) {
-    if (g.gap > worst.gap) worst = g;
-  }
-  double maxPay = 1;
-  for (final AzGapRow g in gaps) {
-    if (g.pay > maxPay) maxPay = g.pay;
-  }
-  await AppSheetShell.show<void>(
-    context,
-    header: const SheetHeader(
-      title: '偿债缺口',
-      subtitle: '12 个月',
-      centered: true,
-      leading: SheetCancelAction(),
-    ),
-    child: Builder(
-      builder: (BuildContext sheetContext) => OverviewSheetContent(
-        metrics: <SheetMetric>[
-          SheetMetric(label: '最紧月', value: worst.month),
-          SheetMetric(label: '当月还', value: MoneyFormat.yuan0(worst.pay)),
-          SheetMetric(
-            label: worst.gap > 0 ? '还差' : '都还得上',
-            value: MoneyFormat.yuan0(worst.gap > 0 ? worst.gap : 0),
           ),
-        ],
-        trend: <SheetTrendPoint>[
-          for (final AzGapRow g in gaps)
-            SheetTrendPoint(
-              label: g.month,
-              value: (g.pay / maxPay).clamp(0.0, 1.0).toDouble(),
-              highlighted: g.gap > 0,
-            ),
-        ],
-        updatedAt: worst.gap > 0
-            ? '${worst.month} 要还 ${MoneyFormat.yuan0(worst.pay)}，'
-                '能拿出 ${MoneyFormat.yuan0(worst.available)}，'
-                '差 ${MoneyFormat.yuan0(worst.gap)}。动不了的钱未计入，这是估算。'
-            : '未来 12 个月都还得上。动不了的钱未计入，这是估算。',
-        actionLabel: '知道了',
-        onAction: () => SheetActions.close(sheetContext),
+        ),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: TextField(
+        controller: _controllers[c.name],
+        decoration: InputDecoration(
+          labelText: c.required ? '${c.label} *' : c.label,
+          border: const OutlineInputBorder(),
+        ),
+        keyboardType: c.kind == AzInputKind.text
+            ? TextInputType.text
+            : const TextInputType.numberWithOptions(decimal: true),
       ),
-    ),
-  );
-}
-
-/// ⑦ 先还哪一笔最划算（7.10）：默认按「实际一年要付多少」从高到低。
-Future<void> showAzPayoffSheet(BuildContext context) async {
-  final AzController az = context.read<AzController>();
-  final AzData d = az.data;
-  final List<LiabilityRecord> order = AzMath.payoffOrder(d);
-  final double topRate =
-      order.isEmpty ? 0 : AzMath.realAnnualRate(order.first);
-  final double oneYearSave = order.isEmpty
-      ? 0
-      : order.first.principal * topRate;
-  double maxRate = 0.01;
-  for (final LiabilityRecord x in order) {
-    final double r = AzMath.realAnnualRate(x);
-    if (r > maxRate) maxRate = r;
+    );
   }
-  await AppSheetShell.show<void>(
-    context,
-    header: const SheetHeader(
-      title: '还款顺序',
-      centered: true,
-      leading: SheetCancelAction(),
-    ),
-    child: Builder(
-      builder: (BuildContext sheetContext) => OverviewSheetContent(
-        metrics: <SheetMetric>[
-          SheetMetric(
-            label: order.isEmpty ? '无欠款' : '先还：${order.first.name}',
-            value: order.isEmpty
-                ? '—'
-                : '${(topRate * 100).toStringAsFixed(1)}%',
-          ),
-          SheetMetric(label: '年少付', value: MoneyFormat.yuan0(oneYearSave)),
-          SheetMetric(label: '笔数', value: '${order.length} 笔'),
-        ],
-        trend: <SheetTrendPoint>[
-          for (final LiabilityRecord x in order)
-            SheetTrendPoint(
-              label: x.name,
-              value: (AzMath.realAnnualRate(x) / maxRate)
-                  .clamp(0.0, 1.0)
-                  .toDouble(),
-              highlighted: x == order.first,
-            ),
-        ],
-        updatedAt: order.isEmpty
-            ? '暂无欠款'
-            : '先还「${order.first.name}」：实际一年 '
-                '${(topRate * 100).toStringAsFixed(1)}%，现在最贵。',
-        actionLabel: '知道了',
-        onAction: () => SheetActions.close(sheetContext),
-      ),
-    ),
-  );
 }

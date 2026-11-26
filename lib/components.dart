@@ -12,7 +12,6 @@ import 'package:yuan/service/credit_card_account_controller.dart';
 import 'package:yuan/service/savings_account_controller.dart';
 import 'package:yuan/service/user_controller.dart';
 import 'package:yuan/service/core/account_ledger.dart';
-import 'package:yuan/service/core/entity_registry.dart';
 import 'package:yuan/service/core/image_transaction.dart';
 import 'package:yuan/service/core/lifecycle_service.dart';
 import 'package:yuan/service/core/query_facade.dart';

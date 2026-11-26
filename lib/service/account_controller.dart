@@ -453,7 +453,7 @@ class AccountController extends ChangeNotifier {
           if (r.includeInNetWorth) restricted += r.balance;
         case AccountKind.investment:
           // 契-7：K4 真钱按 include_in_net_worth 单列进投资块，
-          // 与 AzMath.mirrors 的 A1 镜像同源；不进 spendable / restricted。
+          // 与资债侧 A1 账户镜像同源；不进 spendable / restricted。
           if (r.includeInNetWorth) investment += r.balance;
       }
     }

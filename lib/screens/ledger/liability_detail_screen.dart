@@ -1,32 +1,86 @@
-import 'dart:async';
-
-import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
 
-import '../../database/ledger/az_db.dart';
-import '../../database/ledger/az_math.dart';
 import '../../database/ledger/az_record.dart';
-import '../../screens/commons/function/app_detail_page.dart';
-import '../../screens/commons/function/app_floating_actions.dart';
-import '../../screens/commons/function/app_function_layout.dart';
-import '../../screens/commons/icons/app_icons.dart';
-import '../../service/account_controller.dart';
+import '../../database/ledger/az_schema.dart';
 import '../../service/ledger/az_controller.dart';
-import '../../styles/app_decorations.dart';
-import '../../styles/app_typography.dart';
 import '../../styles/theme_tokens.dart';
-import '../../utils/money_format.dart';
 import 'az_sheets.dart';
-import 'widgets/az_cards.dart';
 
-/// 负债详情页（7.4 / 7.8 / 7.10 共用同一个框架）。
-///
-/// 头卡说清「现在还欠多少」，信息网格把「这笔钱贵不贵」逐项摊开，
-/// 还款计划表把每一期里的 本金 / 利息 / 手续费 **分列**显示 ——
-/// 7.12 的方向铁律就靠这三列让人一眼看懂「哪部分真花掉了」。
-///
-/// 与资产详情页共用 [AppDetailPage] 与 [AppFloatingActions]，不新建壳。
+/// 把一条记录渲染成只读字段列表。
+/// 【所属模块】screens/ledger · 详情
+/// 【实现功能】按 AzSchema 列清单逐行显示字段名与值，供资产 / 负债详情复用。
+/// 【使用限制】纯展示；不写库；不解析金额语义。
+/// 【入参与结果】收 record；返回 Widget。
+/// 【异常与调用方处理】不抛异常；空值显示 '—'。
+Widget azRecordFields(AzRecord record) {
+  final List<AzColumn> cols = AzSchema.columnsFor(record.table);
+  if (cols.isEmpty) return const Text('该表未登记列');
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    mainAxisSize: MainAxisSize.min,
+    children: <Widget>[
+      for (final AzColumn c in cols)
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 2),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: <Widget>[
+              Text(c.label, style: const TextStyle(fontSize: 12)),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Text(
+                  (record.fields[c.name] ?? '—').toString(),
+                  textAlign: TextAlign.end,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+    ],
+  );
+}
+
+/// 列出与主表行关联的附属表记录（按 asset_id / liability_id 过滤）。
+/// 【所属模块】screens/ledger · 详情
+/// 【实现功能】遍历 AzSchema.allTables 中该侧的附属表，按外键筛出属于本条主表记录的行，按表分块展示。
+/// 【使用限制】纯展示；附表只按外键过滤，不做金额计算；次表单独由调用方展示。
+/// 【入参与结果】收 data / mainId / side / subTable；返回 Widget。
+/// 【异常与调用方处理】不抛异常；无附属记录时显示「暂无附属记录」。
+Widget azAttachedRows(AzData data, int mainId, String side, String subTable) {
+  final String fk = side == 'asset' ? 'asset_id' : 'liability_id';
+  final String prefix = side == 'asset' ? 'az_asset_' : 'az_liability_';
+  final List<Widget> blocks = <Widget>[];
+  for (final String table in AzSchema.allTables) {
+    if (!table.startsWith(prefix) || table == subTable) continue;
+    if (AzSchema.bySubTable(table) != null) continue;
+    final List<AzRecord> rows = data.rowsOf(table)
+        .where((AzRecord r) => r.intOf(fk) == mainId)
+        .toList(growable: false);
+    if (rows.isEmpty) continue;
+    blocks.add(Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Text(table, style: const TextStyle(fontWeight: FontWeight.w600)),
+          for (final AzRecord r in rows) azRecordFields(r),
+        ],
+      ),
+    ));
+  }
+  if (blocks.isEmpty) return const Text('暂无附属记录');
+  return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: blocks);
+}
+
+/// 负债详情页：主表 + 贷款 / 分期次表 + 还款 / 支取附表。
+/// 【所属模块】screens/ledger · 详情
+/// 【实现功能】按 debtId 从共享账本取主表行，显示主表字段、对应次表字段与全部附表记录，并提供软删入口。
+/// 【使用限制】页面不读库、不写库；删除走 AzWriteController；debtId 无效时展示空态；挂卡分期不与卡欠款相加。
+/// 【入参与结果】构造收 debtId（由路由 /ledger/debt/:id 传入）；build 返回 Scaffold。
+/// 【异常与调用方处理】删除异常由 AzWriteController 上抛，本页 try/catch 后用 SnackBar 提示；不吞异常后返回上一页。
 class LiabilityDetailScreen extends StatelessWidget {
   const LiabilityDetailScreen({super.key, required this.debtId});
 
@@ -35,251 +89,92 @@ class LiabilityDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final AzController az = context.watch<AzController>();
-    final AccountController accounts = context.watch<AccountController>();
-    final LiabilityRecord? debt = az.liabilityById(debtId);
-    if (debt == null) {
-      return AppDetailPage(
-        title: '未找到',
-        child: Center(
-          child: Text('可能已删除', style: context.appText.body),
-        ),
-      );
-    }
-
-    final AzData d = az.data;
-    final List<RepayPlanRecord> plans = az.plansFor(debt);
-    final double realRate = AzMath.realAnnualRate(debt);
-    final AzLeverage? lev = AzMath.leverageOf(debt, d.activeAssets);
-    String assetName = '—（没关联）';
-    for (final AssetRecord a in d.activeAssets) {
-      if (a.id == debt.linkAssetId) {
-        assetName = a.name;
+    final AzData data = az.data;
+    AzRecord? found;
+    for (final AzRecord r in data.liabilities) {
+      if (r.id == debtId) {
+        found = r;
         break;
       }
     }
-    final String accountName = _accountName(accounts, debt.linkAccountId);
-    final double progress = debt.totalTerms == 0
-        ? 0
-        : (debt.paidTerms / debt.totalTerms).clamp(0.0, 1.0).toDouble();
+    if (found == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('负债详情')),
+        body: const Center(child: Text('记录不存在或已删除')),
+      );
+    }
+    final AzRecord row = found;
+    final AzTypeSpec? spec = data.typOf(row);
+    final AzRecord? sub = spec == null ? null : data.subFor(row.id, spec.subTable);
 
-    return AppDetailPage(
-      title: debt.name,
-      actions: <Widget>[
-        IconButton(
-          tooltip: '编辑',
-          icon: const Icon(AppIcons.edit),
-          onPressed: () => unawaited(
-            showAzLiabilitySheet(context, existing: debt),
-          ),
-        ),
-      ],
-      floating: AppFloatingActions(
-        actions: <AppFloatingAction>[
-          AppFloatingAction(
-            label: '还款',
-            icon: AppIcons.repay,
-            emphasized: true,
-            onPressed: () => unawaited(
-              showAzRepaySheet(context, debt, plans),
-            ),
-          ),
-          AppFloatingAction(
-            label: '提前还',
-            icon: AppIcons.balanceAdjust,
-            onPressed: () => unawaited(showAzPrepaySheet(context, debt)),
-          ),
-          AppFloatingAction(
-            label: '编辑',
-            icon: AppIcons.edit,
-            onPressed: () => unawaited(
-              showAzLiabilitySheet(context, existing: debt),
-            ),
-          ),
-          AppFloatingAction(
-            label: '删除',
-            icon: AppIcons.trash,
-            onPressed: () => unawaited(
-              showAzDeleteSheet(
-                context,
-                title: '删除「${debt.name}」？',
-                description:
-                    '${plans.length} 期还款计划会保留，30 天内可恢复。',
-                onConfirm: () async {
-                  await context.read<AzWriteController>().softDelete(
-                        AzDb.liabilitiesTable,
-                        debt.id!,
-                        '删除欠款',
-                      );
-                  if (context.mounted) context.pop();
-                },
-              ),
-            ),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          AppSummaryHero(
-            label: '欠款',
-            value: MoneyFormat.yuan0(debt.principal),
-            caption: debt.totalTerms == 0
-                ? '${debt.repayMethod.label}：${debt.repayMethod.hint}'
-                : '已经还了 ${debt.paidTerms} 期 / 一共 ${debt.totalTerms} 期，'
-                    '还剩 ${debt.leftTerms} 期。',
-            accent: context.tokens.expense,
-            progress: progress,
-            secondary: <AppInfoItem>[
-              AppInfoItem(
-                label: '本月还',
-                value: MoneyFormat.yuan0(debt.monthlyPay),
-              ),
-              AppInfoItem(
-                label: '本月成本',
-                value: MoneyFormat.yuan0(debt.monthlyCost),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppLayout.sectionGap),
-          AppInfoGrid(
-            items: <AppInfoItem>[
-              AppInfoItem(label: '类型', value: debt.type.label),
-              AppInfoItem(label: '用途', value: debt.purpose.label),
-              AppInfoItem(
-                label: '实际年化',
-                value: '${(realRate * 100).toStringAsFixed(1)}%',
-              ),
-              AppInfoItem(
-                label: '合同利率',
-                value: '${(debt.rate * 100).toStringAsFixed(1)}%',
-              ),
-              AppInfoItem(label: '利率型', value: debt.rateType.label),
-              AppInfoItem(label: '怎么还', value: debt.repayMethod.label),
-              AppInfoItem(
-                label: '本金',
-                value: MoneyFormat.yuan0(debt.monthlyPrincipal),
-              ),
-              AppInfoItem(
-                label: '利息',
-                value: MoneyFormat.yuan0(debt.monthlyInterest),
-              ),
-              AppInfoItem(
-                label: '手续费',
-                value: MoneyFormat.yuan0(debt.monthlyFee),
-              ),
-              AppInfoItem(
-                label: '还款日',
-                value: debt.payDay == null ? '—' : '${debt.payDay} 号',
-              ),
-              AppInfoItem(label: '扣款卡', value: accountName),
-              AppInfoItem(label: '关联资产', value: assetName),
-              AppInfoItem(label: '状态', value: debt.status.label),
-              if (debt.feeNote.isNotEmpty)
-                AppInfoItem(label: '其他费用', value: debt.feeNote),
-            ],
-          ),
-          const SizedBox(height: AppLayout.sectionGap),
-          if (lev != null)
-            Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-              child: Text(
-                lev.net >= 0
-                    ? '「${lev.asset.name}」每月进 ${MoneyFormat.yuan0(lev.steadyIn)}，'
-                        '成本 ${MoneyFormat.yuan0(lev.cost)}，多留 ${MoneyFormat.yuan0(lev.net)}。'
-                    : '「${lev.asset.name}」每月进 ${MoneyFormat.yuan0(lev.steadyIn)}，'
-                        '成本 ${MoneyFormat.yuan0(lev.cost)}，净拿走 ${MoneyFormat.yuan0(-lev.net)}。',
-                style: context.appText.body.copyWith(
-                  color: lev.net >= 0
-                      ? context.tokens.income
-                      : context.tokens.expense,
-                ),
-              ),
-            ),
-          AppFunctionSection(
-            title: '每期还款',
-            actionLabel: '还款顺序 ›',
-            onAction: () => unawaited(showAzPayoffSheet(context)),
-            child: plans.isEmpty
-                ? const AzSmallEmpty('暂无逐期计划')
-                : _planTable(context, plans),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _planTable(BuildContext context, List<RepayPlanRecord> plans) {
-    final t = context.tokens;
-    return Container(
-      decoration: AppDecorations.card(context),
-      padding: const EdgeInsets.all(AppSpacing.sm),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          Row(
-            children: <Widget>[
-              _head('期数'),
-              _head('哪天还'),
-              _head('本金'),
-              _head('利息'),
-              _head('费用'),
-              _head('还剩'),
-              _head('状态'),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.xxs),
-          for (final RepayPlanRecord p in plans) ...<Widget>[
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxs),
-              child: Row(
+    return Scaffold(
+      appBar: AppBar(title: Text(row.text('name'))),
+      body: SingleChildScrollView(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
-                  _cell(context, '${p.termNo}'),
-                  _cell(context, _dateText(p.dueDate)),
-                  _cell(context, MoneyFormat.yuan0(p.principal)),
-                  _cell(
-                    context,
-                    MoneyFormat.yuan0(p.interest),
-                    color: t.expense,
-                  ),
-                  _cell(context, MoneyFormat.yuan0(p.fee), color: t.warning),
-                  _cell(context, MoneyFormat.yuan0(p.remainingPrincipal)),
-                  _cell(context, p.status.label),
+                  Text('主表 az_liabilities', style: const TextStyle(fontWeight: FontWeight.w700)),
+                  azRecordFields(row),
+                  const SizedBox(height: AppSpacing.md),
+                  if (spec != null) ...<Widget>[
+                    Text('次表 ${spec.subTable}（${spec.label}）',
+                        style: const TextStyle(fontWeight: FontWeight.w700)),
+                    if (sub == null) const Text('尚未录入次表') else azRecordFields(sub),
+                    const SizedBox(height: AppSpacing.md),
+                    Text('还款 / 支取等附表', style: const TextStyle(fontWeight: FontWeight.w700)),
+                    azAttachedRows(data, row.id, 'liability', spec.subTable),
+                  ],
+                  const SizedBox(height: AppSpacing.md),
+                  if (spec != null)
+                    OutlinedButton(
+                      onPressed: () async {
+                        final AzEntryDraft? draft = await showAzEntrySheet(
+                          context,
+                          spec,
+                          initialData: data,
+                          editId: row.id,
+                        );
+                        if (draft == null || !context.mounted) return;
+                        try {
+                          await context.read<AzWriteController>().updateEntry(
+                                spec,
+                                row.id,
+                                draft.mainValues,
+                                draft.subValues,
+                              );
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('保存失败：$e')),
+                            );
+                          }
+                        }
+                      },
+                      child: const Text('编辑这条记录'),
+                    ),
+                  if (spec != null)
+                    const SizedBox(height: AppSpacing.xs),
+                  if (spec != null)
+                    OutlinedButton(
+                      onPressed: () async {
+                        try {
+                          await context.read<AzWriteController>().removeEntry(
+                                spec, row.id, '详情页删除');
+                          if (context.mounted) Navigator.of(context).pop();
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('删除失败：$e')),
+                            );
+                          }
+                        }
+                      },
+                      child: const Text('删除这笔负债'),
+                    ),
                 ],
               ),
             ),
-          ],
-        ],
-      ),
     );
   }
-
-  Widget _head(String s) => Expanded(
-        child: Text(
-          s,
-          style: AppTypography.labelSmall,
-          textAlign: TextAlign.center,
-        ),
-      );
-
-  Widget _cell(BuildContext context, String s, {Color? color}) => Expanded(
-        child: Text(
-          s,
-          style: context.appText.caption.copyWith(color: color),
-          textAlign: TextAlign.center,
-        ),
-      );
-
-  static String _accountName(AccountController accounts, int? id) {
-    if (id == null) return '—（没关联）';
-    for (final dynamic a in accounts.all) {
-      if (a.id == id) return a.name as String;
-    }
-    return '原卡已删除';
-  }
-
-  static String _dateText(DateTime d) =>
-      '${d.month.toString().padLeft(2, '0')}-'
-      '${d.day.toString().padLeft(2, '0')}';
 }

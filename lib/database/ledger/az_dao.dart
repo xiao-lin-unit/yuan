@@ -1,239 +1,121 @@
 import 'package:sqflite/sqflite.dart';
 
-import 'az_db.dart';
 import 'az_record.dart';
+import 'az_schema.dart';
 
-/// 资债模块的纯 SQL 层。
+/// 资债模块唯一 DAO：32 张表统一走这里，页面与其它模块不得直连 db.query / db.insert。
 ///
-/// 【职责边界】本类无状态、不通知、不认识页面；只做「一行 ↔ 一条记录」。
-/// 事务边界由 [AzWriteController] 持有（10.8 即时保存、崩溃不半写），
-/// 所以这里的写方法都用 [DatabaseExecutor]：既能收 `Database`，也能收
-/// `Transaction`，与 AccountEntryDao.append 同一套写法。
-///
-/// 【静态优先】没有缓存、没有 Notifier、没有跨帧回调。共享账本
-/// [AzController] 负责在启动时把快照一次读进内存，页面不在这里逐条查。
+/// 所有方法第一参数收 [DatabaseExecutor]，在 UnitOfWork.run 里自动复用同一个
+/// txn；本类**不自建事务**，满足《项目规范与契约.md》硬-19。
+/// 【所属模块】database/ledger · 资债读写
+/// 【实现功能】按 AzSchema.allTables 白名单对 32 张表做查询 / 插入 / 更新 / 软删 / 恢复 / 归档，并一次性加载全量快照。
+/// 【使用限制】必须在 UnitOfWork.run 事务内执行写方法；表名只允许 AzSchema.allTables 中的常量，禁止拼接用户输入；不自建事务、不调 refresh。
+/// 【入参与结果】方法首参均为 DatabaseExecutor；loadAll 返回 AzData，insert 返回新行 id，其余返回 Future<void> 或影响行数；调用方必须 await。
+/// 【异常与调用方处理】表名未登记抛 ArgumentError；SQL / CHECK 异常原样上抛并由外层事务整体回滚；调用方需自行 try/catch 提示用户并保持旧快照，不得吞异常后继续展示半写数据。
 class AzDao {
-  /// 一次读齐模块全部数据。归档 / 软删的行**也读进来**：
-  /// 10.7「所有操作可逆」，过滤掉之后页面就没有恢复入口了。
-  /// 真正的「在用」过滤统一在 [AzData.activeAssets] 等 getter 里做。
+  const AzDao();
+
+  static const Set<String> _mainTables = <String>{'az_assets', 'az_liabilities'};
+
+  /// 【所属模块】database/ledger · 资债读写
+  /// 【实现功能】校验表名是否在 AzSchema 白名单内，拒绝任何拼接 / 用户输入表名。
+  /// 【使用限制】所有公开方法调用前必经；只允许 32 张登记表。
+  /// 【入参与结果】收 table；合法时无返回，非法抛 ArgumentError。
+  /// 【异常与调用方处理】非法表名抛 ArgumentError('未登记的资债表: xxx')；调用方需自行 try/catch 或保证表名来自 AzSchema 常量。
+  void _assertTable(String table) {
+    if (!AzSchema.allTables.contains(table)) {
+      throw ArgumentError('未登记的资债表: $table');
+    }
+  }
+
+  /// 【所属模块】database/ledger · 资债读写
+  /// 【实现功能】一次性读齐 32 张表：两张主表过滤软删，其余次表 / 附表全量取回，组成 AzData 快照。
+  /// 【使用限制】只读，可在事务内也可在事务外调用；不得在写事务 body 里调用本方法做「先查再写」的跨模块判断（应改用 UniquenessService）。
+  /// 【入参与结果】收 DatabaseExecutor db；返回 Future<AzData>，调用方必须 await；today 取 DateTime.now()。
+  /// 【异常与调用方处理】表未建 / 查询失败抛 DatabaseException 并上抛；调用方需自行 try/catch 并展示错误态，保留上一次快照，不得清空页面。
   Future<AzData> loadAll(DatabaseExecutor db) async {
-    final List<Map<String, Object?>> assets = await db.query(
-      AzDb.assetsTable,
-      orderBy: 'asset_class ASC, sort_order ASC, id ASC',
-    );
-    final List<Map<String, Object?>> liabilities = await db.query(
-      AzDb.liabilitiesTable,
-      orderBy: 'sort_order ASC, id ASC',
-    );
-    final List<Map<String, Object?>> plans = await db.query(
-      AzDb.plansTable,
-      orderBy: 'liability_id ASC, plan_version ASC, term_no ASC',
-    );
-    final List<Map<String, Object?>> trades = await db.query(
-      AzDb.tradesTable,
-      orderBy: 'asset_id ASC, occurred_at DESC, id DESC',
-    );
-    final List<Map<String, Object?>> contingents = await db.query(
-      AzDb.contingentsTable,
-      orderBy: 'kind ASC, sort_order ASC, id ASC',
-    );
-    final List<Map<String, Object?>> prefs =
-        await db.query(AzDb.preferencesTable);
-    return AzData(
-      assets: assets.map(AssetRecord.fromMap).toList(growable: false),
-      liabilities:
-          liabilities.map(LiabilityRecord.fromMap).toList(growable: false),
-      plans: plans.map(RepayPlanRecord.fromMap).toList(growable: false),
-      trades: trades.map(AssetTradeRecord.fromMap).toList(growable: false),
-      contingents:
-          contingents.map(ContingentRecord.fromMap).toList(growable: false),
-      preferences: AzPreferences.fromRows(prefs),
-    );
-  }
-
-  /// 新增或整行覆盖一张资产。id 为 null 时 insert 并返回新 id。
-  ///
-  /// 【revision 在这里递增，3 步】① 先读旧行版本号；② 覆盖成 旧值+1；
-  /// ③ 写库。业务层只管填字段，10.9「变更留痕」不会漏加，也不会因为
-  /// 调用方传了固定 1 而每次归零。事务由调用方持有。
-  Future<int> saveAsset(DatabaseExecutor db, AssetRecord record) async {
-    final Map<String, Object?> values = record.toMap();
-    final int? id = record.id;
-    if (id == null) {
-      return db.insert(AzDb.assetsTable, values);
-    }
-    values['revision'] = await _nextRevision(
-      db,
-      AzDb.assetsTable,
-      id,
-      record.revision,
-    );
-    values['updated_at'] = DateTime.now().millisecondsSinceEpoch;
-    await db.update(
-      AzDb.assetsTable,
-      values,
-      where: 'id = ?',
-      whereArgs: <Object?>[id],
-    );
-    return id;
-  }
-
-  Future<int> saveLiability(DatabaseExecutor db, LiabilityRecord record) async {
-    final Map<String, Object?> values = record.toMap();
-    final int? id = record.id;
-    if (id == null) {
-      return db.insert(AzDb.liabilitiesTable, values);
-    }
-    values['revision'] = await _nextRevision(
-      db,
-      AzDb.liabilitiesTable,
-      id,
-      record.revision,
-    );
-    values['updated_at'] = DateTime.now().millisecondsSinceEpoch;
-    await db.update(
-      AzDb.liabilitiesTable,
-      values,
-      where: 'id = ?',
-      whereArgs: <Object?>[id],
-    );
-    return id;
-  }
-
-  Future<int> saveContingent(
-    DatabaseExecutor db,
-    ContingentRecord record,
-  ) async {
-    final Map<String, Object?> values = record.toMap();
-    final int? id = record.id;
-    if (id == null) {
-      return db.insert(AzDb.contingentsTable, values);
-    }
-    values['revision'] = await _nextRevision(
-      db,
-      AzDb.contingentsTable,
-      id,
-      record.revision,
-    );
-    values['updated_at'] = DateTime.now().millisecondsSinceEpoch;
-    await db.update(
-      AzDb.contingentsTable,
-      values,
-      where: 'id = ?',
-      whereArgs: <Object?>[id],
-    );
-    return id;
-  }
-
-  /// 记一笔买入 / 卖出。卖出的 [costBasis] / [realizedPnl] 由
-  /// AzMath.tradeSummary 先算出当时平均成本后由业务层填入，历史不覆盖。
-  Future<int> insertTrade(DatabaseExecutor db, AssetTradeRecord record) =>
-      db.insert(AzDb.tradesTable, record.toMap());
-
-  /// 一次写入一批还款计划（同一个 plan_version）。
-  /// 重算时**不删旧版本**：旧行留着可对比（7.8），只是主表的
-  /// active_plan_version 指向新版本，页面只显示生效的那一版。
-  Future<void> insertPlans(
-    DatabaseExecutor db,
-    List<RepayPlanRecord> rows,
-  ) async {
-    for (final RepayPlanRecord row in rows) {
-      await db.insert(
-        AzDb.plansTable,
-        row.toMap(),
-        conflictAlgorithm: ConflictAlgorithm.replace,
+    final Map<String, List<AzRecord>> byTable = <String, List<AzRecord>>{};
+    for (final String table in AzSchema.allTables) {
+      final List<Map<String, Object?>> rows = await db.query(
+        table,
+        where: _mainTables.contains(table) ? 'deleted_at IS NULL' : null,
+        orderBy: _mainTables.contains(table) ? 'sort_order ASC, id ASC' : 'id ASC',
       );
+      byTable[table] = rows
+          .map((Map<String, Object?> r) => AzRecord(table, r))
+          .toList(growable: false);
     }
+    return AzData(
+      assets: byTable['az_assets'] ?? const <AzRecord>[],
+      liabilities: byTable['az_liabilities'] ?? const <AzRecord>[],
+      rowsByTable: byTable,
+      today: DateTime.now(),
+    );
   }
 
-  Future<void> markPlanPaid(
-    DatabaseExecutor db,
-    int planId,
-    double actualAmount,
-    String reason,
+  /// 【所属模块】database/ledger · 资债读写
+  /// 【实现功能】向指定表插一行，返回自增 id；供 AzWriteController 在同一事务里写主表 + 次表。
+  /// 【使用限制】必须在 uow.run 事务内调用；values 的键必须是该表真实列名；金额列传 String。
+  /// 【入参与结果】收 txn / table / values；返回 Future<int> 新行 id，调用方必须 await 并用于次表外键。
+  /// 【异常与调用方处理】非法表名抛 ArgumentError；NOT NULL / UNIQUE / CHECK 失败抛 DatabaseException 并整体回滚；调用方需自行 try/catch 提示用户。
+  Future<int> insert(
+    DatabaseExecutor txn,
+    String table,
+    Map<String, Object?> values,
   ) async {
-    await db.update(
-      AzDb.plansTable,
-      <String, Object?>{
-        'status': PlanStatus.paid.dbValue,
-        'paid_at': DateTime.now().millisecondsSinceEpoch,
-        'actual_amount': actualAmount,
-        'reason': reason,
-      },
-      where: 'id = ?',
-      whereArgs: <Object?>[planId],
-    );
+    _assertTable(table);
+    return txn.insert(table, values);
   }
 
-  Future<void> setActivePlanVersion(
-    DatabaseExecutor db,
-    int liabilityId,
-    int version,
+  /// 【所属模块】database/ledger · 资债读写
+  /// 【实现功能】按主键更新一行，返回影响行数。
+  /// 【使用限制】必须在事务内调用；id 必须 > 0；values 不得包含 id。
+  /// 【入参与结果】收 txn / table / id / values；返回 Future<int>（通常为 1），调用方必须 await 并判 0 为未生效。
+  /// 【异常与调用方处理】非法表名抛 ArgumentError；SQL 异常上抛并回滚；调用方需自行 try/catch 并提示「更新未生效」。
+  Future<int> update(
+    DatabaseExecutor txn,
+    String table,
+    int id,
+    Map<String, Object?> values,
   ) async {
-    await db.update(
-      AzDb.liabilitiesTable,
-      <String, Object?>{
-        'active_plan_version': version,
-        'updated_at': DateTime.now().millisecondsSinceEpoch,
-      },
-      where: 'id = ?',
-      whereArgs: <Object?>[liabilityId],
-    );
+    _assertTable(table);
+    return txn.update(table, values, where: 'id = ?', whereArgs: <Object?>[id]);
   }
 
-  /// 记录 / 显示口径开关。切估值口径要留痕（6.4 / 10.9），
-  /// 所以每次写入都把 revision +1，updated_at 记下时间。
-  Future<void> setPreference(
-    DatabaseExecutor db,
-    String key,
-    String value,
-  ) async {
-    final List<Map<String, Object?>> old = await db.query(
-      AzDb.preferencesTable,
-      columns: <String>['revision'],
-      where: 'key = ?',
-      whereArgs: <Object?>[key],
-      limit: 1,
-    );
-    final int previous = old.isEmpty
-        ? 0
-        : (old.first['revision'] as num?)?.toInt() ?? 0;
-    await db.insert(
-      AzDb.preferencesTable,
-      <String, Object?>{
-        'key': key,
-        'value': value,
-        'updated_at': DateTime.now().millisecondsSinceEpoch,
-        'revision': previous + 1,
-      },
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
-  }
-
-  /// 月末快照表由分析模块（8.1.3 / 8.1.4 / 13.12）接管：DDL 保留在
-  /// 本模块建表，但资债不再读写它，不留下「点了没反应」的半成品入口。
-
-  /// 软删进回收站（10.2 / 10.7）：保留历史记录，30 天内可恢复。
-  /// [reason] 必填，与账户「余额调整必须填原因」同一条留痕规矩。
+  /// 【所属模块】database/ledger · 资债读写
+  /// 【实现功能】软删一行：写 deleted_at / delete_reason / updated_at，不物理删除。供 LifecycleService 调用（保持历史签名）。
+  /// 【使用限制】必须在 uow.run 事务内调用；只对两张主表有意义；调用方负责先判断记录存在。
+  /// 【入参与结果】收 txn / table / id / reason（位置参数）；返回 Future<void>，必须 await。
+  /// 【异常与调用方处理】非法表名抛 ArgumentError；SQL 异常上抛并整体回滚；调用方需自行 try/catch 提示「删除未生效」。
   Future<void> softDelete(
-    DatabaseExecutor db,
+    DatabaseExecutor txn,
     String table,
     int id,
     String reason,
   ) async {
-    await db.update(
+    _assertTable(table);
+    final int now = DateTime.now().millisecondsSinceEpoch;
+    await txn.update(
       table,
       <String, Object?>{
-        'deleted_at': DateTime.now().millisecondsSinceEpoch,
+        'deleted_at': now,
         'delete_reason': reason,
+        'updated_at': now,
+        'revision': 1,
       },
       where: 'id = ?',
       whereArgs: <Object?>[id],
     );
   }
 
-  Future<void> restore(DatabaseExecutor db, String table, int id) async {
-    await db.update(
+  /// 【所属模块】database/ledger · 资债读写
+  /// 【实现功能】恢复一条软删记录：清 deleted_at / delete_reason。供 LifecycleService 调用。
+  /// 【使用限制】必须在事务内调用；只对两张主表有意义。
+  /// 【入参与结果】收 txn / table / id；返回 Future<void>，必须 await。
+  /// 【异常与调用方处理】非法表名抛 ArgumentError；SQL 异常上抛并回滚；调用方需自行 try/catch。
+  Future<void> restore(DatabaseExecutor txn, String table, int id) async {
+    _assertTable(table);
+    await txn.update(
       table,
       <String, Object?>{'deleted_at': null, 'delete_reason': null},
       where: 'id = ?',
@@ -241,13 +123,19 @@ class AzDao {
     );
   }
 
+  /// 【所属模块】database/ledger · 资债读写
+  /// 【实现功能】设置归档标记 0/1，只改标记与留痕，不碰余额与流水。供 LifecycleService 调用。
+  /// 【使用限制】必须在事务内调用；只有 az_assets 支持归档（负债主表 archived 列存在但业务不开放）。
+  /// 【入参与结果】收 txn / table / id / archived；返回 Future<void>，必须 await。
+  /// 【异常与调用方处理】非法表名抛 ArgumentError；SQL 异常上抛并回滚；调用方需自行 try/catch。
   Future<void> setArchived(
-    DatabaseExecutor db,
+    DatabaseExecutor txn,
     String table,
     int id,
     bool archived,
   ) async {
-    await db.update(
+    _assertTable(table);
+    await txn.update(
       table,
       <String, Object?>{
         'archived': archived ? 1 : 0,
@@ -256,95 +144,5 @@ class AzDao {
       where: 'id = ?',
       whereArgs: <Object?>[id],
     );
-  }
-
-  /// 「万一这笔要我还」→ 正式转成一条真实负债（7.11 唯一入口）。
-  /// 由业务层在一个事务里：插负债 + 软删原或有项，保证不会两边都算。
-  Future<int> insertLiabilityFromContingent(
-    DatabaseExecutor db,
-    LiabilityRecord record,
-    int contingentId,
-  ) async {
-    final int newId = await db.insert(AzDb.liabilitiesTable, record.toMap());
-    await softDelete(
-      db,
-      AzDb.contingentsTable,
-      contingentId,
-      '已转成我欠的钱（负债 #$newId）',
-    );
-    return newId;
-  }
-
-  /// 「重名校验」：同一账本下未删除的行不能同名（部分唯一索引兜底，
-  /// 这里提前给表单一句人话提示）。
-  Future<bool> nameExists(
-    DatabaseExecutor db,
-    String table,
-    String name, {
-    int? exceptId,
-  }) async {
-    final List<Map<String, Object?>> rows = await db.query(
-      table,
-      columns: <String>['id'],
-      where: 'name = ? AND deleted_at IS NULL AND id <> ?',
-      whereArgs: <Object?>[name, exceptId ?? -1],
-      limit: 1,
-    );
-    return rows.isNotEmpty;
-  }
-
-  /// 「代码唯一校验」：投资类 A4/A5/A6 的代码相同不允许二次新增。
-  /// 只查未软删的行（与名称唯一索引同口径），空代码不参与；
-  /// 用 TRIM(code) 兼容老数据里可能带空格的代码。不加数据库唯一索引，
-  /// 避免老库已有重复代码时升级直接失败；由表单 + 写侧两层拦截。
-  Future<bool> codeExists(
-    DatabaseExecutor db,
-    String table,
-    String code, {
-    int? exceptId,
-  }) async {
-    final List<Map<String, Object?>> rows = await db.query(
-      table,
-      columns: <String>['id'],
-      where: "TRIM(code) = ? AND code <> '' "
-          'AND deleted_at IS NULL AND id <> ?',
-      whereArgs: <Object?>[code, exceptId ?? -1],
-      limit: 1,
-    );
-    return rows.isNotEmpty;
-  }
-
-  /// 删掉一个资产前数它的买卖记录（3.8「这个账户下还有 XX 笔记录」同款）。
-  Future<int> countTrades(DatabaseExecutor db, int assetId) async {
-    final List<Map<String, Object?>> rows = await db.rawQuery(
-      'SELECT COUNT(*) AS n FROM ${AzDb.tradesTable} WHERE asset_id = ?',
-      <Object?>[assetId],
-    );
-    return (rows.first['n'] as num?)?.toInt() ?? 0;
-  }
-
-  Future<int> countPlans(DatabaseExecutor db, int liabilityId) async {
-    final List<Map<String, Object?>> rows = await db.rawQuery(
-      'SELECT COUNT(*) AS n FROM ${AzDb.plansTable} WHERE liability_id = ?',
-      <Object?>[liabilityId],
-    );
-    return (rows.first['n'] as num?)?.toInt() ?? 0;
-  }
-
-  Future<int> _nextRevision(
-    DatabaseExecutor db,
-    String table,
-    int id,
-    int fallback,
-  ) async {
-    final List<Map<String, Object?>> old = await db.query(
-      table,
-      columns: <String>['revision'],
-      where: 'id = ?',
-      whereArgs: <Object?>[id],
-      limit: 1,
-    );
-    if (old.isEmpty) return fallback;
-    return ((old.first['revision'] as num?)?.toInt() ?? 0) + 1;
   }
 }

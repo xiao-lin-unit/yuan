@@ -1,35 +1,86 @@
-import 'dart:async';
-
-import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
 
-import '../../database/ledger/az_db.dart';
-import '../../database/ledger/az_math.dart';
 import '../../database/ledger/az_record.dart';
-import '../../screens/commons/function/app_floating_actions.dart';
-import '../../screens/commons/function/app_function_layout.dart';
-import '../../screens/commons/function/app_detail_page.dart';
-import '../../screens/commons/icons/app_icons.dart';
-import '../../service/account_controller.dart';
+import '../../database/ledger/az_schema.dart';
 import '../../service/ledger/az_controller.dart';
-import '../../styles/app_decorations.dart';
-import '../../styles/app_typography.dart';
 import '../../styles/theme_tokens.dart';
-import '../../utils/money_format.dart';
 import 'az_sheets.dart';
-import 'widgets/az_cards.dart';
 
-/// 资产详情页（6.5 / 6.6 / 6.7 共用同一个框架）。
-///
-/// 【为什么用 AppDetailPage + AppFloatingActions】项目已有「资产 / 负债 /
-/// 账户三类明细页共用」的公共框架与悬浮按钮组：头（返回 / 标题）、
-/// 可滚动主体、右下角悬浮三件事都由布局决定，这里只填内容，不另写一套壳。
-/// 原型里股票、基金、房子、车、借出款长得不一样，但骨架一致 —— 差异
-/// 只体现在 [AppInfoGrid] 的行和买卖记录区，符合「通用 / 私有分开」。
-///
-/// 【静态优先】页面 StatelessWidget，所有数据来自 `context.watch`，没有
-/// 本地状态；点按钮只做导航或打开 Sheet，写库全交给 AzWriteController。
+/// 把一条记录渲染成只读字段列表。
+/// 【所属模块】screens/ledger · 详情
+/// 【实现功能】按 AzSchema 列清单逐行显示字段名与值，供资产 / 负债详情复用。
+/// 【使用限制】纯展示；不写库；不解析金额语义。
+/// 【入参与结果】收 record；返回 Widget。
+/// 【异常与调用方处理】不抛异常；空值显示 '—'。
+Widget azRecordFields(AzRecord record) {
+  final List<AzColumn> cols = AzSchema.columnsFor(record.table);
+  if (cols.isEmpty) return const Text('该表未登记列');
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    mainAxisSize: MainAxisSize.min,
+    children: <Widget>[
+      for (final AzColumn c in cols)
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 2),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: <Widget>[
+              Text(c.label, style: const TextStyle(fontSize: 12)),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Text(
+                  (record.fields[c.name] ?? '—').toString(),
+                  textAlign: TextAlign.end,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+    ],
+  );
+}
+
+/// 列出与主表行关联的附属表记录（按 asset_id / liability_id 过滤）。
+/// 【所属模块】screens/ledger · 详情
+/// 【实现功能】遍历 AzSchema.allTables 中该侧的附属表，按外键筛出属于本条主表记录的行，按表分块展示。
+/// 【使用限制】纯展示；附表只按外键过滤，不做金额计算；次表单独由调用方展示。
+/// 【入参与结果】收 data / mainId / side / subTable；返回 Widget。
+/// 【异常与调用方处理】不抛异常；无附属记录时显示「暂无附属记录」。
+Widget azAttachedRows(AzData data, int mainId, String side, String subTable) {
+  final String fk = side == 'asset' ? 'asset_id' : 'liability_id';
+  final String prefix = side == 'asset' ? 'az_asset_' : 'az_liability_';
+  final List<Widget> blocks = <Widget>[];
+  for (final String table in AzSchema.allTables) {
+    if (!table.startsWith(prefix) || table == subTable) continue;
+    if (AzSchema.bySubTable(table) != null) continue;
+    final List<AzRecord> rows = data.rowsOf(table)
+        .where((AzRecord r) => r.intOf(fk) == mainId)
+        .toList(growable: false);
+    if (rows.isEmpty) continue;
+    blocks.add(Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Text(table, style: const TextStyle(fontWeight: FontWeight.w600)),
+          for (final AzRecord r in rows) azRecordFields(r),
+        ],
+      ),
+    ));
+  }
+  if (blocks.isEmpty) return const Text('暂无附属记录');
+  return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: blocks);
+}
+
+/// 资产详情页：主表 + 对应次表 + 全部附属记录。
+/// 【所属模块】screens/ledger · 详情
+/// 【实现功能】按 assetId 从共享账本取主表行，显示主表字段、次表字段与附属表记录，并提供软删入口。
+/// 【使用限制】页面不读库、不写库；删除走 AzWriteController（内部经 LifecycleService 同事务）；assetId 无效时展示空态。
+/// 【入参与结果】构造收 assetId（由路由 /ledger/asset/:id 传入）；build 返回 Scaffold。
+/// 【异常与调用方处理】删除异常由 AzWriteController 上抛，本页 try/catch 后用 SnackBar 提示；不吞异常后返回上一页。
 class AssetDetailScreen extends StatelessWidget {
   const AssetDetailScreen({super.key, required this.assetId});
 
@@ -38,259 +89,92 @@ class AssetDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final AzController az = context.watch<AzController>();
-    final AccountController accounts = context.watch<AccountController>();
-    final AssetRecord? asset = az.assetById(assetId);
-    if (asset == null) {
-      return AppDetailPage(
-        title: '未找到',
-        child: Center(
-          child: Text('可能已删除', style: context.appText.body),
-        ),
+    final AzData data = az.data;
+    AzRecord? found;
+    for (final AzRecord r in data.assets) {
+      if (r.id == assetId) {
+        found = r;
+        break;
+      }
+    }
+    if (found == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('资产详情')),
+        body: const Center(child: Text('记录不存在或已删除')),
       );
     }
+    final AzRecord row = found;
+    final AzTypeSpec? spec = data.typOf(row);
+    final AzRecord? sub = spec == null ? null : data.subFor(row.id, spec.subTable);
 
-    final AzData d = az.data;
-    final DateTime today = az.today;
-    final List<AssetTradeRecord> trades = az.tradesFor(asset);
-    final AzTradeSummary summary = AzMath.tradeSummary(trades);
-    final double value = AzMath.assetValueOf(asset, d.preferences.valuationMode);
-    final AzFlowTag tag = AzMath.flowTagOf(asset, d.activeLiabilities);
-    final int staleDays = asset.valuedAt == null
-        ? -1
-        : today.difference(asset.valuedAt!).inDays;
-    final String accountName = _accountName(accounts, asset.linkAccountId);
-    final String debtName = az.liabilityById(asset.linkDebtId)?.name ?? '—';
-
-    return AppDetailPage(
-      title: asset.name,
-      actions: <Widget>[
-        IconButton(
-          tooltip: '编辑',
-          icon: const Icon(AppIcons.edit),
-          onPressed: () => unawaited(
-            showAzAssetSheet(context, existing: asset),
-          ),
-        ),
-      ],
-      floating: AppFloatingActions(
-        actions: <AppFloatingAction>[
-          AppFloatingAction(
-            label: '更新估值',
-            icon: AppIcons.edit,
-            emphasized: true,
-            onPressed: () => unawaited(showAzValuationSheet(context, asset)),
-          ),
-          AppFloatingAction(
-            label: '买入',
-            icon: AppIcons.add,
-            onPressed: () => unawaited(
-              showAzTradeSheet(context, asset, TradeDirection.buy),
-            ),
-          ),
-          AppFloatingAction(
-            label: '卖出',
-            icon: AppIcons.secondHand,
-            onPressed: () => unawaited(
-              showAzTradeSheet(context, asset, TradeDirection.sell),
-            ),
-          ),
-          AppFloatingAction(
-            label: '计入总账',
-            icon: AppIcons.balanceAdjust,
-            onPressed: () => unawaited(showAzCountedSheet(context, asset)),
-          ),
-          AppFloatingAction(
-            label: '删除',
-            icon: AppIcons.trash,
-            onPressed: () => unawaited(
-              showAzDeleteSheet(
-                context,
-                title: '删除「${asset.name}」？',
-                description:
-                    '${trades.length} 笔买卖记录会保留，30 天内可恢复。',
-                onConfirm: () async {
-                  await context.read<AzWriteController>().softDelete(
-                        AzDb.assetsTable,
-                        asset.id!,
-                        '删除资产',
-                      );
-                  if (context.mounted) context.pop();
-                },
+    return Scaffold(
+      appBar: AppBar(title: Text(row.text('name'))),
+      body: SingleChildScrollView(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  Text('主表 az_assets', style: const TextStyle(fontWeight: FontWeight.w700)),
+                  azRecordFields(row),
+                  const SizedBox(height: AppSpacing.md),
+                  if (spec != null) ...<Widget>[
+                    Text('次表 ${spec.subTable}（${spec.label}）',
+                        style: const TextStyle(fontWeight: FontWeight.w700)),
+                    if (sub == null) const Text('尚未录入次表') else azRecordFields(sub),
+                    const SizedBox(height: AppSpacing.md),
+                    Text('附属记录', style: const TextStyle(fontWeight: FontWeight.w700)),
+                    azAttachedRows(data, row.id, 'asset', spec.subTable),
+                  ],
+                  const SizedBox(height: AppSpacing.md),
+                  if (spec != null)
+                    OutlinedButton(
+                      onPressed: () async {
+                        final AzEntryDraft? draft = await showAzEntrySheet(
+                          context,
+                          spec,
+                          initialData: data,
+                          editId: row.id,
+                        );
+                        if (draft == null || !context.mounted) return;
+                        try {
+                          await context.read<AzWriteController>().updateEntry(
+                                spec,
+                                row.id,
+                                draft.mainValues,
+                                draft.subValues,
+                              );
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('保存失败：$e')),
+                            );
+                          }
+                        }
+                      },
+                      child: const Text('编辑这条记录'),
+                    ),
+                  if (spec != null)
+                    const SizedBox(height: AppSpacing.xs),
+                  if (spec != null)
+                    OutlinedButton(
+                      onPressed: () async {
+                        try {
+                          await context.read<AzWriteController>().removeEntry(
+                                spec, row.id, '详情页删除');
+                          if (context.mounted) Navigator.of(context).pop();
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('删除失败：$e')),
+                            );
+                          }
+                        }
+                      },
+                      child: const Text('删除这条资产'),
+                    ),
+                ],
               ),
             ),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          AppSummaryHero(
-            label: asset.counted ? '估值口径' : '不计入',
-            value: asset.counted ? MoneyFormat.yuan0(value) : '不算进总账',
-            caption: staleDays < 0
-                ? '按买入价算'
-                : '$staleDays 天前填的',
-            accent: tag.bad ? context.tokens.expense : null,
-            secondary: <AppInfoItem>[
-              AppInfoItem(
-                label: '成本',
-                value: MoneyFormat.yuan0(asset.cost),
-              ),
-              if (asset.latestValue != null)
-                AppInfoItem(
-                  label: '最新价',
-                  value: MoneyFormat.yuan0(asset.latestValue!),
-                ),
-            ],
-          ),
-          const SizedBox(height: AppLayout.sectionGap),
-          AppInfoGrid(
-            items: <AppInfoItem>[
-              AppInfoItem(label: '属于哪类', value: asset.assetClass.label),
-              AppInfoItem(label: '变现', value: asset.liquidity.label),
-              // 投资没有每月净流向：赚亏只在卖出时结算，不摆固定收付的格子。
-              if (!asset.assetClass.isInvestment) ...<AppInfoItem>[
-                AppInfoItem(label: '稳定性', value: asset.stability.label),
-                AppInfoItem(label: '月入', value: MoneyFormat.yuan0(asset.monthlyIn)),
-                AppInfoItem(label: '月出', value: MoneyFormat.yuan0(asset.monthlyOut)),
-                AppInfoItem(label: '净流向', value: tag.text),
-              ],
-              if (asset.assetClass.isInvestment && asset.code.isNotEmpty)
-                AppInfoItem(label: '代码', value: asset.code),
-              AppInfoItem(label: '退出费', value: MoneyFormat.yuan0(asset.exitCost)),
-              AppInfoItem(label: '计入', value: asset.counted ? '算' : '不算'),
-              AppInfoItem(label: '付款卡', value: accountName),
-              AppInfoItem(label: '关联债', value: debtName),
-              AppInfoItem(label: '估值来源', value: asset.valuationSource.label),
-              AppInfoItem(label: '买入日', value: _dateText(asset.createdAt)),
-              if (asset.quantity != null)
-                AppInfoItem(
-                  label: '持有数量',
-                  value: '${asset.quantity!.toStringAsFixed(2)} 份',
-                ),
-              // 新增只录数据；这里把旧记录按类回显，避免列名对不上。
-              // depreciation_note 按类放的是：A3 说好利息 / A6 说好票息 /
-              // A8 一年掉 / A9 凭证 —— 都是备注文本，不是状态。
-              if (asset.useMode.isNotEmpty)
-                AppInfoItem(
-                  label: asset.assetClass == AssetClass.loan ? '借出情形' : '用途',
-                  value: _useModeText(asset.useMode),
-                ),
-              if (asset.depreciationNote.isNotEmpty)
-                AppInfoItem(
-                  label: switch (asset.assetClass) {
-                    AssetClass.loan => '说好利息',
-                    AssetClass.otherInvest => '说好票息',
-                    AssetClass.valuable => '凭证',
-                    AssetClass.vehicle => '一年掉',
-                    _ => '备注',
-                  },
-                  value: asset.depreciationNote,
-                ),
-            ],
-          ),
-          const SizedBox(height: AppLayout.sectionGap),
-          AppFunctionSection(
-            title: '买卖记录',
-            child: trades.isEmpty
-                ? const AzSmallEmpty('暂无买卖记录')
-                : Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    mainAxisSize: MainAxisSize.min,
-                    children: <Widget>[
-                      for (final AssetTradeRecord x in trades) ...<Widget>[
-                        _tradeRow(context, x),
-                        const SizedBox(height: AppSpacing.xs),
-                      ],
-                    ],
-                  ),
-          ),
-          AppStatBar(
-            items: <AppStatItem>[
-              AppStatItem(
-                label: '已实现',
-                value: MoneyFormat.yuan0(summary.realized),
-              ),
-              AppStatItem(
-                label: '持仓成本',
-                value: MoneyFormat.yuan0(summary.holdingCost),
-              ),
-              AppStatItem(
-                label: '持仓量',
-                value: summary.holdingQuantity.toStringAsFixed(2),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          if (asset.countedReason.isNotEmpty)
-            AzHint(asset.countedReason),
-        ],
-      ),
     );
   }
-
-  Widget _tradeRow(BuildContext context, AssetTradeRecord x) {
-    final t = context.tokens;
-    final bool buy = x.direction == TradeDirection.buy;
-    return Container(
-      decoration: AppDecorations.item(context),
-      padding: const EdgeInsets.all(AppSpacing.sm),
-      child: Row(
-        children: <Widget>[
-          Icon(
-            buy ? AppIcons.add : AppIcons.secondHand,
-            size: AppIconSize.medium,
-            color: buy ? t.info : t.income,
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                Text(
-                  '${x.direction.label} ${x.quantity.toStringAsFixed(2)} 份 · '
-                  '${_dateText(x.occurredAt)}',
-                  style: context.appText.menuTitle,
-                ),
-                Text(
-                  '单价 ${MoneyFormat.yuan(x.unitPrice)} · '
-                  '另外${buy ? '交' : '扣'} ${MoneyFormat.yuan0(x.fee)}'
-                  '${x.realizedPnl == null ? '' : ' · 这次赚 ${MoneyFormat.yuan0(x.realizedPnl!)}'}',
-                  style: context.appText.caption,
-                ),
-              ],
-            ),
-          ),
-          Text(
-            MoneyFormat.yuan0(x.amount),
-            style: context.appText.menuTitle.copyWith(
-              color: buy ? t.expense : t.income,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  static String _accountName(AccountController accounts, int? id) {
-    if (id == null) return '—（没关联）';
-    for (final dynamic a in accounts.all) {
-      if (a.id == id) return a.name as String;
-    }
-    return '原卡已删除';
-  }
-
-  /// 房产用途在库里存短码，界面一律白话；A3 借出情形本来就存中文，原样回显。
-  static String _useModeText(String raw) => switch (raw) {
-        'rent' => '租给别人',
-        'empty' => '空着',
-        'business' => '做生意用',
-        _ => raw,
-      };
-
-  static String _dateText(DateTime d) =>
-      '${d.year}-${d.month.toString().padLeft(2, '0')}-'
-      '${d.day.toString().padLeft(2, '0')}';
 }

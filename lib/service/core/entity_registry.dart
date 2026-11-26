@@ -19,10 +19,6 @@ enum EntityKind {
   category(category_db.CategoryDb.tableName, hasBookId: true, supportsPurge: true, supportsReorder: true, supportsUniqueName: true, supportsCategoryKind: true),
   asset(az_db.AzDb.assetsTable, supportsArchive: true, supportsUniqueName: true, supportsCode: true),
   liability(az_db.AzDb.liabilitiesTable, supportsUniqueName: true),
-  contingent(az_db.AzDb.contingentsTable),
-  plan(az_db.AzDb.plansTable),
-  trade(az_db.AzDb.tradesTable),
-  preference(az_db.AzDb.preferencesTable),
   user(user_db.UserDb.tableName);
 
   const EntityKind(

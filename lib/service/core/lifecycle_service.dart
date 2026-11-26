@@ -57,12 +57,7 @@ class LifecycleService {
         affected = await accountDao.softDelete(txn, id, at: now, reason: reason);
       case EntityKind.category:
         affected = await categoryDao.softDelete(txn, id, at: now, reason: reason);
-      case EntityKind.asset ||
-          EntityKind.liability ||
-          EntityKind.contingent ||
-          EntityKind.plan ||
-          EntityKind.trade ||
-          EntityKind.preference:
+      case EntityKind.asset || EntityKind.liability:
         await azDao.softDelete(txn, kind.table, id, reason);
         affected = 1; // AzDao 不返回行数，由调用方校验记录存在
       case EntityKind.user:
@@ -89,12 +84,7 @@ class LifecycleService {
         affected = await accountDao.restore(txn, id, now);
       case EntityKind.category:
         affected = await categoryDao.restore(txn, id, now);
-      case EntityKind.asset ||
-          EntityKind.liability ||
-          EntityKind.contingent ||
-          EntityKind.plan ||
-          EntityKind.trade ||
-          EntityKind.preference:
+      case EntityKind.asset || EntityKind.liability:
         await azDao.restore(txn, kind.table, id);
         affected = 1;
       case EntityKind.user:

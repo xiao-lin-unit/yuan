@@ -1,7 +1,6 @@
 import 'package:sqflite/sqflite.dart';
 
 import '../db_module.dart';
-import 'account_record.dart';
 import 'credit_card_rule.dart';
 
 /// 账户模块 6 张表（《账户表结构草案.md》定稿）。
