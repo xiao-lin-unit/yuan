@@ -5,6 +5,11 @@ import '../database/account/account_dao.dart';
 import '../database/account/account_entry_dao.dart';
 import '../database/account/account_record.dart';
 import '../database/account/credit_card_rule.dart';
+import 'core/entity_registry.dart';
+import 'core/lifecycle_service.dart';
+import 'core/query_facade.dart';
+import 'core/uniqueness_service.dart';
+import 'core/unit_of_work.dart';
 
 /// 账户模块的**共享账本**（ChangeNotifier，由 Services.initServices 装配）。
 ///
@@ -20,10 +25,11 @@ import '../database/account/credit_card_rule.dart';
 ///   · 信用卡账户
 ///       → CreditCardAccountController（save / spend / repay / adjustUsedAmount /
 ///         setCreditLimit）
-/// 两个处理器各自持有自己的事务与规则（[AccountBalanceRule]），互不调用、
-/// 互不复用实现；写完之后统一调本类的 [refresh] 重读快照并通知页面。
+/// 两个处理器共用 [UnitOfWork] 事务入口与 [AccountLedger] 资金门面，
+/// 不再各写一套出账逻辑；写完之后统一调本类的 [refresh] 重读快照。
 /// 本类保留的是**不含资金口径**的通用记录维护：归档 / 恢复 / 排序 /
-/// 回收站删除，这些动作只改标记，不写流水、不动 balance。
+/// 回收站删除 —— 这些动作现在一律走 [LifecycleService] 这一个功能接口，
+/// 不再与分类 / 资债各写一套。
 ///
 /// 【动态逻辑说明，按项目约定写清】
 /// 为什么动态：账户列表、余额、流水会随用户操作变化，构造期定不死。
@@ -37,11 +43,39 @@ import '../database/account/credit_card_rule.dart';
 /// 【准确性铁律 10.9】账户累计值只允许 AccountEntryDao.append 写，
 /// 本类不 UPDATE balance，也不决定任何流水的方向或规则。
 class AccountController extends ChangeNotifier {
-  AccountController(this.db, this.dao, this.entryDao);
+  AccountController(
+    this.db,
+    this.dao,
+    this.entryDao, {
+    UnitOfWork? uow,
+    LifecycleService? lifecycle,
+    UniquenessService? uniqueness,
+    QueryFacade? queries,
+  })  : uow = uow ?? UnitOfWork(db),
+        lifecycle = lifecycle ?? LifecycleService(accountDao: dao),
+        uniqueness = uniqueness ?? const UniquenessService(),
+        queries = queries ??
+            QueryFacade(
+              entryDao: entryDao,
+              accountDao: dao,
+              uniqueness: const UniquenessService(),
+            );
 
   final Database db;
   final AccountDao dao;
   final AccountEntryDao entryDao;
+
+  /// 全库唯一事务入口；本类的写动作一律在 uow.run 的提交后刷新。
+  final UnitOfWork uow;
+
+  /// 软删 / 恢复 / 归档 / 排序 / 清理的唯一接口。
+  final LifecycleService lifecycle;
+
+  /// 名称查重的写侧真源（表单 validator 仍可走内存快照做即时提示）。
+  final UniquenessService uniqueness;
+
+  /// 需要读库的查询统一门面。
+  final QueryFacade queries;
 
   List<AccountRecord> _all = <AccountRecord>[];
   final Map<int, Set<int>> _bindings = <int, Set<int>>{};
@@ -153,7 +187,7 @@ class AccountController extends ChangeNotifier {
     _detailAccountId = accountId;
     _detailDirection = direction;
     try {
-      final int total = await entryDao.countForAccount(
+      final int total = await queries.countForAccount(
         db,
         accountId,
         direction: direction,
@@ -165,7 +199,7 @@ class AccountController extends ChangeNotifier {
       final int safePage = pages == 0
           ? 1
           : (page < 1 ? 1 : (page > pages ? pages : page));
-      final List<AccountEntryRecord> rows = await entryDao.listForAccount(
+      final List<AccountEntryRecord> rows = await queries.listForAccount(
         db,
         accountId,
         limit: _detailPageSize,
@@ -174,14 +208,14 @@ class AccountController extends ChangeNotifier {
       );
       // 三个标签条数：本地 SQLite 的 COUNT 成本可忽略，每次都查，
       // 换来「不做缓存失效」——写操作后 refresh 自然同步，不会脏。
-      final int all = await entryDao.countForAccount(db, accountId);
-      final int inbound = await entryDao.countForAccount(
+      final int all = await queries.countForAccount(db, accountId);
+      final int inbound = await queries.countForAccount(
         db,
         accountId,
         direction: AccountDirection.inbound,
       );
       final AccountEntrySummary summary =
-          await entryDao.summaryFor(db, accountId);
+          await queries.summaryFor(db, accountId);
       if (req != _detailRequest) return; // 旧请求：丢弃，finally 也不通知
       _detailEntries = rows;
       _detailSummary = summary;
@@ -452,6 +486,8 @@ class AccountController extends ChangeNotifier {
   }
 
   /// 同步重名校验（给新增/编辑表单的 validator 用）。
+  /// 表单即时提示（内存快照）。**写库前的真源**是 [uniqueness]，
+  /// 由各业务处理器在 [UnitOfWork.run] 事务内调 assertUnique 再查一次。
   bool nameExists(String name, {int? excludeId}) => _all.any(
         (AccountRecord r) =>
             !r.isDeleted && r.name == name && r.id != excludeId,
@@ -461,18 +497,17 @@ class AccountController extends ChangeNotifier {
 
   /// 归档 / 恢复（3.7）：只改标记，历史流水全部保留。
   Future<void> setArchived(int id, bool archived) async {
-    final AccountRecord? old = await dao.byId(db, id);
-    if (old == null) return;
-    final int affected = await dao.update(
-      db,
-      old.copyWith(
-        archived: archived,
-        updatedAt: DateTime.now(),
-        revision: old.revision + 1,
-      ),
+    await uow.run(
+      (txn) async {
+        await lifecycle.setArchived(
+          txn,
+          EntityKind.account,
+          id,
+          archived: archived,
+        );
+      },
+      afterCommit: load,
     );
-    if (affected == 0) throw StateError('归档状态写入未生效');
-    await load();
   }
 
   /// 拖拽排序（3.7）。传**当前显示的那批** id，其余留在原槽位。
@@ -493,8 +528,16 @@ class AccountController extends ChangeNotifier {
     for (final int id in orderedVisibleIds) {
       if (!result.contains(id)) result.add(id);
     }
-    await dao.reorder(db, result);
-    await load();
+    await uow.run(
+      (txn) async {
+        await lifecycle.reorder(
+          txn,
+          EntityKind.account,
+          orderedIds: result,
+        );
+      },
+      afterCommit: load,
+    );
   }
 
   /// 常用账户 / 上次使用账户的**只读**查询（详见
@@ -510,37 +553,50 @@ class AccountController extends ChangeNotifier {
     int limit = 5,
     String? refType,
   }) =>
-      entryDao.usageByAccount(db, limit: limit, refType: refType);
+      queries.usageByAccount(db, limit: limit, refType: refType);
 
   /// 删除 = 进回收站（10.7）。先数流水给页面提示（3.8），
   /// 记录本身永不物理删除。
-  Future<int> countEntries(int id) => dao.countEntries(db, id);
+  Future<int> countEntries(int id) => queries.countEntries(db, id);
 
   Future<void> delete(int id, {String reason = '用户于账户页删除'}) async {
-    final int affected = await dao.softDelete(
-      db,
-      id,
-      at: DateTime.now(),
-      reason: reason,
+    await uow.run(
+      (txn) async {
+        await lifecycle.softDelete(
+          txn,
+          EntityKind.account,
+          id,
+          reason: reason,
+        );
+      },
+      afterCommit: load,
     );
-    if (affected == 0) throw StateError('账户删除未生效');
-    await load();
   }
 
   Future<void> restore(int id) async {
-    final int affected = await dao.restore(db, id, DateTime.now());
-    if (affected == 0) throw StateError('账户恢复未生效');
-    await load();
+    await uow.run(
+      (txn) async {
+        await lifecycle.restore(txn, EntityKind.account, id);
+      },
+      afterCommit: load,
+    );
   }
 
   Future<int> purgeExpired() async {
-    final int n = await dao.purgeExpired(db, DateTime.now());
-    if (n > 0) await load();
+    late int n;
+    await uow.run(
+      (txn) async {
+        n = await lifecycle.purgeExpired(txn, EntityKind.account);
+      },
+      afterCommit: () async {
+        if (n > 0) await load();
+      },
+    );
     return n;
   }
 
-  /// 恒等式审计（10.9）。DAO 会按账户类别选对应规则，本类不判断口径。
-  Future<double> auditBalance(int id) => entryDao.auditBalance(db, id);
+  /// 恒等式审计（10.9）：走统一查询门面，本类不判断口径。
+  Future<double> auditBalance(int id) => queries.auditBalance(db, id);
 }
 
 /// 3.4 还款提醒的一条（纯数据，界面只显示、不计算）。

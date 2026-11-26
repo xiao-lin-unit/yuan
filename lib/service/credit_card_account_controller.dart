@@ -6,6 +6,10 @@ import '../database/account/account_db.dart';
 import '../database/account/account_record.dart';
 import '../database/account/credit_card_rule.dart';
 import 'account_controller.dart';
+import 'core/account_ledger.dart';
+import 'core/entity_registry.dart';
+import 'core/uniqueness_service.dart';
+import 'core/unit_of_work.dart';
 
 /// 信用卡账户的业务处理器（含信用卡 / 花呗 / 借呗等信用形态）。
 ///
@@ -32,17 +36,35 @@ import 'account_controller.dart';
 ///   · [rulesFor] / [saveRules]：3.4 的卡章程十项（v8 附属表），只存不算。
 ///
 /// 【动态逻辑说明，按项目约定写清】本类不是 ChangeNotifier：页面只 watch
-/// 共享账本 [AccountController]。每个方法固定 4 步：校验 → 单事务写入
-/// （append 显式传规则）→ 失败整体回滚 → `catalog.refresh` 通知页面。
+/// 共享账本 [AccountController]。每个方法固定 4 步：校验 → `uow.run`
+/// 单事务内调 [AccountLedger] 组合接口写入 → 失败整体回滚 →
+/// 提交成功后 `catalog.refresh` 通知页面。
 class CreditCardAccountController {
-  CreditCardAccountController(this.db, this.dao, this.entryDao, this.catalog);
+  CreditCardAccountController(
+    this.db,
+    this.dao,
+    this.entryDao,
+    this.catalog, {
+     UnitOfWork? uow,
+    AccountLedger? ledger,
+    UniquenessService? uniqueness,
+  })  : uow = uow ?? UnitOfWork(db),
+        ledger = ledger ?? AccountLedger(entryDao),
+        uniqueness = uniqueness ?? const UniquenessService();
 
   final Database db;
   final AccountDao dao;
   final AccountEntryDao entryDao;
   final AccountController catalog;
 
-  static const AccountBalanceRule _rule = AccountBalanceRule.credit;
+  /// 与储蓄类处理器共享同一个事务编排入口，跨模块组合才能同事务。
+  final UnitOfWork uow;
+
+  /// 与储蓄类处理器共享同一个记账功能接口：出账 / 入账只有一套。
+  final AccountLedger ledger;
+
+  /// 名称查重的写侧真源（与分类 / 资债共用）。
+  final UniquenessService uniqueness;
 
   /// 新增 / 编辑信用卡账户。
   ///
@@ -117,22 +139,33 @@ class CreditCardAccountController {
     );
 
     int savedId = 0;
-    await db.transaction((txn) async {
-      if (id == null) {
-        savedId = await dao.insert(txn, record);
-        if (savedId <= 0) throw StateError('账户写入未生效');
-      } else {
-        final int affected = await dao.update(txn, record);
-        if (affected == 0) throw StateError('账户更新未生效');
-        savedId = id;
-      }
-    });
-    await catalog.refresh(touched: <int>{savedId});
+    await uow.run(
+      (txn) async {
+        await uniqueness.assertUnique(
+          txn,
+          EntityKind.account,
+          name: name,
+          excludeId: id,
+          bookId: record.bookId,
+        );
+        if (id == null) {
+          savedId = await dao.insert(txn, record);
+          if (savedId <= 0) throw StateError('账户写入未生效');
+        } else {
+          final int affected = await dao.update(txn, record);
+          if (affected == 0) throw StateError('账户更新未生效');
+          savedId = id;
+        }
+      },
+      afterCommit: () => catalog.refresh(touched: <int>{savedId}),
+    );
     return savedId;
   }
 
   /// 消费出账：direction = `out`，信用卡规则下已用额度 **+amount**。
-  /// 这是「信用卡已用金额是出账金额」的写入口，不复用储蓄类的支出逻辑。
+  /// 这是「信用卡已用金额是出账金额」的入口，但底层**复用统一的
+  /// [AccountLedger.debit] 出账接口**；规则由门面按账户类别推导，
+  /// 不再在本类另写一套出账逻辑。
   ///
   /// 边界：金额 > 0、账户必须是信用卡。额度不足不硬拦（4.7 的口径是
   /// 提示而不是拦住），界面会显示可用额度供用户核对。
@@ -150,25 +183,21 @@ class CreditCardAccountController {
       throw StateError('仅信用卡账户支持消费出账');
     }
     final DateTime at = occurredAt ?? DateTime.now();
-    await db.transaction((txn) async {
-      await entryDao.append(
-        txn,
-        AccountEntryRecord(
+    await uow.run(
+      (txn) async {
+        // 消费与还款共用同一个出账接口 [AccountLedger.debit]。
+        await ledger.spend(
+          txn,
           accountId: accountId,
-          direction: AccountDirection.outbound,
           amount: amount,
-          balanceAfter: 0,
-          entryType: AccountEntryType.creditSpend,
-          occurredAt: at,
+          note: note,
           categoryId: categoryId,
           payee: payee,
-          note: note,
-          createdAt: DateTime.now(),
-        ),
-        rule: _rule,
-      );
-    });
-    await catalog.refresh(touched: <int>{accountId});
+          occurredAt: at,
+        );
+      },
+      afterCommit: () => catalog.refresh(touched: <int>{accountId}),
+    );
   }
 
   /// 立即还款：**独立实现，不调用 SavingsAccountController.transfer**。
@@ -240,52 +269,23 @@ class CreditCardAccountController {
     }
 
     final DateTime at = occurredAt ?? DateTime.now();
-    final String group =
-        'repay_${at.microsecondsSinceEpoch}_${fromAccountId}_$creditCardId';
-    await db.transaction((txn) async {
-      // ① 来源账户：按本息费综合出账（C9-c）。
-      await entryDao.append(
-        txn,
-        AccountEntryRecord(
-          accountId: fromAccountId,
-          direction: AccountDirection.outbound,
+    await uow.run(
+      (txn) async {
+        // 2 条等值流水由门面组合「出账 + 入账」生成，与消费共用根接口。
+        await ledger.repay(
+          txn,
+          creditCardId: creditCardId,
+          fromAccountId: fromAccountId,
           amount: amount,
-          balanceAfter: 0,
-          entryType: AccountEntryType.creditRepay,
-          occurredAt: at,
-          counterpartyAccountId: creditCardId,
-          transferGroupId: group,
           note: note,
-          // 全局约定 11：还款类出账指债务模块还款记录；信用卡账单还款
-          // 无负债侧行，ref_id 可空（未来按账单周期回填）。
-          refType: 'liability_repay',
-          createdAt: DateTime.now(),
-        ),
-        rule: AccountBalanceRule.savings,
-      );
-      // ② 信用卡：等值入账（已用额度减少同样的钱）。
-      await entryDao.append(
-        txn,
-        AccountEntryRecord(
-          accountId: creditCardId,
-          direction: AccountDirection.inbound,
-          amount: amount,
-          balanceAfter: 0,
-          entryType: AccountEntryType.creditRepay,
           occurredAt: at,
-          counterpartyAccountId: fromAccountId,
-          transferGroupId: group,
-          note: note,
-          // 配对腿共指同一条还款记录；这条只减欠款，不进统计视图。
-          refType: 'liability_repay',
-          createdAt: DateTime.now(),
-        ),
-        rule: _rule,
-      );
-      // ③ 已删除：息费只由 [rollStatement] 在账单出账时记一次，
-      //    还款不重复记「借钱的成本」（契-12 / 硬-16）。
-    });
-    await catalog.refresh(touched: <int>{fromAccountId, creditCardId});
+        );
+        // 息费只由 [rollStatement] 在账单出账时记一次，
+        // 还款不重复记「借钱的成本」（契-12 / 硬-16）。
+      },
+      afterCommit: () =>
+          catalog.refresh(touched: <int>{fromAccountId, creditCardId}),
+    );
   }
 
   /// 已用额度校准（信用卡专属，与储蓄类的「余额调整」分开）。
@@ -308,25 +308,20 @@ class CreditCardAccountController {
     final double delta = actualUsed - account.balance;
     if (delta == 0) return;
     final DateTime at = occurredAt ?? DateTime.now();
-    await db.transaction((txn) async {
-      await entryDao.append(
-        txn,
-        AccountEntryRecord(
+    await uow.run(
+      (txn) async {
+        // 信用卡「已用额度增加 = 出账」与储蓄类方向相反，
+        // 由门面按账户类别统一推导规则，本类不另写一套。
+        await ledger.adjust(
+          txn,
           accountId: accountId,
-          direction: delta > 0
-              ? AccountDirection.outbound
-              : AccountDirection.inbound,
-          amount: delta.abs(),
-          balanceAfter: 0,
-          entryType: AccountEntryType.adjustment,
-          occurredAt: at,
+          delta: -delta,
           reason: reason.trim(),
-          createdAt: DateTime.now(),
-        ),
-        rule: _rule,
-      );
-    });
-    await catalog.refresh(touched: <int>{accountId});
+          occurredAt: at,
+        );
+      },
+      afterCommit: () => catalog.refresh(touched: <int>{accountId}),
+    );
   }
 
   /// 调整总额度：只改属性，不动累计值、不写流水（额度不是余额）。
@@ -336,16 +331,20 @@ class CreditCardAccountController {
     if (old == null || old.kind != AccountKind.credit) {
       throw StateError('仅信用卡账户支持调整额度');
     }
-    final int affected = await dao.update(
-      db,
-      old.copyWith(
-        creditLimit: limit,
-        updatedAt: DateTime.now(),
-        revision: old.revision + 1,
-      ),
+    await uow.run(
+      (txn) async {
+        final int affected = await dao.update(
+          txn,
+          old.copyWith(
+            creditLimit: limit,
+            updatedAt: DateTime.now(),
+            revision: old.revision + 1,
+          ),
+        );
+        if (affected == 0) throw StateError('额度写入未生效');
+      },
+      afterCommit: () => catalog.refresh(touched: <int>{accountId}),
     );
-    if (affected == 0) throw StateError('额度写入未生效');
-    await catalog.refresh(touched: <int>{accountId});
   }
 
   /// 读取某张卡的章程（3.4 十项）。没填过返回 [CreditCardRule.empty]，
@@ -375,10 +374,12 @@ class CreditCardAccountController {
     if (rule.accountId != accountId) {
       throw ArgumentError('章程的账户编号与目标账户不一致');
     }
-    await db.transaction((txn) async {
-      await CreditCardRuleDao().upsert(txn, rule);
-    });
-    await catalog.refresh(touched: <int>{accountId});
+    await uow.run(
+      (txn) async {
+        await CreditCardRuleDao().upsert(txn, rule);
+      },
+      afterCommit: () => catalog.refresh(touched: <int>{accountId}),
+    );
   }
 
   /// 【契-13 账单出账动作】打开 / 操作时按 `last_period_key` 判跨账单日：
@@ -412,32 +413,24 @@ class CreditCardAccountController {
     if (sub.first['last_period_key'] == period) return;  // 本周期已滚动
 
     final int stamp = now.millisecondsSinceEpoch;
-    await db.transaction((txn) async {
-      await txn.rawUpdate(
-        'UPDATE ${AccountDb.creditTable} SET current_period_spent = ?, '
-        'period_installed_amount = ?, last_period_key = ?, '
-        'updated_at = ?, revision = revision + 1 WHERE account_id = ?',
-        <Object?>['0', '0', period, stamp, creditCardId],
-      );
-      if (interestAndFees > 0) {
-        await entryDao.append(
-          txn,
-          AccountEntryRecord(
-            accountId: creditCardId,
-            direction: AccountDirection.outbound,
-            amount: interestAndFees,
-            balanceAfter: 0,
-            entryType: AccountEntryType.interest,
-            occurredAt: now,
-            note: '账单息费',
-            refType: 'debt_cost',
-            createdAt: now,
-          ),
-          rule: _rule,
-          recordSource: 'auto',
+    await uow.run(
+      (txn) async {
+        await txn.rawUpdate(
+          'UPDATE ${AccountDb.creditTable} SET current_period_spent = ?, '
+          'period_installed_amount = ?, last_period_key = ?, '
+          'updated_at = ?, revision = revision + 1 WHERE account_id = ?',
+          <Object?>['0', '0', period, stamp, creditCardId],
         );
-      }
-    });
-    await catalog.refresh(touched: <int>{creditCardId});
+        if (interestAndFees > 0) {
+          await ledger.accrueInterest(
+            txn,
+            accountId: creditCardId,
+            amount: interestAndFees,
+            occurredAt: now,
+          );
+        }
+      },
+      afterCommit: () => catalog.refresh(touched: <int>{creditCardId}),
+    );
   }
 }

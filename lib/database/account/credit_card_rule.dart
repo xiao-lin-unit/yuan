@@ -195,7 +195,7 @@ class CreditCardRule {
 class CreditCardRuleDao {
   static const String table = CreditCardRuleDb.table;
 
-  Future<CreditCardRule?> byId(Database db, int accountId) async {
+  Future<CreditCardRule?> byId(DatabaseExecutor db, int accountId) async {
     final List<Map<String, dynamic>> rows = await db.query(
       table,
       where: 'account_id = ?',
@@ -208,7 +208,7 @@ class CreditCardRuleDao {
   /// 一次读出全部章程（卡通常只有几张），供共享账本 load() 建内存快照。
   /// key = account_id，没填过章程的卡不在结果里，取用时按
   /// `CreditCardRule.empty(id)` 兜底。
-  Future<Map<int, CreditCardRule>> all(Database db) async {
+  Future<Map<int, CreditCardRule>> all(DatabaseExecutor db) async {
     final List<Map<String, dynamic>> rows = await db.query(table);
     return <int, CreditCardRule>{
       for (final Map<String, dynamic> m in rows)

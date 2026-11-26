@@ -11,6 +11,15 @@ import 'package:yuan/service/category_controller.dart';
 import 'package:yuan/service/credit_card_account_controller.dart';
 import 'package:yuan/service/savings_account_controller.dart';
 import 'package:yuan/service/user_controller.dart';
+import 'package:yuan/service/core/account_ledger.dart';
+import 'package:yuan/service/core/entity_registry.dart';
+import 'package:yuan/service/core/image_transaction.dart';
+import 'package:yuan/service/core/lifecycle_service.dart';
+import 'package:yuan/service/core/query_facade.dart';
+import 'package:yuan/service/core/uniqueness_service.dart';
+import 'package:yuan/service/core/unit_of_work.dart';
+import 'package:yuan/service/image/image_service.dart';
+import 'package:yuan/service/ledger/az_repayment_service.dart';
 
 import 'database/user/user_dao.dart';
 
@@ -22,36 +31,111 @@ abstract class BaseDao {
   String get name;
 }
 
+/// 全局装配点。
+///
+/// 【项目检查 1 / 2 / 3 的落点】
+///   · 功能接口（事务 / 资金 / 生命周期 / 查重 / 查询 / 图片 / 跨模块编排）
+///     全部在这里**各建一份实例**，注入所有业务处理器并注册 Provider；
+///     页面一律 `context.read<Xxx>()` 取用，与具体页面无关 —— 换掉整套
+///     UI 不需要重写任何功能。
+///   · 账户侧与资债侧拿的是**同一个** [UnitOfWork] 和 [AccountLedger]，
+///     因此「债务处理 + 账户出账」能放进同一个事务，后者失败回滚前者。
 class Services {
   /// 页面一律 `context.read<XxxController>()` 取用。
   static Future<List<SingleChildWidget>> initServices(Database db) async {
+    // ── 1. 数据层（无状态，全库一份）──────────────────────────────
     final userDao = UserInfoDao();
-    final userController = UserController(db, userDao);
-    await userController.load();
-
-    // 分类：启动时把 41 条预设 / 用户自定义分类读进内存快照，
-    // 分类管理页与以后的记账选择器共用这一份，不在页面各读一遍。
     final categoryDao = CategoryDao();
-    final categoryController = CategoryController(db, categoryDao);
-    await categoryController.load();
-
-    // 账户：启动时把账户、绑定用途读进内存快照；流水不预加载
-    // （按账户点开明细时再读，避免几十万条流水常驻内存）。
     final accountDao = AccountDao();
     final accountEntryDao = AccountEntryDao();
-    final accountController =
-        AccountController(db, accountDao, accountEntryDao);
+    final azDao = AzDao();
+
+    // ── 2. 功能接口层（全库唯一实例，页面无关）────────────────────
+    final uow = UnitOfWork(db);
+    final uniqueness = const UniquenessService();
+    final accountLedger = AccountLedger(accountEntryDao);
+    final lifecycle = LifecycleService(
+      accountDao: accountDao,
+      categoryDao: categoryDao,
+      azDao: azDao,
+    );
+    final queries = QueryFacade(
+      entryDao: accountEntryDao,
+      accountDao: accountDao,
+      uniqueness: uniqueness,
+    );
+    final images = ImageService.instance;
+    final imageTx = ImageTransaction(uow, images);
+
+    // ── 3. 共享账本（ChangeNotifier，页面 watch 它们）──────────────
+    final userController = UserController(
+      db,
+      userDao,
+      images: images,
+      uow: uow,
+      imageTx: imageTx,
+    );
+    await userController.load();
+
+    final categoryController = CategoryController(
+      db,
+      categoryDao,
+      images: images,
+      uow: uow,
+      lifecycle: lifecycle,
+      uniqueness: uniqueness,
+      imageTx: imageTx,
+    );
+    await categoryController.load();
+
+    final accountController = AccountController(
+      db,
+      accountDao,
+      accountEntryDao,
+      uow: uow,
+      lifecycle: lifecycle,
+      uniqueness: uniqueness,
+      queries: queries,
+    );
     await accountController.load();
 
-    // 资债：启动时把资产 / 负债 / 还款计划 / 成对清单 / 口径开关
-    // 读进内存快照。账户镜像不在这里复制，页面同时 watch
-    // AccountController，余额一变家底账当场跟着变，不注册第二份监听。
-    // AzDao 不登记进 Components.components：那个 Map 的类型是
-    // BaseDao，数据层不该反向依赖 components.dart；本模块由下面两个
-    // Provider 直接持有实例即可。
-    final azDao = AzDao();
     final azController = AzController(db, azDao);
     await azController.load();
+
+    // ── 4. 业务处理器（薄层：校验 + 调功能接口 + 提交后刷新）────────
+    final savings = SavingsAccountController(
+      db,
+      accountDao,
+      accountEntryDao,
+      accountController,
+      uow: uow,
+      ledger: accountLedger,
+      uniqueness: uniqueness,
+    );
+    final credit = CreditCardAccountController(
+      db,
+      accountDao,
+      accountEntryDao,
+      accountController,
+      uow: uow,
+      ledger: accountLedger,
+      uniqueness: uniqueness,
+    );
+    final azWrite = AzWriteController(
+      db,
+      azDao,
+      azController,
+      uow: uow,
+      lifecycle: lifecycle,
+      uniqueness: uniqueness,
+    );
+    final azRepayment = AzRepaymentService(
+      uow: uow,
+      azWrite: azWrite,
+      ledger: accountLedger,
+      accountCatalog: accountController,
+      azLedger: azController,
+    );
 
     Components.components.putIfAbsent("user", () => userDao);
     Components.components.putIfAbsent("category", () => categoryDao);
@@ -59,21 +143,23 @@ class Services {
     Components.components.putIfAbsent("account_entry", () => accountEntryDao);
 
     return <SingleChildWidget>[
+      // 共享账本
       ChangeNotifierProvider<UserController>.value(value: userController),
       ChangeNotifierProvider<CategoryController>.value(value: categoryController),
       ChangeNotifierProvider<AccountController>.value(value: accountController),
-      Provider<SavingsAccountController>.value(
-        value: SavingsAccountController(
-            db, accountDao, accountEntryDao, accountController),
-      ),
-      Provider<CreditCardAccountController>.value(
-        value: CreditCardAccountController(
-            db, accountDao, accountEntryDao, accountController),
-      ),
       ChangeNotifierProvider<AzController>.value(value: azController),
-      Provider<AzWriteController>.value(
-        value: AzWriteController(db, azDao, azController),
-      ),
+      // 业务处理器（保持原有类型，页面零改动）
+      Provider<SavingsAccountController>.value(value: savings),
+      Provider<CreditCardAccountController>.value(value: credit),
+      Provider<AzWriteController>.value(value: azWrite),
+      // 功能接口：新页面直接 context.read<...>() 调用，与 UI 完全解耦
+      Provider<UnitOfWork>.value(value: uow),
+      Provider<AccountLedger>.value(value: accountLedger),
+      Provider<LifecycleService>.value(value: lifecycle),
+      Provider<UniquenessService>.value(value: uniqueness),
+      Provider<QueryFacade>.value(value: queries),
+      Provider<ImageTransaction>.value(value: imageTx),
+      Provider<AzRepaymentService>.value(value: azRepayment),
     ];
   }
 }

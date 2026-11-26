@@ -155,7 +155,7 @@ class AccountEntryDao implements BaseDao {
   /// 内存后再截断。[direction] 给「全部 / 出账 / 入账」标签用，null = 不过滤。
   /// 排序固定 `occurred_at DESC, id DESC`，所以第 1 页就是最近 10 条。
   Future<List<AccountEntryRecord>> listForAccount(
-    Database db,
+    DatabaseExecutor db,
     int accountId, {
     int? limit,
     int? offset,
@@ -191,7 +191,7 @@ class AccountEntryDao implements BaseDao {
   /// 满足条件的流水总条数，用于算总页数 / 标签条数。
   /// 与 [listForAccount] 共用同一套 where 条件，两者永远同源。
   Future<int> countForAccount(
-    Database db,
+    DatabaseExecutor db,
     int accountId, {
     AccountDirection? direction,
     DateTime? from,
@@ -220,7 +220,7 @@ class AccountEntryDao implements BaseDao {
 
   /// 明细页顶部「总入账 / 总出账 / 净变动 / 当前余额」。
   Future<AccountEntrySummary> summaryFor(
-    Database db,
+    DatabaseExecutor db,
     int accountId, {
     DateTime? from,
     DateTime? to,
@@ -268,7 +268,7 @@ class AccountEntryDao implements BaseDao {
   /// 过滤参数，无需改表、无需迁移。
   /// 无数据时返回空列表，不抛异常。
   Future<List<AccountUsage>> usageByAccount(
-    Database db, {
+    DatabaseExecutor db, {
     int limit = 5,
     String? refType,
   }) async {
@@ -310,7 +310,7 @@ class AccountEntryDao implements BaseDao {
   /// 与欠款，不进视图；账单出账息费也不另计（已含在还款金额里）。
   /// **取数不依赖 `ref_type`**：支出 / 收入模块未开工、ref_id 全空也能算。
   Future<AccountExpenseStats> expenseStats(
-    Database db, {
+    DatabaseExecutor db, {
     String bookId = 'default',
     DateTime? from,
     DateTime? to,
@@ -358,7 +358,7 @@ class AccountEntryDao implements BaseDao {
   /// 本来就从 DB 读出了完整账户行，能安全推出规则；append 是**写**路径，
   /// 必须让处理器在调用点把规则说清楚，二者不矛盾。
   /// 信用卡没有「期初已用额度」，恒等式是 `Σ出账 − Σ入账`。
-  Future<double> auditBalance(Database db, int accountId) async {
+  Future<double> auditBalance(DatabaseExecutor db, int accountId) async {
     final AccountRecord? account = await AccountDao().byId(db, accountId);
     if (account == null) return 0;
     final AccountEntrySummary summary = await summaryFor(db, accountId);

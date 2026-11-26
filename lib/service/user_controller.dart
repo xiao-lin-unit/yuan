@@ -7,14 +7,28 @@ import 'image/image_category.dart';
 import 'image/image_ref.dart';
 import 'image/image_service.dart';
 import 'image/image_validator.dart';
+import 'core/image_transaction.dart';
+import 'core/unit_of_work.dart';
 
 class UserController extends ChangeNotifier {
   final Database db;
   final UserInfoDao dao;
-  final ImageService _images;
 
-  UserController(this.db, this.dao, {ImageService? images})
-      : _images = images ?? ImageService.instance;
+  final UnitOfWork uow;
+  final ImageTransaction imageTx;
+
+  UserController(
+    this.db,
+    this.dao, {
+    ImageService? images,
+    UnitOfWork? uow,
+    ImageTransaction? imageTx,
+  })  : uow = uow ?? UnitOfWork(db),
+        imageTx = imageTx ??
+            ImageTransaction(
+              uow ?? UnitOfWork(db),
+              images ?? ImageService.instance,
+            );
 
   UserInfo? _user;
   UserInfo? get user => _user;
@@ -31,66 +45,75 @@ class UserController extends ChangeNotifier {
   ///
   /// [avatar] 传 [imageUndefined] = 不改；null = 清空；(ImageCandidate) = 新图。
   ///
-  /// 图片与资料共用一条「两阶段」链路，由 [ImageService.plan] 统一编排：
-  /// 新图先落盘 → await 写数据库 → 成功才删旧图 / 失败回滚新图。
-  /// 这段逻辑与业务无关，账单凭证等多图场景调用的是同一个 plan。
+  /// 图片与资料的一致性由 [ImageTransaction] 统一编排：新图落盘 →
+  /// 在 [UnitOfWork.run] 的一个事务里写 DB → 提交成功删旧图 /
+  /// 回滚删新图。与 CategoryController.save 共用同一个功能接口，
+  /// 不再各写一套 try/catch。
   Future<void> updateProfile({
     String? username,
     String? userSub,
     Object? avatar = imageUndefined,
   }) async {
-    final current = _user;
+    final UserInfo? current = _user;
     if (current == null || _saving) return;
 
     _saving = true;
     notifyListeners();
 
-    ImageCommitPlan? plan;
     try {
-      final changed = !identical(avatar, imageUndefined);
-      final existing = current.avatarRef == null
+      final bool changed = !identical(avatar, imageUndefined);
+      final List<ImageRef> existing = current.avatarRef == null
           ? <ImageRef>[]
           : <ImageRef>[current.avatarRef!];
-      ImageRef? nextRef = current.avatarRef;
+      late UserInfo updated;
 
       if (changed) {
-        final entries = <ImageEntry>[];
+        final List<ImageEntry> entries = <ImageEntry>[];
         if (avatar != null) {
           entries.add(NewImage(avatar as ImageCandidate));
         }
-        plan = await _images.plan(
-          ImageCategory.avatar,
-          entries,
+        await imageTx.run<void>(
+          category: ImageCategory.avatar,
+          entries: entries,
           existing: existing,
           ownerId: '${current.id ?? 1}',
+          body: (ImageCommitPlan plan, DatabaseExecutor txn) async {
+            final ImageRef? nextRef =
+                plan.refs.isEmpty ? null : plan.refs.first;
+            updated = current.copyWith(
+              username: username,
+              userSub: userSub,
+              avatarRef: nextRef,
+            );
+            final int affected = await dao.updateUser(txn, updated);
+            if (affected == 0) {
+              throw StateError('资料写入未生效（未匹配到用户记录）');
+            }
+          },
+          afterCommit: () async {
+            _user = updated;
+            notifyListeners();
+          },
         );
-        nextRef = plan.refs.isEmpty ? null : plan.refs.first;
+      } else {
+        updated = current.copyWith(
+          username: username,
+          userSub: userSub,
+          avatarRef: imageUndefined,
+        );
+        await uow.run(
+          (txn) async {
+            final int affected = await dao.updateUser(txn, updated);
+            if (affected == 0) {
+              throw StateError('资料写入未生效（未匹配到用户记录）');
+            }
+          },
+          afterCommit: () async {
+            _user = updated;
+            notifyListeners();
+          },
+        );
       }
-
-      final updated = current.copyWith(
-        username: username,
-        userSub: userSub,
-        avatarRef: changed ? nextRef : imageUndefined,
-      );
-
-      // ✅ await 到底：调用方 await 返回时，数据一定已落库
-      final affected = await dao.updateUser(db, updated);
-      if (affected == 0) {
-        throw StateError('资料写入未生效（未匹配到用户记录）');
-      }
-
-      // 落库成功后才清理旧图。先把 plan 摘掉：
-      // 万一 commit 抛错，catch 也不能再回滚这批已被 DB 引用的新图。
-      final committed = plan;
-      plan = null;
-      await committed?.commit();
-
-      _user = updated;
-      notifyListeners();
-    } catch (_) {
-      // 写失败：内存保持旧值，回滚本次新落盘的文件
-      await plan?.discard();
-      rethrow;
     } finally {
       _saving = false;
       notifyListeners();

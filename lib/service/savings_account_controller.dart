@@ -4,6 +4,10 @@ import '../database/account/account_dao.dart';
 import '../database/account/account_entry_dao.dart';
 import '../database/account/account_record.dart';
 import 'account_controller.dart';
+import 'core/account_ledger.dart';
+import 'core/entity_registry.dart';
+import 'core/uniqueness_service.dart';
+import 'core/unit_of_work.dart';
 
 /// 储蓄类账户的业务处理器：**流动资金账户 + 其他资金账户**。
 ///
@@ -13,29 +17,45 @@ import 'account_controller.dart';
 /// 绑定用途、且 `is_liquid` 默认否，属于同一套逻辑里的字段差异，不是
 /// 两套逻辑。
 ///
-/// 【与 CreditCardAccountController 的关系】两者**不互相调用、不复用
-/// 实现**：信用卡的 balance 是已用额度，方向规则相反，还款也不是
-/// 「把钱转进信用卡」。各自的事务、校验、文案都留在各自文件里，
-/// 读一个文件就能看全一种账户的全部行为。
+/// 【与 CreditCardAccountController 的关系】两者的**校验与文案**各自
+/// 留在各自文件里，读一个文件就能看全一种账户的全部行为；但**写库动作
+/// 共用同一套功能接口**：都调 [AccountLedger] 的出账 / 入账接口，
+/// 事务都由 [UnitOfWork] 统一编排，不再各自写一套出账逻辑。
 ///
 /// 【动态逻辑说明，按项目约定写清】本类不是 ChangeNotifier：页面只 watch
 /// 共享账本 [AccountController]。每个方法的工作逻辑固定 4 步：
 ///   ① 校验参数与账户类别（错配在事务开始前就抛，界面保持打开）；
-///   ② 在一个 `db.transaction` 内完成全部写入，流水 append 显式传
-///      [AccountBalanceRule.savings]；
+///   ② 在 `uow.run` 的一个事务内调 [AccountLedger] 的组合接口完成写入
+///      （规则由门面按账户类别统一推导，本类不再各自判断方向）；
 ///   ③ 失败由事务整体回滚，内存快照不动（10.8）；
 ///   ④ 成功后 `await catalog.refresh(touched: ...)` 重读并通知页面。
 /// 没有隐藏状态、没有跨帧回调。
 class SavingsAccountController {
-  SavingsAccountController(this.db, this.dao, this.entryDao, this.catalog);
+  SavingsAccountController(
+    this.db,
+    this.dao,
+    this.entryDao,
+    this.catalog, {
+     UnitOfWork? uow,
+    AccountLedger? ledger,
+    UniquenessService? uniqueness,
+  })  : uow = uow ?? UnitOfWork(db),
+        ledger = ledger ?? AccountLedger(entryDao),
+        uniqueness = uniqueness ?? const UniquenessService();
 
   final Database db;
   final AccountDao dao;
   final AccountEntryDao entryDao;
   final AccountController catalog;
 
-  /// 本处理器唯一的累计值规则。写成常量而不是每次推导，避免误传。
-  static const AccountBalanceRule _rule = AccountBalanceRule.savings;
+  /// 全库唯一的事务编排入口：跨接口组合时与其他模块共享同一个实例。
+  final UnitOfWork uow;
+
+  /// 全库唯一的账户记账功能接口（出账 / 入账 / 组合动作）。
+  final AccountLedger ledger;
+
+  /// 名称查重的写侧真源（与分类 / 资债共用）。
+  final UniquenessService uniqueness;
 
   /// 新增 / 编辑储蓄类账户。
   ///
@@ -124,7 +144,14 @@ class SavingsAccountController {
     );
 
     int savedId = 0;
-    await db.transaction((txn) async {
+    await uow.run((txn) async {
+      await uniqueness.assertUnique(
+        txn,
+        EntityKind.account,
+        name: name,
+        excludeId: id,
+        bookId: record.bookId,
+      );
       if (id == null) {
         savedId = await dao.insert(txn, record);
         if (savedId <= 0) throw StateError('账户写入未生效');
@@ -133,18 +160,11 @@ class SavingsAccountController {
         // 属有意的期初事实录入，与「历史持仓补录」（契-14，不写流水）不同。
         final double opening = record.initialBalance;
         if (opening > 0) {
-          await entryDao.append(
+          await ledger.opening(
             txn,
-            AccountEntryRecord(
-              accountId: savedId,
-              direction: AccountDirection.inbound,
-              amount: opening,
-              balanceAfter: 0, // append 在事务内重算并覆盖
-              entryType: AccountEntryType.opening,
-              occurredAt: now,
-              createdAt: now,
-            ),
-            rule: _rule,
+            accountId: savedId,
+            amount: opening,
+            occurredAt: now,
           );
         }
       } else {
@@ -160,17 +180,16 @@ class SavingsAccountController {
             type == AccountType.socialSecurity ? const <int>{} : bindingIds;
         await dao.replaceBindings(txn, savedId, effectiveBindings);
       }
-    });
-    await catalog.refresh(touched: <int>{savedId});
+    }, afterCommit: () => catalog.refresh(touched: <int>{savedId}));
     return savedId;
   }
 
   /// 账户间转账（3.7）。**只在储蓄类账户之间**，信用卡不参与：
   /// 给信用卡还钱是 [CreditCardAccountController.repay]，不是转账。
   ///
-  /// 【工作逻辑】转出方 `out`、转入方 `in`，两条流水共用 group id，
-  /// 同一个事务、同一条 [AccountBalanceRule.savings] 规则；两端余额
-  /// 要么全变、要么全回滚（附录 A）。
+  /// 【工作逻辑】转出 / 转入两条流水由 [AccountLedger.transfer] 组合
+  /// 同一个出账接口与入账接口生成，共用 group id、同处一个事务；
+  /// 两端余额要么全变、要么全回滚（附录 A）。
   /// 边界：两端相同、金额 ≤ 0、任一端不存在或属于信用卡都拦。
   Future<void> transfer({
     required int fromId,
@@ -189,44 +208,19 @@ class SavingsAccountController {
     }
 
     final DateTime at = occurredAt ?? DateTime.now();
-    final String group = 'tx_${at.microsecondsSinceEpoch}_${fromId}_$toId';
-    await db.transaction((txn) async {
-      await entryDao.append(
-        txn,
-        AccountEntryRecord(
-          accountId: fromId,
-          direction: AccountDirection.outbound,
+    await uow.run(
+      (txn) async {
+        await ledger.transfer(
+          txn,
+          fromId: fromId,
+          toId: toId,
           amount: amount,
-          balanceAfter: 0,
-          entryType: AccountEntryType.transferOut,
-          occurredAt: at,
-          counterpartyAccountId: toId,
-          transferGroupId: group,
           note: note,
-          refType: 'transfer',
-          createdAt: DateTime.now(),
-        ),
-        rule: _rule,
-      );
-      await entryDao.append(
-        txn,
-        AccountEntryRecord(
-          accountId: toId,
-          direction: AccountDirection.inbound,
-          amount: amount,
-          balanceAfter: 0,
-          entryType: AccountEntryType.transferIn,
           occurredAt: at,
-          counterpartyAccountId: fromId,
-          transferGroupId: group,
-          note: note,
-          refType: 'transfer',
-          createdAt: DateTime.now(),
-        ),
-        rule: _rule,
-      );
-    });
-    await catalog.refresh(touched: <int>{fromId, toId});
+        );
+      },
+      afterCommit: () => catalog.refresh(touched: <int>{fromId, toId}),
+    );
   }
 
   /// 余额调整（3.8）：必须填原因，差额记为一条 `adjustment` 流水，
@@ -249,26 +243,18 @@ class SavingsAccountController {
     final double delta = actualBalance - account.balance;
     if (delta == 0) return;
     final DateTime at = occurredAt ?? DateTime.now();
-    await db.transaction((txn) async {
-      await entryDao.append(
-        txn,
-        AccountEntryRecord(
+    await uow.run(
+      (txn) async {
+        await ledger.adjust(
+          txn,
           accountId: accountId,
-          direction: delta > 0
-              ? AccountDirection.inbound
-              : AccountDirection.outbound,
-          amount: delta.abs(),
-          balanceAfter: 0,
-          entryType: AccountEntryType.adjustment,
-          occurredAt: at,
+          delta: delta,
           reason: reason.trim(),
-          refType: 'adjustment',
-          createdAt: DateTime.now(),
-        ),
-        rule: _rule,
-      );
-    });
-    await catalog.refresh(touched: <int>{accountId});
+          occurredAt: at,
+        );
+      },
+      afterCommit: () => catalog.refresh(touched: <int>{accountId}),
+    );
   }
 
   /// 修改其他资金账户的绑定用途（3.5）。空集合 = 不绑定 = 不限制。
@@ -286,9 +272,11 @@ class SavingsAccountController {
     if (old.type == AccountType.socialSecurity) {
       throw StateError('社保账户不能绑定支出类型');
     }
-    await db.transaction((txn) async {
-      await dao.replaceBindings(txn, accountId, categoryIds);
-    });
-    await catalog.refresh(touched: <int>{accountId});
+    await uow.run(
+      (txn) async {
+        await dao.replaceBindings(txn, accountId, categoryIds);
+      },
+      afterCommit: () => catalog.refresh(touched: <int>{accountId}),
+    );
   }
 }

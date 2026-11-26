@@ -10,7 +10,7 @@ class UserInfoDao implements BaseDao {
   @override
   String get name => "user";
 
-  Future<UserInfo> getUser(Database db) async {
+  Future<UserInfo> getUser(DatabaseExecutor db) async {
     final rows = await db.query(
       table,
       where: 'id = ?',
@@ -38,7 +38,7 @@ class UserInfoDao implements BaseDao {
   }
 
   /// 返回受影响行数。调用方必须检查它，0 行说明写入根本没生效。
-  Future<int> updateUser(Database db, UserInfo user) async {
+  Future<int> updateUser(DatabaseExecutor db, UserInfo user) async {
     final id = user.id ?? defaultId;
     return db.update(
       table,

@@ -2,6 +2,12 @@ import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 
 import '../../database/ledger/az_dao.dart';
+import '../core/entity_registry.dart';
+import '../core/lifecycle_service.dart';
+import '../core/uniqueness_service.dart';
+import '../core/unit_of_work.dart';
+import '../../database/account/account_dao.dart';
+import '../../database/category/category_dao.dart';
 import '../../database/ledger/az_math.dart';
 import '../../database/ledger/az_record.dart';
 
@@ -85,31 +91,57 @@ class AzController extends ChangeNotifier {
 /// 同样的理由：共享账本只负责读，写操作各自持有事务与校验规则。
 /// 页面一律 `context.read<AzWriteController>()` 取用。
 ///
-/// 【事务边界】每个公开方法只开一次 `db.transaction`，DAO 不自建事务；
-/// 成功后 `await ledger.refresh()` 重读并通知。任一步抛异常，事务回滚、
-/// 内存快照保持旧值（10.8 / 附录 E 崩溃恢复后数据不丢、不重复）。
+/// 【事务边界】每个公开方法走 [uow.run] 开一次事务；DAO 不自建事务，
+/// 且刷新放在 `afterCommit`，**提交成功后**才重读并通知。任一步抛异常，
+/// 事务回滚、内存快照保持旧值（10.8 / 附录 E 崩溃恢复后数据不丢、不重复）。
+/// 需要与其他模块（例如账户出账）同事务时，调用 [markPlanPaidIn] 这类
+/// 「收 [DatabaseExecutor]、不自建事务」的内部接口，由外层 [UnitOfWork.run]
+/// 统一编排。
 ///
-/// 【本轮明确的边界，不伪装完成】
-/// 资产买卖现金收付、还款时账户扣款，都要走 `AccountEntryDao.append`
-/// 这个账户余额唯一写入点，属于「记支出 / 记收入」模块开工时的联动。
-/// 本轮只登记买卖批次与还款记录，**不改任何账户余额、不写账户流水**，
-/// 因此家底账不会凭空虚增；界面在对应位置写清这句话。
+/// 【本轮边界】单个资产 / 负债的登记动作仍然只写本模块的表；
+/// **「还一期 = 债务处理 + 账户出账」的跨模块联动**已由
+/// `AzRepaymentService.repayLoanInstallment` 用 [UnitOfWork.run] 编排到
+/// 同一个事务里，债务侧走 [markPlanPaidIn]、账户侧走
+/// `AccountLedger.debit`，任一方失败整体回滚。资产买卖的现金收付仍等
+/// 对应模块开工后按同一套编排接入，不在这里假装完成。
 class AzWriteController {
-  AzWriteController(this.db, this.dao, this.ledger);
+  AzWriteController(
+    this.db,
+    this.dao,
+    this.ledger, {
+    UnitOfWork? uow,
+    LifecycleService? lifecycle,
+    UniquenessService? uniqueness,
+  })  : uow = uow ?? UnitOfWork(db),
+        lifecycle = lifecycle ??
+            LifecycleService(
+              accountDao: AccountDao(),
+              categoryDao: CategoryDao(),
+              azDao: dao,
+            ),
+        uniqueness = uniqueness ?? const UniquenessService();
 
   final Database db;
   final AzDao dao;
   final AzController ledger;
 
+  /// 与账户侧共享同一个事务编排入口，跨模块还款才能同事务。
+  final UnitOfWork uow;
+
+  /// 软删 / 恢复 / 归档 / 排序的唯一接口（全库共用一份实现）。
+  final LifecycleService lifecycle;
+
+  /// 名称 / 代码查重的唯一写侧真源。
+  final UniquenessService uniqueness;
+
   /// 新增 / 编辑一项资产。名称重复由部分唯一索引兜底，提前给一句校验；
   /// 投资类代码相同不允许二次新增（用户口径），表单即时校验 + 这里查库兜底。
   Future<int> saveAsset(AssetRecord record) async {
-    await _checkAssetUnique(record);
     late int id;
-    await db.transaction((Transaction txn) async {
+    await uow.run((txn) async {
+      await _checkAssetUnique(txn, record);
       id = await dao.saveAsset(txn, record);
-    });
-    await ledger.refresh();
+    }, afterCommit: ledger.refresh);
     return id;
   }
 
@@ -126,7 +158,6 @@ class AzWriteController {
     required double quantity,
     double fee = 0,
   }) async {
-    await _checkAssetUnique(record);
     _requirePositive(unitPrice, '每个多少钱');
     _requirePositive(quantity, '买了多少');
     if (fee < 0) throw ArgumentError('另外交的钱不能是负数');
@@ -136,7 +167,8 @@ class AzWriteController {
     }
     late int id;
     final DateTime now = DateTime.now();
-    await db.transaction((Transaction txn) async {
+    await uow.run((txn) async {
+      await _checkAssetUnique(txn, record);
       id = await dao.saveAsset(txn, record);
       await dao.insertTrade(
         txn,
@@ -151,29 +183,26 @@ class AzWriteController {
           createdAt: now,
         ),
       );
-    });
-    await ledger.refresh();
+    }, afterCommit: ledger.refresh);
     return id;
   }
 
   /// 名称 / 代码唯一的共用校验：表单即时拦一次，写库前再查一次，
   /// 防两个弹层同时提交或以后别的入口绕过表单。
   /// 空代码不查；软删的行不占用代码（与名称部分唯一索引同口径）。
-  Future<void> _checkAssetUnique(AssetRecord record) async {
+  Future<void> _checkAssetUnique(
+    DatabaseExecutor txn,
+    AssetRecord record,
+  ) async {
     _requirePositive(record.cost, '买它一共花了多少');
-    if (await dao.nameExists(
-      db,
-      'az_assets',
-      record.name,
-      exceptId: record.id,
-    )) {
-      throw ArgumentError('已经有同名的一项东西了，换个名字吧');
-    }
-    final String code = record.code.trim();
-    if (code.isNotEmpty &&
-        await dao.codeExists(db, 'az_assets', code, exceptId: record.id)) {
-      throw ArgumentError('这个代码已经登记过了');
-    }
+    // 写库前在同一事务内走全库唯一查重接口，口径与账户 / 分类一致。
+    await uniqueness.assertUnique(
+      txn,
+      EntityKind.asset,
+      name: record.name,
+      code: record.code,
+      excludeId: record.id,
+    );
   }
 
   /// 「更新一下现在值多少」（6.4）：填一次价，留一次痕，历史不覆盖。
@@ -186,10 +215,9 @@ class AzWriteController {
       ..['valued_at'] = DateTime.now().millisecondsSinceEpoch
       ..['valuation_source'] = ValuationSource.manual.dbValue
       ..['note'] = asset.note;
-    await db.transaction((Transaction txn) async {
+    await uow.run((txn) async {
       await dao.saveAsset(txn, AssetRecord.fromMap(next));
-    });
-    await ledger.refresh();
+    }, afterCommit: ledger.refresh);
   }
 
   /// 记一笔买入 / 卖出（6.5）。卖出时用移动加权平均当场结算已落袋赚亏，
@@ -244,10 +272,9 @@ class AzWriteController {
       note: note,
       createdAt: now,
     );
-    await db.transaction((Transaction txn) async {
+    await uow.run((txn) async {
       await dao.insertTrade(txn, row);
-    });
-    await ledger.refresh();
+    }, afterCommit: ledger.refresh);
   }
 
   /// 新增 / 编辑一笔欠款。剩余本金只许正数；填 0 时按 7.13 提示「是不是
@@ -256,19 +283,16 @@ class AzWriteController {
     if (record.principal < 0) {
       throw ArgumentError('现在还欠多少不能是负数');
     }
-    if (await dao.nameExists(
-      db,
-      'az_liabilities',
-      record.name,
-      exceptId: record.id,
-    )) {
-      throw ArgumentError('已经有同名的一笔欠款了，换个名字吧');
-    }
     late int id;
-    await db.transaction((Transaction txn) async {
+    await uow.run((txn) async {
+      await uniqueness.assertUnique(
+        txn,
+        EntityKind.liability,
+        name: record.name,
+        excludeId: record.id,
+      );
       id = await dao.saveLiability(txn, record);
-    });
-    await ledger.refresh();
+    }, afterCommit: ledger.refresh);
     return id;
   }
 
@@ -282,11 +306,31 @@ class AzWriteController {
     required String reason,
   }) async {
     if (actualAmount <= 0) throw ArgumentError('还了多少要填正数');
-    await db.transaction((Transaction txn) async {
-      await dao.markPlanPaid(txn, planId, actualAmount, reason);
-    });
-    await ledger.refresh();
+    await uow.run(
+      (txn) async {
+        await markPlanPaidIn(
+          txn,
+          planId: planId,
+          actualAmount: actualAmount,
+          reason: reason,
+        );
+      },
+      afterCommit: ledger.refresh,
+    );
   }
+
+  /// **债务处理接口（可注入事务）**：只收 [DatabaseExecutor]、不自建事务。
+  ///
+  /// 供 [AzRepaymentService] 把「债务状态更新」和「账户出账」放进同一个
+  /// [UnitOfWork.run]：出账失败 → 本方法已执行的 UPDATE 一并回滚，
+  /// 不会出现「债务已记已还、卡里的钱没扣」。单独调用请走 [markPlanPaid]。
+  Future<void> markPlanPaidIn(
+    DatabaseExecutor txn, {
+    required int planId,
+    required double actualAmount,
+    required String reason,
+  }) =>
+      dao.markPlanPaid(txn, planId, actualAmount, reason);
 
   /// 重算还款计划：另存新版本，旧版本保留可对比（7.8）。
   Future<void> regeneratePlan({
@@ -294,7 +338,7 @@ class AzWriteController {
     required List<RepayPlanRecord> rows,
   }) async {
     final int version = debt.activePlanVersion + 1;
-    await db.transaction((Transaction txn) async {
+    await uow.run((txn) async {
       await dao.insertPlans(
         txn,
         <RepayPlanRecord>[
@@ -315,8 +359,7 @@ class AzWriteController {
         ],
       );
       await dao.setActivePlanVersion(txn, debt.id!, version);
-    });
-    await ledger.refresh();
+    }, afterCommit: ledger.refresh);
   }
 
   /// 两张成对清单的唯一编辑入口（13.13）。
@@ -325,10 +368,9 @@ class AzWriteController {
       throw ArgumentError('最多可能要还多少不能是负数');
     }
     late int id;
-    await db.transaction((Transaction txn) async {
+    await uow.run((txn) async {
       id = await dao.saveContingent(txn, record);
-    });
-    await ledger.refresh();
+    }, afterCommit: ledger.refresh);
     return id;
   }
 
@@ -340,42 +382,47 @@ class AzWriteController {
   }) async {
     if (item.id == null) throw ArgumentError('这一笔还没保存');
     late int id;
-    await db.transaction((Transaction txn) async {
+    await uow.run((txn) async {
       id = await dao.insertLiabilityFromContingent(txn, debt, item.id!);
-    });
-    await ledger.refresh();
+    }, afterCommit: ledger.refresh);
     return id;
   }
 
   /// 记录 / 显示口径（估值口径 / 价格过期天数 / 隐藏已还清）。切了留痕。
   /// 情境设计与分析模块的参数不在这里写。
   Future<void> setPreference(String key, String value) async {
-    await db.transaction((Transaction txn) async {
+    await uow.run((txn) async {
       await dao.setPreference(txn, key, value);
-    });
-    await ledger.refresh();
+    }, afterCommit: ledger.refresh);
   }
 
   /// 软删进回收站（10.7）。reason 必填；删前由页面先问一句并数记录。
   Future<void> softDelete(String table, int id, String reason) async {
-    await db.transaction((Transaction txn) async {
-      await dao.softDelete(txn, table, id, reason);
-    });
-    await ledger.refresh();
+    await uow.run((txn) async {
+      await lifecycle.softDelete(
+        txn,
+        EntityKind.fromTable(table),
+        id,
+        reason: reason,
+      );
+    }, afterCommit: ledger.refresh);
   }
 
   Future<void> restore(String table, int id) async {
-    await db.transaction((Transaction txn) async {
-      await dao.restore(txn, table, id);
-    });
-    await ledger.refresh();
+    await uow.run((txn) async {
+      await lifecycle.restore(txn, EntityKind.fromTable(table), id);
+    }, afterCommit: ledger.refresh);
   }
 
   Future<void> setArchived(String table, int id, bool archived) async {
-    await db.transaction((Transaction txn) async {
-      await dao.setArchived(txn, table, id, archived);
-    });
-    await ledger.refresh();
+    await uow.run((txn) async {
+      await lifecycle.setArchived(
+        txn,
+        EntityKind.fromTable(table),
+        id,
+        archived: archived,
+      );
+    }, afterCommit: ledger.refresh);
   }
 
   static void _requirePositive(double v, String label) {

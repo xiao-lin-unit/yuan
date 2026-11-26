@@ -75,6 +75,8 @@ class DatabaseService {
   }
 
   /// 全新安装：一个事务里按模块清单建全部表 + 种子。
+  /// 【本轮】这是全库仅有的两处「非业务事务」之一（另一处在 UnitOfWork）：
+  /// 建表是 Schema 装配，不参与功能接口组合，故保留独立的 db.transaction。
   Future<void> _onCreate(Database db, int version) async {
     try {
       await db.transaction((txn) async {

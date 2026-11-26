@@ -6,6 +6,7 @@ import 'category_record.dart';
 
 /// 分类表的纯 SQL 层：**不含业务规则**（预设不可删、重名提示、30 天清理
 /// 都在 CategoryController），只负责把行搬进搬出。
+/// 【本轮】所有方法收 [DatabaseExecutor]，可在跨模块事务里复用同一个 txn。
 class CategoryDao implements BaseDao {
   static const table = CategoryDb.tableName;
   static const defaultBookId = 'default';
@@ -15,7 +16,7 @@ class CategoryDao implements BaseDao {
 
   /// 取一个账本下全部未软删的分类（两种类型一起取，Controller 再分组）。
   Future<List<CategoryRecord>> listAll(
-    Database db, {
+    DatabaseExecutor db, {
     String bookId = defaultBookId,
     bool includeDeleted = false,
   }) async {
@@ -30,7 +31,7 @@ class CategoryDao implements BaseDao {
     return rows.map(CategoryRecord.fromMap).toList(growable: false);
   }
 
-  Future<CategoryRecord?> byId(Database db, int id) async {
+  Future<CategoryRecord?> byId(DatabaseExecutor db, int id) async {
     final rows = await db.query(
       table,
       where: 'id = ?',
@@ -42,11 +43,11 @@ class CategoryDao implements BaseDao {
 
   /// 返回新 id；AUTOINCREMENT 保证软删/物理清理后 id 永不复用，
   /// 流水表里按 id 引用的历史记录不会指错分类。
-  Future<int> insert(Database db, CategoryRecord record) =>
+  Future<int> insert(DatabaseExecutor db, CategoryRecord record) =>
       db.insert(table, record.toMap());
 
   /// 返回受影响行数；0 行说明 where 没命中，调用方必须检查（与 UserInfoDao 同规矩）。
-  Future<int> update(Database db, CategoryRecord record) {
+  Future<int> update(DatabaseExecutor db, CategoryRecord record) {
     final id = record.id;
     if (id == null) throw ArgumentError('update 需要带 id 的 CategoryRecord');
     return db.update(
@@ -57,29 +58,29 @@ class CategoryDao implements BaseDao {
     );
   }
 
-  /// 批量重排：一次事务写完全部 sort_order，避免中途崩溃留下
-  /// 「两个分类都是第 3 位」的脏顺序（10.8 即时保存 / 10.9 事务边界）。
+  /// 批量重排：事务由调用方（LifecycleService + UnitOfWork）统一持有，
+  /// 这里只写 SQL，保证「删分类 + 压平顺序」等组合动作同事务。
   Future<void> reorder(
-    Database db,
+    DatabaseExecutor db,
     CategoryKind kind,
     List<int> orderedIds, {
     String bookId = defaultBookId,
   }) async {
-    await db.transaction((txn) async {
-      for (var i = 0; i < orderedIds.length; i++) {
-        await txn.update(
-          table,
-          <String, Object?>{'sort_order': i},
-          where: 'id = ? AND kind = ? AND book_id = ?',
-          whereArgs: <Object?>[orderedIds[i], kind.dbValue, bookId],
-        );
-      }
-    });
+    // 【本轮】排序统一走 LifecycleService.reorder（UnitOfWork 持事务），
+    // DAO 不再自建事务，否则跨模块组合会被切成两段、无法整体回滚。
+    for (var i = 0; i < orderedIds.length; i++) {
+      await db.update(
+        table,
+        <String, Object?>{'sort_order': i},
+        where: 'id = ? AND kind = ? AND book_id = ?',
+        whereArgs: <Object?>[orderedIds[i], kind.dbValue, bookId],
+      );
+    }
   }
 
   /// 软删：不真删，写删除时刻与原因，30 天后由 [purgeExpired] 清理。
   Future<int> softDelete(
-    Database db,
+    DatabaseExecutor db,
     int id, {
     required DateTime at,
     required String reason,
@@ -95,7 +96,7 @@ class CategoryDao implements BaseDao {
         whereArgs: <Object?>[id],
       );
 
-  Future<int> restore(Database db, int id, DateTime at) => db.update(
+  Future<int> restore(DatabaseExecutor db, int id, DateTime at) => db.update(
         table,
         <String, Object?>{
           'deleted_at': null,
@@ -107,7 +108,7 @@ class CategoryDao implements BaseDao {
       );
 
   /// 回收站过期清理（10.7：30 天）。只删自定义分类，预设永不物理删除。
-  Future<int> purgeExpired(Database db, DateTime now) => db.delete(
+  Future<int> purgeExpired(DatabaseExecutor db, DateTime now) => db.delete(
         table,
         where: 'deleted_at IS NOT NULL AND deleted_at < ? AND preset = 0',
         whereArgs: <Object?>[
