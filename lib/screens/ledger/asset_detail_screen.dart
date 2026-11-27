@@ -10,6 +10,7 @@ import '../../database/ledger/az_schema.dart';
 import '../../screens/commons/empty/app_empty_state.dart';
 import '../../screens/commons/function/app_detail_page.dart';
 import '../../screens/commons/function/app_floating_actions.dart';
+import '../../screens/commons/function/app_function_grid.dart';
 import '../../screens/commons/function/app_function_layout.dart';
 import '../../screens/commons/icons/app_icons.dart';
 import '../../service/ledger/az_controller.dart';
@@ -27,7 +28,8 @@ const String _kAttachSection = '关联记录';
 
 /// AssetDetailScreen：二级功能页，用公共 [AppDetailPage]，与 home 页
 /// [LedgerScreen] 的 [AppHomePage] 明确分开。布局与账户明细页同源：
-/// AppSummaryHero → AppInfoGrid → AppFunctionSection，右下角 AppFloatingActions。
+/// AppSummaryHero → AppFunctionGrid → AppInfoGrid → AppFunctionSection；
+/// 编辑 / 删除是首屏横排功能格，不再是右下角悬浮展开列。
 /// 【所属模块】screens/ledger · 详情
 /// 【实现功能】按 assetId 从共享账本取主表行，展示主表 / 次表 / 全部关联附表，并提供编辑与删除。
 /// 【使用限制】页面不读库、不写库；编辑与删除走 AzWriteController；assetId 无效时展示空态。
@@ -52,6 +54,7 @@ class AssetDetailScreen extends StatelessWidget {
     if (found == null) {
       return AppDetailPage(
         title: _kNotFoundTitle,
+        brandHeader: true,
         child: AppEmptyState(
           icon: AppIcons.warning,
           title: _kNotFoundTitle,
@@ -67,29 +70,31 @@ class AssetDetailScreen extends StatelessWidget {
         : AzMath.valueOf(data, row, spec);
     final String status = row.text('status');
 
+    // 功能入口从右下悬浮展开列改成首屏横排格（图标 + 文字，一步点到）。
+    // 数据契约不变，仍是 AppFloatingAction 的纯 label / icon / 回调。
+    final List<AppFloatingAction> actions = <AppFloatingAction>[
+      AppFloatingAction(
+        label: '编辑',
+        icon: AppIcons.edit,
+        emphasized: true,
+        onPressed: () => unawaited(_edit(context, data, row, spec)),
+      ),
+      AppFloatingAction(
+        label: '删除',
+        icon: AppIcons.trash,
+        onPressed: () => unawaited(_remove(context, row, spec)),
+      ),
+    ];
+
     return AppDetailPage(
       title: row.text('name').isEmpty ? '详情' : row.text('name'),
-      // 底部多留一个 FAB 的高度：右下角悬浮层不参与滚动区。
+      brandHeader: true,
+      // 不再有右下悬浮层，底部留白回到常规值。
       padding: const EdgeInsets.fromLTRB(
         0,
         AppLayout.pageTop,
         0,
-        AppLayout.pageBottom + AppComponentSize.fabSize,
-      ),
-      floating: AppFloatingActions(
-        actions: <AppFloatingAction>[
-          AppFloatingAction(
-            label: '编辑',
-            icon: AppIcons.edit,
-            emphasized: true,
-            onPressed: () => unawaited(_edit(context, data, row, spec)),
-          ),
-          AppFloatingAction(
-            label: '删除',
-            icon: AppIcons.trash,
-            onPressed: () => unawaited(_remove(context, row, spec)),
-          ),
-        ],
+        AppLayout.pageBottom,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -103,10 +108,13 @@ class AssetDetailScreen extends StatelessWidget {
               value: MoneyFormat.yuan0(amount),
               caption: '按次表当前估值或成本展示，不讨论增值贬值。',
               accent: null,
+              // 资产页单独定主角：次要指标放与主角同源的「总收益」，
+              // 而不是把已经在信息网格里出现过的「类型」再摆一遍。
               secondary: <AppInfoItem>[
                 AppInfoItem(
-                  label: '类型',
-                  value: spec == null ? '未登记' : '${spec.code}（${spec.label}）',
+                  label: '总收益',
+                  value: MoneyFormat.yuan(row.money('total_gain')),
+                  tip: '主表登记的累计收益，按当前记录原值展示。',
                 ),
                 AppInfoItem(
                   label: '状态',
@@ -115,13 +123,24 @@ class AssetDetailScreen extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: AppSpacing.sm),
+          // ★ 留白按层级查表，不再一路 sm 等权排队：
+          //   主角 → 操作层 md（紧跟）→ 主信息组 lg（拉开）
+          //   → 附表大区块 xl（最松）→ 组内 md（收紧）。
+          const SizedBox(height: AppSpacing.md),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-            child: AppInfoGrid(items: azInfoItems(row)),
+            child: AppFunctionGrid(actions: actions),
           ),
-          const SizedBox(height: AppSpacing.sm),
+          const SizedBox(height: AppSpacing.lg),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+            child: AppInfoGrid(
+              items: azInfoItems(row),
+              groupLabel: '资产信息',
+            ),
+          ),
           if (spec != null) ...<Widget>[
+            const SizedBox(height: AppSpacing.xl),
             AppFunctionSection(
               title: '${spec.label} · $_kSubSection',
               child: Padding(
@@ -131,7 +150,7 @@ class AssetDetailScreen extends StatelessWidget {
                     : AppInfoGrid(items: azInfoItems(sub)),
               ),
             ),
-            const SizedBox(height: AppSpacing.sm),
+            const SizedBox(height: AppSpacing.md),
             AppFunctionSection(
               title: _kAttachSection,
               child: Padding(

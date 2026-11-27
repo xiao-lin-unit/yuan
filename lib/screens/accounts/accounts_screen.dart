@@ -14,6 +14,7 @@ import '../../styles/theme_tokens.dart';
 import '../../utils/money_format.dart';
 import '../commons/empty/app_empty_state.dart';
 import '../commons/function/app_function_layout.dart';
+import '../commons/function/app_info_tip.dart';
 import '../commons/home/app_home_page.dart';
 import '../commons/icons/app_icons.dart';
 import 'widgets/account_card.dart';
@@ -346,7 +347,8 @@ class _AccountsScreenState extends State<AccountsScreen> {
           emphasized: true,
           label: '能花的钱',
           value: MoneyFormat.yuan0(stats.spendable),
-          caption: '你当前可支配金额，共 ${stats.accountCount} 个账户。',
+          caption: '你当前可支配金额。',
+          detail: '共 ${stats.accountCount} 个账户。',
           secondary: <AppInfoItem>[
             AppInfoItem(
               label: '欠银行的钱',
@@ -361,7 +363,7 @@ class _AccountsScreenState extends State<AccountsScreen> {
       _AccountFilter.liquid => AppSummaryHero(
           label: '流动资金账户',
           value: MoneyFormat.yuan0(stats.spendable),
-          caption: '可自由支配的资金，共 ${stats.accountCount} 个账户。',
+          caption: '可自由支配的资金。',
           secondary: <AppInfoItem>[
             AppInfoItem(label: '账户数', value: '${stats.accountCount} 个'),
             const AppInfoItem(label: '计入', value: '可用余额'),
@@ -826,12 +828,28 @@ class _RepaymentReminders extends StatelessWidget {
 }
 
 /// 账户页底部「再看看」：A2 趋势口径 + A3 名义金额口径 + 总账说明。
+/// 三段小灰字以前整段常驻，像需求文档贴在列表下面；现在每组收成
+/// 「短标签 + 小 ⓘ」，点图标弹框看全文（参考基金详情页的口径提示）。
 /// A1 两行「留够应急金 / 不上班能撑住」是情境设计的推算结果，
 /// 不在记录页摆静态槽位（8.2 / 13.2）。
 class _BoardNotes extends StatelessWidget {
   const _BoardNotes({required this.netWorthText});
 
   final String netWorthText;
+
+  Widget _note(BuildContext context, String label, String message) {
+    final cs = Theme.of(context).colorScheme;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        Text(
+          label,
+          style: context.appText.caption.copyWith(color: cs.onSurfaceVariant),
+        ),
+        AppInfoTip(title: label, message: message, size: AppIconSize.small),
+      ],
+    );
+  }
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -841,24 +859,27 @@ class _BoardNotes extends StatelessWidget {
         ),
         child: Container(
           decoration: AppDecorations.card(context),
-          padding: const EdgeInsets.all(AppSpacing.md),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            mainAxisSize: MainAxisSize.min,
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.sm,
+            vertical: AppSpacing.xs,
+          ),
+          child: Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: AppSpacing.sm,
             children: <Widget>[
-              Text('再看看', style: context.appText.sectionHeader),
-              const SizedBox(height: AppSpacing.sm),
-              Text(_kTrendNote, style: context.appText.caption),
-              const SizedBox(height: AppSpacing.xs),
-              Text(_kNominalNote, style: context.appText.caption),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
+              Padding(
+                padding: const EdgeInsets.only(left: AppSpacing.xs),
+                child: Text('再看看', style: context.appText.sectionHeader),
+              ),
+              _note(context, '趋势口径', _kTrendNote),
+              _note(context, '名义金额', _kNominalNote),
+              _note(
+                context,
+                '总账说明',
                 '$_kFootNote\n目前按账户算：$netWorthText',
-                style: context.appText.caption,
               ),
             ],
           ),
         ),
       );
-
 }

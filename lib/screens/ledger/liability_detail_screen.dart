@@ -10,6 +10,7 @@ import '../../database/ledger/az_schema.dart';
 import '../../screens/commons/empty/app_empty_state.dart';
 import '../../screens/commons/function/app_detail_page.dart';
 import '../../screens/commons/function/app_floating_actions.dart';
+import '../../screens/commons/function/app_function_grid.dart';
 import '../../screens/commons/function/app_function_layout.dart';
 import '../../screens/commons/icons/app_icons.dart';
 import '../../service/ledger/az_controller.dart';
@@ -27,7 +28,8 @@ const String _kAttachSection = '关联记录';
 
 /// LiabilityDetailScreen：二级功能页，用公共 [AppDetailPage]，与 home 页
 /// [LedgerScreen] 的 [AppHomePage] 明确分开。布局与账户明细页同源：
-/// AppSummaryHero → AppInfoGrid → AppFunctionSection，右下角 AppFloatingActions。
+/// AppSummaryHero → AppFunctionGrid → AppInfoGrid → AppFunctionSection；
+/// 编辑 / 删除是首屏横排功能格，不再是右下角悬浮展开列。
 /// 【所属模块】screens/ledger · 详情
 /// 【实现功能】按 debtId 从共享账本取主表行，展示主表 / 次表 / 全部关联附表，并提供编辑与删除。
 /// 【使用限制】页面不读库、不写库；编辑与删除走 AzWriteController；debtId 无效时展示空态。
@@ -52,6 +54,7 @@ class LiabilityDetailScreen extends StatelessWidget {
     if (found == null) {
       return AppDetailPage(
         title: _kNotFoundTitle,
+        brandHeader: true,
         child: AppEmptyState(
           icon: AppIcons.warning,
           title: _kNotFoundTitle,
@@ -68,29 +71,30 @@ class LiabilityDetailScreen extends StatelessWidget {
     final String status = row.text('status');
     final AppThemeTokens tokens = context.tokens;
 
+    // 与资产详情页同一套：功能入口上移到首屏横排格。
+    final List<AppFloatingAction> actions = <AppFloatingAction>[
+      AppFloatingAction(
+        label: '编辑',
+        icon: AppIcons.edit,
+        emphasized: true,
+        onPressed: () => unawaited(_edit(context, data, row, spec)),
+      ),
+      AppFloatingAction(
+        label: '删除',
+        icon: AppIcons.trash,
+        onPressed: () => unawaited(_remove(context, row, spec)),
+      ),
+    ];
+
     return AppDetailPage(
       title: row.text('name').isEmpty ? '详情' : row.text('name'),
-      // 底部多留一个 FAB 的高度：右下角悬浮层不参与滚动区。
+      brandHeader: true,
+      // 不再有右下悬浮层，底部留白回到常规值。
       padding: const EdgeInsets.fromLTRB(
         0,
         AppLayout.pageTop,
         0,
-        AppLayout.pageBottom + AppComponentSize.fabSize,
-      ),
-      floating: AppFloatingActions(
-        actions: <AppFloatingAction>[
-          AppFloatingAction(
-            label: '编辑',
-            icon: AppIcons.edit,
-            emphasized: true,
-            onPressed: () => unawaited(_edit(context, data, row, spec)),
-          ),
-          AppFloatingAction(
-            label: '删除',
-            icon: AppIcons.trash,
-            onPressed: () => unawaited(_remove(context, row, spec)),
-          ),
-        ],
+        AppLayout.pageBottom,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -104,10 +108,13 @@ class LiabilityDetailScreen extends StatelessWidget {
               value: MoneyFormat.yuan0(amount),
               caption: '挂卡分期已含在信用卡欠款里，不重复相加。',
               accent: tokens.expense,
+              // 负债页单独定主角：次要指标放主表的「总亏损」与「状态」，
+              // 与待还本金同属金额语义；类型留在信息网格里，不重复。
               secondary: <AppInfoItem>[
                 AppInfoItem(
-                  label: '类型',
-                  value: spec == null ? '未登记' : '${spec.code}（${spec.label}）',
+                  label: '总亏损',
+                  value: MoneyFormat.yuan(row.money('total_loss')),
+                  tip: '主表登记的累计亏损，按当前记录原值展示。',
                 ),
                 AppInfoItem(
                   label: '状态',
@@ -116,13 +123,23 @@ class LiabilityDetailScreen extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: AppSpacing.sm),
+          // ★ 留白按层级查表：主角 → 操作 md → 主信息 lg
+          //   → 附表大区块 xl → 组内 md。与资产 / 账户详情页同一套节奏。
+          const SizedBox(height: AppSpacing.md),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-            child: AppInfoGrid(items: azInfoItems(row)),
+            child: AppFunctionGrid(actions: actions),
           ),
-          const SizedBox(height: AppSpacing.sm),
+          const SizedBox(height: AppSpacing.lg),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+            child: AppInfoGrid(
+              items: azInfoItems(row),
+              groupLabel: '负债信息',
+            ),
+          ),
           if (spec != null) ...<Widget>[
+            const SizedBox(height: AppSpacing.xl),
             AppFunctionSection(
               title: '${spec.label} · $_kSubSection',
               child: Padding(
@@ -132,7 +149,7 @@ class LiabilityDetailScreen extends StatelessWidget {
                     : AppInfoGrid(items: azInfoItems(sub)),
               ),
             ),
-            const SizedBox(height: AppSpacing.sm),
+            const SizedBox(height: AppSpacing.md),
             AppFunctionSection(
               title: _kAttachSection,
               child: Padding(

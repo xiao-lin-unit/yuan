@@ -5,10 +5,12 @@ import '../../../styles/app_typography.dart';
 import '../../../styles/theme_tokens.dart';
 import '../header/section_header.dart';
 import '../icons/app_icons.dart';
+import 'app_info_tip.dart';
 
 // ── 组件私有样式（只服务本文件，全部引用全局令牌）──────────────
-const double _kStatCellHeight = 56;
-const double _kHintRadius = AppRadius.item;
+// 56 → 60：label 旁多了 28dp 的小 ⓘ 热区，给 Row 留 4dp 余量，
+// 避免 IntrinsicHeight 下文字 + 图标把固定格撑出 overflow。
+const double _kStatCellHeight = 60;
 const double _kSegmentMinHeight = AppComponentSize.segmentedButtonHeight;
 const double _kStatIndicatorHeight = 2;
 
@@ -72,10 +74,17 @@ class AppFunctionSection extends StatelessWidget {
 /// 统计条的一格（纯数据，不含样式）。
 @immutable
 class AppStatItem {
-  const AppStatItem({required this.label, required this.value});
+  const AppStatItem({
+    required this.label,
+    required this.value,
+    this.tip,
+  });
 
   final String label;
   final String value;
+
+  /// 口径说明。传了就在 label 旁显示小 ⓘ，点开展示；不常驻占版面。
+  final String? tip;
 }
 
 /// 三格统计条（原型「在用 / 已隐藏 / 自定义」「总入账 / 总出账 / 净变动」
@@ -183,11 +192,25 @@ class _StatCell extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
                 children: <Widget>[
-                  Text(
-                    item.label,
-                    style: context.appText.caption.copyWith(
-                      color: selected ? t.info : null,
-                    ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: <Widget>[
+                      Text(
+                        item.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: context.appText.caption.copyWith(
+                          color: selected ? t.info : null,
+                        ),
+                      ),
+                      if (item.tip != null)
+                        AppInfoTip(
+                          title: item.label,
+                          message: item.tip!,
+                          size: AppIconSize.small,
+                        ),
+                    ],
                   ),
                   const SizedBox(height: AppSpacing.xxs),
                   Text(
@@ -217,74 +240,66 @@ class _StatCell extends StatelessWidget {
   }
 }
 
-/// 提示条（原型「拖动右侧 ⠿ 可调整顺序…」）。
+/// 提示条：现在只是**一行小 ⓘ + 短标签**，点图标才看全文。
 ///
-/// 是否显示由调用方决定（页面里一个 bool），本组件只负责「显示时
-/// 长什么样 + 点关闭回调」，不自己持有可见状态 —— 静态优先。
+/// 旧版是一整块淡蓝底 + 整段常驻小灰字，占掉列表顶部一块版面，和
+/// 「提示不该抢内容」的层级冲突。参考基金详情页的做法：解释文案收进
+/// label 旁的小图标，点开用弹框展示。
+///
+/// 是否显示仍由调用方决定（页面里一个 bool），本组件不持有可见状态。
 class AppHintBanner extends StatelessWidget {
   const AppHintBanner({
     super.key,
     required this.message,
     required this.onDismiss,
-    this.icon = AppIcons.about,
+    this.label = '使用提示',
   });
 
   final String message;
   final VoidCallback onDismiss;
-  final IconData icon;
+
+  /// 图标旁的短引导文字，不重复展示 [message] 全文。
+  /// 视觉固定用 [AppInfoTip] 的小圆圈 i，不再允许调用方换图标 ——
+  /// 「提示」全软件一个样子，才不会又散成几套语义。
+  final String label;
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final t = context.tokens;
     return Padding(
       padding: const EdgeInsets.fromLTRB(
-        AppSpacing.md,
-        AppSpacing.xs,
-        AppSpacing.md,
         AppSpacing.sm,
+        AppSpacing.xs,
+        AppSpacing.sm,
+        AppSpacing.xs,
       ),
-      child: Container(
-        decoration: BoxDecoration(
-          // 提示是「信息」职能，用固定蓝淡底；不再铺 primaryContainer。
-          color: Color.lerp(cs.surface, t.info, AppColorEmphasis.accentTint) ??
-              cs.surfaceContainerHigh,
-          borderRadius: BorderRadius.circular(_kHintRadius),
-        ),
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.sm,
-          AppSpacing.xs,
-          AppSpacing.xxs,
-          AppSpacing.xs,
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Padding(
-              padding: const EdgeInsets.only(top: AppSpacing.xxs),
-              child: Icon(icon, size: AppIconSize.small, color: t.info),
+      child: Row(
+        children: <Widget>[
+          AppInfoTip(
+            title: label,
+            message: message,
+            size: AppIconSize.small,
+          ),
+          Text(
+            label,
+            style: context.appText.caption.copyWith(
+              color: cs.onSurfaceVariant,
             ),
-            const SizedBox(width: AppSpacing.xs),
-            Expanded(
-              child: Text(
-                message,
-                style: context.appText.caption.copyWith(color: t.info),
-              ),
+          ),
+          const Spacer(),
+          IconButton(
+            onPressed: onDismiss,
+            icon: const Icon(AppIcons.clear),
+            iconSize: AppIconSize.small,
+            color: cs.onSurfaceVariant,
+            constraints: const BoxConstraints.tightFor(
+              width: kMinTapTarget,
+              height: kMinTapTarget,
             ),
-            IconButton(
-              onPressed: onDismiss,
-              icon: const Icon(AppIcons.clear),
-              iconSize: AppIconSize.small,
-              color: t.info,
-              constraints: const BoxConstraints.tightFor(
-                width: kMinTapTarget,
-                height: kMinTapTarget,
-              ),
-              padding: EdgeInsets.zero,
-              tooltip: '不再提示',
-            ),
-          ],
-        ),
+            padding: EdgeInsets.zero,
+            tooltip: '不再提示',
+          ),
+        ],
       ),
     );
   }
@@ -373,16 +388,25 @@ const double _kLedgerRowHeight = AppLayout.listItemMinHeight;
 /// 信息网格的一格（纯数据）。
 @immutable
 class AppInfoItem {
-  const AppInfoItem({required this.label, required this.value});
+  const AppInfoItem({
+    required this.label,
+    required this.value,
+    this.tip,
+  });
 
   final String label;
   final String value;
+
+  /// 字段口径说明。传了就在 label 旁显示小 ⓘ，点开展示。
+  final String? tip;
 }
 
 /// 明细页顶部的大数字摘要卡（原型 `.detail-hero`）。
 ///
 /// [value] 是业务层用 MoneyFormat 格式化好的字符串；[caption] 是
-/// 设计原则第一条要求的「大白话解释」，每个数字旁边都要说清代表什么。
+/// 「口径说明」，现在**不再常驻**：label 旁挂一个小 ⓘ，点开才看
+/// （参考基金详情页「昨日收益(元) ⓘ」）。少数必须常驻的补充数据
+/// （账单日 / 还款日这类）走 [detail]，不混进提示里。
 /// [progress] 0..1 时显示一条已用比例（信用卡额度条），不传就不画。
 /// [accent] 由调用方从 `context.tokens` 取**语义色**，本组件不定义颜色。
 ///
@@ -390,7 +414,8 @@ class AppInfoItem {
 ///   ① 提示位 —— [label]（口径 / 单位），最小最淡、居中；[trailing] 放
 ///      右上，供分类胶囊等状态标记用；
 ///   ② 主角区 —— [value]，全页唯一的大字号、纯中性 onSurface、上下留白
-///      最大；[caption] 是它下面的次要说明，淡且居中；
+///      最大；[caption] 收进 label 旁的小 ⓘ，[detail] 才是可选的常驻
+///      补充数据行（淡且居中）；
 ///   ③ 分组指标 —— [secondary]，一条细线隔开，组内收紧、组间放松。
 /// 文字职能也分三档（hintStyle / heroValue / captionStyle / infoStyle），
 /// 不再一路 caption + sm 等权排队。
@@ -405,6 +430,7 @@ class AppSummaryHero extends StatelessWidget {
     required this.label,
     required this.value,
     required this.caption,
+    this.detail,
     this.trailing,
     this.secondary = const <AppInfoItem>[],
     this.progress,
@@ -414,7 +440,12 @@ class AppSummaryHero extends StatelessWidget {
 
   final String label;
   final String value;
+
+  /// 口径提示：点 label 旁的小 ⓘ 展示，不占版面。
   final String caption;
+
+  /// 可选的常驻补充数据（账单日 / 还款日等）。不是提示，别塞进 caption。
+  final String? detail;
   final Widget? trailing;
   final List<AppInfoItem> secondary;
 
@@ -488,13 +519,37 @@ class AppSummaryHero extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          // 提示位：口径 / 单位居中，右上角留给分类胶囊等状态标记。
-          Stack(
-            alignment: Alignment.center,
+          // 提示位：口径 / 单位居中，紧跟一个小 ⓘ 收起解释文案；
+          // 右上角留给分类胶囊等状态标记。左右各放一个等宽 Expanded，
+          // 既让 label 严格居中，又不会和 trailing 叠在一起。
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: <Widget>[
-              Text(label, textAlign: TextAlign.center, style: hintStyle),
+              if (trailing != null) const Expanded(child: SizedBox.shrink()),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: <Widget>[
+                  Text(
+                    label,
+                    textAlign: TextAlign.center,
+                    style: hintStyle,
+                  ),
+                  if (caption.isNotEmpty)
+                    AppInfoTip(
+                      title: label,
+                      message: caption,
+                      size: AppIconSize.small,
+                    ),
+                ],
+              ),
               if (trailing != null)
-                Align(alignment: Alignment.centerRight, child: trailing!),
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: trailing!,
+                  ),
+                ),
             ],
           ),
           const SizedBox(height: AppSpacing.md),
@@ -513,9 +568,16 @@ class AppSummaryHero extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(height: AppSpacing.sm),
-          // 白话说明：次要、淡、居中，不跟主角争。
-          Text(caption, textAlign: TextAlign.center, style: captionStyle),
+          if (detail != null) ...<Widget>[
+            const SizedBox(height: AppSpacing.sm),
+            // 必须常驻的补充数据（账单日 / 还款日）；解释性文案已经收进
+            // label 旁的小 ⓘ，这里不再出现一整行小灰字。
+            Text(
+              detail!,
+              textAlign: TextAlign.center,
+              style: captionStyle,
+            ),
+          ],
           if (progress != null) ...<Widget>[
             const SizedBox(height: AppSpacing.md),
             ClipRRect(
@@ -543,10 +605,24 @@ class AppSummaryHero extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.center,
                       mainAxisSize: MainAxisSize.min,
                       children: <Widget>[
-                        Text(
-                          secondary[i].label,
-                          textAlign: TextAlign.center,
-                          style: hintStyle,
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: <Widget>[
+                            Text(
+                              secondary[i].label,
+                              textAlign: TextAlign.center,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: hintStyle,
+                            ),
+                            if (secondary[i].tip != null)
+                              AppInfoTip(
+                                title: secondary[i].label,
+                                message: secondary[i].tip!,
+                                size: AppIconSize.small,
+                              ),
+                          ],
                         ),
                         const SizedBox(height: AppSpacing.xxs),
                         Text(
@@ -599,7 +675,23 @@ class AppInfoGrid extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              Text(item.label, style: labelStyle),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Text(
+                    item.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: labelStyle,
+                  ),
+                  if (item.tip != null)
+                    AppInfoTip(
+                      title: item.label,
+                      message: item.tip!,
+                      size: AppIconSize.small,
+                    ),
+                ],
+              ),
               const SizedBox(height: AppSpacing.xxs),
               Text(
                 item.value,

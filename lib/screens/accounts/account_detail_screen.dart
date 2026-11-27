@@ -14,6 +14,7 @@ import '../../utils/money_format.dart';
 import '../commons/empty/app_empty_state.dart';
 import '../commons/function/app_detail_page.dart';
 import '../commons/function/app_floating_actions.dart';
+import '../commons/function/app_function_grid.dart';
 import '../commons/function/app_function_layout.dart';
 import '../commons/function/app_paginator.dart';
 import '../commons/icons/app_icons.dart';
@@ -63,10 +64,11 @@ AccountDirection? _directionOf(_EntryFilter f) => switch (f) {
 ///     └ AppPageScaffold（骨架：固定头 → 滚动主体 → 悬浮层）
 ///        ├ header: AppDetailHeader  返回 / 标题 / 编辑·删除（固定）
 ///        ├ child:  Column           ← 主体，本页自己填
-///        │   ├ AppSummaryHero       余额 或 已用额度
+///        │   ├ AppSummaryHero       余额 或 已用额度（口径提示收进小 ⓘ）
+///        │   ├ AppFunctionGrid      ★ 操作下移到对应账户明细页，首屏横排
 ///        │   ├ AppInfoGrid          账户类型 / 计入总资产 / 关联还款 / 备注
 ///        │   └ AppFunctionSection → AppStatBar + AppLedgerList
-///        └ floating: AppFloatingActions  ← ★ 操作下移到对应账户明细页
+///        └ （无 floating：功能已平铺，不再用右下悬浮展开列）
 /// ```
 ///
 /// 【动态状态，工作逻辑写清楚】
@@ -135,6 +137,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
       // 「参数控制」形态：只传 title，公共框架自动补默认返回按钮。
       return AppDetailPage(
         title: _kNotFoundTitle,
+        brandHeader: true,
         child: const AppEmptyState(
           icon: AppIcons.warning,
           title: _kNotFoundTitle,
@@ -144,9 +147,10 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     }
 
     return AppDetailPage(
-      // 「内容控制」形态：直接传 AppDetailHeader 组件。
+      // 「内容控制」形态：直接传 AppDetailHeader 组件，品牌色在这里开。
       header: AppDetailHeader(
         title: account.name,
+        branded: true,
         actions: <Widget>[
           IconButton(
             icon: const Icon(AppIcons.edit),
@@ -175,22 +179,25 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
           ),
         ],
       ),
-      // 底部多留一个 FAB 的高度：右下角悬浮层不参与滚动区，
-      // 不留白会把最后一条流水压在按钮下面。
+      // 功能入口已上移到首屏横排格，右下角不再有悬浮层，
+      // 底部留白回到常规值，不必再为 FAB 让出一行。
       padding: const EdgeInsets.fromLTRB(
         0,
         AppLayout.pageTop,
         0,
-        AppLayout.pageBottom + AppComponentSize.fabSize,
-      ),
-      // ★ 操作仍按账户类型下移到「对应账户下」，且分别使用各自的处理器。
-      floating: AppFloatingActions(
-        actions: _floatingActions(context, catalog, savings, credit, account),
+        AppLayout.pageBottom,
       ),
       child: catalog.detailLoading ||
               catalog.detailAccountId != widget.accountId
           ? const AppLoadingState(message: _kLoading)
-          : _content(context, catalog, account),
+          : _content(
+              context,
+              catalog,
+              account,
+              // ★ 操作仍按账户类型下移到「对应账户下」，且分别使用各自的
+              // 处理器；只是呈现方式从「悬浮展开列」换成首屏横排功能格。
+              _floatingActions(context, catalog, savings, credit, account),
+            ),
     );
   }
 
@@ -198,6 +205,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     BuildContext context,
     AccountController catalog,
     AccountRecord account,
+    List<AppFloatingAction> actions,
   ) {
     final AccountEntrySummary? summary = catalog.detailSummary;
     return Column(
@@ -211,6 +219,13 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
           child: _hero(context, catalog, account),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        // 功能入口：图标在上、文字在下，一行 5 个等分（参考基金详情页
+        // 红框那一排「收益明细 / 持仓分析 / …」）。多于 5 项自动换行。
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+          child: AppFunctionGrid(actions: actions),
         ),
         const SizedBox(height: AppSpacing.lg),
         Padding(
@@ -254,20 +269,41 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     final double outbound = summary?.outbound ?? 0;
     if (account.kind == AccountKind.credit) {
       return <AppStatItem>[
-        AppStatItem(label: '消费出账', value: MoneyFormat.yuan0(outbound)),
-        AppStatItem(label: '还款入账', value: MoneyFormat.yuan0(inbound)),
+        AppStatItem(
+          label: '消费出账',
+          value: MoneyFormat.yuan0(outbound),
+          tip: '全部消费类出账流水合计，不随下方分页或方向筛选变化。',
+        ),
+        AppStatItem(
+          label: '还款入账',
+          value: MoneyFormat.yuan0(inbound),
+          tip: '全部还款类入账流水合计，不随下方分页或方向筛选变化。',
+        ),
         // 数值是「已用额度净增」，同一数字也就是「可用额度净减」；
         // 按本轮口径用后者作标签，与逐笔行「可用金额 +/−」保持一致。
         AppStatItem(
           label: '可用额度净减',
           value: MoneyFormat.yuan0(outbound - inbound),
+          tip: '即已用额度净增；与逐笔流水里的「可用金额 +/−」口径一致。',
         ),
       ];
     }
     return <AppStatItem>[
-      AppStatItem(label: '总入账', value: MoneyFormat.yuan0(inbound)),
-      AppStatItem(label: '总出账', value: MoneyFormat.yuan0(outbound)),
-      AppStatItem(label: '净变动', value: MoneyFormat.yuan0(inbound - outbound)),
+      AppStatItem(
+        label: '总入账',
+        value: MoneyFormat.yuan0(inbound),
+        tip: '全部入账流水合计，不随下方分页或方向筛选变化。',
+      ),
+      AppStatItem(
+        label: '总出账',
+        value: MoneyFormat.yuan0(outbound),
+        tip: '全部出账流水合计，不随下方分页或方向筛选变化。',
+      ),
+      AppStatItem(
+        label: '净变动',
+        value: MoneyFormat.yuan0(inbound - outbound),
+        tip: '总入账减去总出账，即这段时间账户余额的净变化。',
+      ),
     ];
   }
 
@@ -284,7 +320,10 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
         trailing: _kindBadge(context, account),
         value: '${MoneyFormat.yuan0(account.balance)} / '
             '${MoneyFormat.orDash(account.creditLimit)}',
-        caption: '可用 ${MoneyFormat.orDash(account.availableCredit)} · '
+        // 口径解释点小 ⓘ 看；账单日 / 还款日 / 可用额度是数据，
+        // 必须常驻，走 detail 而不是混进提示里。
+        caption: '已用额度为当前累计欠款，可用额度随还款与消费实时变化。',
+        detail: '可用 ${MoneyFormat.orDash(account.availableCredit)} · '
             '账单日每月 ${account.statementDay ?? "—"} 日 · '
             '还款日每月 ${account.dueDay ?? "—"} 日',
         progress: limit > 0 ? (account.balance / limit).clamp(0.0, 1.0) : 0,
@@ -293,32 +332,39 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
           AppInfoItem(
             label: '可用额度',
             value: MoneyFormat.orDash(account.availableCredit),
+            tip: '总额度减去已用额度，随消费出账与还款实时变化。',
           ),
           AppInfoItem(
             label: '最低还款（约）',
             value: MoneyFormat.yuan0(account.balance * account.minPaymentRate),
+            tip: '按当前已用额度乘卡片章程里的最低还款比例估算，以账单为准。',
           ),
         ],
       );
     }
+    // 受限账户单独定主角：label 写清「受限」，并把对它最关键的
+    // 「绑定用途」提到次要指标第一格；普通账户维持「初始余额 → 绑定用途」。
+    final bool restricted = account.kind == AccountKind.restricted;
     return AppSummaryHero(
-      label: '当前余额',
+      label: restricted ? '受限资金余额' : '当前余额',
       trailing: _kindBadge(context, account),
       value: MoneyFormat.yuan(account.balance),
-      caption: account.kind == AccountKind.restricted
+      caption: restricted
           ? '该账户资金有特定用途，记账时将按绑定用途过滤可选账户。'
           : '这是账户当前可用余额，每一笔变动均在下方留痕。',
       secondary: <AppInfoItem>[
+        if (restricted)
+          AppInfoItem(
+            label: '绑定用途',
+            value: '${catalog.bindingsOf(account.id!).length} 类',
+            tip: '受限资金只允许记到这些用途上；社保账户不参与绑定。',
+          ),
         AppInfoItem(
           label: '初始余额',
           value: MoneyFormat.yuan0(account.initialBalance),
         ),
-        AppInfoItem(
-          label: '绑定用途',
-          value: account.kind == AccountKind.restricted
-              ? '${catalog.bindingsOf(account.id!).length} 类'
-              : '不限',
-        ),
+        if (!restricted)
+          const AppInfoItem(label: '绑定用途', value: '不限'),
       ],
     );
   }
@@ -364,6 +410,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
       AppInfoItem(
         label: '算进总账',
         value: account.includeInNetWorth ? '是' : '否',
+        tip: '开启时该账户余额计入总账合计；关闭后只在本页单独查看。',
       ),
       AppInfoItem(
         label: account.kind == AccountKind.credit ? '还款账户' : '备注',
@@ -374,6 +421,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
       AppInfoItem(
         label: '算进能花的钱',
         value: account.isLiquid ? '是' : '否',
+        tip: '开启时这笔余额计入「能花的钱」；关闭后不计入日常可用资金。',
       ),
     ];
   }
@@ -532,9 +580,10 @@ IconData _entryIcon(AccountEntryType type) => switch (type) {
 
 /// ★ 操作配置：按账户类型分派到**各自的业务处理器**。
 ///
-/// 纯数据：业务只声明「名称 / 图标 / 点击」，按钮样式、单按钮 / 多按钮
-/// 形态、展开收起、名称提示全部交给公共 [AppFloatingActions]。
-/// 列表顺序 = 展开后从上到下的顺序，最后一项最靠近主按钮。
+/// 纯数据：业务只声明「名称 / 图标 / 点击」，呈现交给公共
+/// [AppFunctionGrid]（首屏横排：图标在上、文字在下、一行 5 个等分）。
+/// 列表顺序 = 从左到右、超出一行自动换行的顺序。
+/// 该数据契约沿用 [AppFloatingAction]，所以分派表一个字没改。
 /// 异步动作由调用方自己 `unawaited`（工程开了 unawaited_futures）。
 ///
 /// 【分派表】
