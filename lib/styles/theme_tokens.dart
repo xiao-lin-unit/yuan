@@ -46,19 +46,27 @@ abstract final class AppOpacity {
   static const double scrim = 0.4;
 }
 
-/// 强调表面的配色旋钮（本轮配色的**唯一可调处**）。
+/// 强调表面的配色旋钮。
 ///
-/// 【为什么集中在这里】配色要在你的掌控里：觉得 tint 太重 / 太轻，
-/// 只改 [surfaceTint] 一个数，组件、页面、ThemeData 一个字都不用动；
-/// 设成 0 就完全回到改造前的中性底，不需要回滚补丁。
+/// 【配色分工，改之前先读这段】
+///   · 主色只管**品牌与操作**（header 品牌位、悬浮按钮、主按钮）；
+///   · 信息容器一律**中性**，靠明度 / 留白 / 细线分层，不靠色相；
+///   · 状态、导航、分类标记走一组**与主题解耦的固定对比色**（见 info）。
+/// 三者互不越界：强调色一旦铺满容器，就不再是强调色。
+///
+/// [surfaceTint] 曾用来给 card / field 掺 4.5% 主色，结果粉色主题下
+/// 连「备注 未填写」这种最不该有存在感的字段都带粉。现在归零，信息层
+/// 完全中性；想让底色重新带一点主题倾向，只改这一个数即可。
 abstract final class AppColorEmphasis {
-  /// 中性容器（card / field）掺主色的比例。0.045 是「贴近才察觉」的量，
-  /// 目的是让底色参与分层，不是把卡片染色 —— 满屏主色会失去留白与呼吸。
-  /// tint 源取 cs.primary（已由 seed 派生），换主题 / 切亮暗自动跟随。
-  static const double surfaceTint = 0.045;
+  /// 中性容器掺主色的比例：**0 = 信息层完全中性**。
+  static const double surfaceTint = 0.0;
 
   /// 强调表面上的大数字至少与底色差 3:1（WCAG AA 大字号门槛）。
   static const double accentMinContrast = 3.0;
+
+  /// 状态 / 选中 / 导航标记的淡底强度（相对 surface 与 info 的插值）。
+  /// 用固定蓝而不是 primaryContainer，主题换色时这些标记不跟着偏。
+  static const double accentTint = 0.14;
 }
 
 /// 组件尺寸阶梯：Material 组件的固定尺寸统一放这里，
@@ -223,7 +231,9 @@ const double kMinTapTarget = 48.0;
 /// 自定义 Container / 阴影 / 语义色不再各写一遍 Theme.of(context).colorScheme.xxx，
 /// 统一从这里取；主题色一换，所有派生色同步重算。
 class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
-  /// 记账语义色：收入 / 支出 / 提醒 / 信息，已 harmonize 到当前 seed
+  /// 记账语义色：收入 / 支出 / 提醒 / 信息。
+  /// ★ **与主题种子解耦**：不再 harmonize 到 seed，粉色主题下绿仍是绿、
+  /// 蓝仍是蓝。它们承担的是「方向 / 状态 / 导航」职能，不是品牌配色。
   final Color income;
   final Color onIncome;
   final Color expense;
@@ -240,10 +250,10 @@ class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
   final Color divider;
   final Color shadow;
 
-  /// 强调表面三件套：只给「一张主色 hero」用，其余卡片仍是中性卡。
-  /// surfaceEmphasis 取 primaryContainer 淡彩底；onEmphasis 取
-  /// onPrimaryContainer（**不是硬写白**）；accentOnEmphasis 取 primary
-  /// 并校对比度。三者都进 copyWith / lerp，主题切换动画不跳色。
+  /// 强调表面三件套：**中性容器 + 中性文字**，不再带主色。
+  /// surfaceEmphasis = 高一档 surfaceContainer；onEmphasis /
+  /// accentOnEmphasis = onSurface（大数字纯黑，主角唯一）。
+  /// 三者都进 copyWith / lerp，主题切换动画不跳色。
   final Color surfaceEmphasis;
   final Color onEmphasis;
   final Color accentOnEmphasis;
@@ -278,32 +288,34 @@ class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
     this.tapTarget = kMinTapTarget,
   });
 
-  factory AppThemeTokens.fromScheme(ColorScheme cs, Color seed) {
+  /// [seed] 保留在签名里兼容现有调用点，但**语义色不再使用它**：
+  /// 以前靠它把收入/支出/信息色 harmonize 到主题，结果整屏偏向主题色。
+  /// 下划线前缀表示刻意不读取。
+  factory AppThemeTokens.fromScheme(ColorScheme cs, Color _seed) {
     final dark = cs.brightness == Brightness.dark;
 
-    Color semantic(Color base) => ColorMath.toneFor(
-          ColorMath.harmonize(base, seed),
-          cs.brightness,
-        );
+    // ★ 只做明暗适配，**不做 harmonize**。
+    // 旧版把语义色朝 seed 拉最多 15°，粉色主题下连「收益绿」「信息蓝」
+    // 都往粉偏，整屏找不到一个真正的对比色 —— 这正是「全部向主题色
+    // 偏向」的代码级根因。语义色必须保持本色，才有资格当对比色。
+    Color semantic(Color base) => ColorMath.toneFor(base, cs.brightness);
 
     final income = semantic(const Color(0xFF2E7D32));
     final expense = semantic(const Color(0xFFC62828));
     final warning = semantic(const Color(0xFFB26A00));
     final info = semantic(const Color(0xFF1565C0));
 
-    // ── 强调表面三件套（本轮配色试点唯一一处新增取色）──────────────
-    // 强调表面不再用 cs.primary 实色：整屏一块高饱和主色 + 白字是最像
-    // 「后台模板」的观感。改用 primaryContainer 淡彩底 + 深色字，
-    // 大数字仍取主色并校到 3:1。三件套都进 copyWith / lerp，
-    // 换主题 / 切明暗不会跳色。
-    final Color emphasis = cs.primaryContainer;
-    final Color onEmphasis =
-        ColorMath.ensureContrast(cs.onPrimaryContainer, emphasis);
-    final Color accentOnEmphasis = ColorMath.ensureContrast(
-      cs.primary,
-      emphasis,
-      minimum: AppColorEmphasis.accentMinContrast,
-    );
+    // ── 强调表面三件套：全部回到中性 ──────────────────────────────
+    // 旧版 emphasis = primaryContainer、大数字 = primary，等于把主题色
+    // 铺满首屏信息区；对照「品牌色只在框架、内容全中性」的详情页后，
+    // 这里改成：容器是高一档的中性 surface、文字与大数字都是 onSurface。
+    // 主色退到 header / 悬浮操作 / 主按钮，信息层一个色相都不带。
+    // 字段名保留（已进 copyWith / lerp，主题切换动画不跳色），只换取值。
+    final Color emphasis = dark
+        ? cs.surfaceContainerHigh
+        : cs.surfaceContainerLow;
+    final Color onEmphasis = cs.onSurface;
+    final Color accentOnEmphasis = cs.onSurface;
 
     // 中性表面掺一点主色：整屏不再零彩度，但仍保持「中性卡」而不是主色卡。
     // 只在这里算一次，card / field 共用；sheet 玻璃层、语义色、金额色
@@ -327,8 +339,8 @@ class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
           ColorMath.ensureContrast(ColorMath.onColorFor(warning), warning),
       info: info,
       onInfo: ColorMath.ensureContrast(ColorMath.onColorFor(info), info),
-      // 暗色下容器往上抬一档，避免「深灰卡片压在深灰背景上」没有层次；
-      // 再掺一点主色 tint，让中性底色参与分层（强度见 AppColorEmphasis）。
+      // 暗色下容器往上抬一档，避免「深灰卡片压在深灰背景上」没有层次。
+      // surfaceTint 已归零：分层只靠明度 + 留白 + 细线，不靠色相。
       card: tinted(dark ? cs.surfaceContainerHigh : cs.surfaceContainerLow),
       field: tinted(cs.surfaceContainerHighest),
       // Sheet 玻璃层不染主色，保持中性。

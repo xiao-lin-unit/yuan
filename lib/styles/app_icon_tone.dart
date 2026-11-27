@@ -17,8 +17,9 @@ enum AppIconEmphasis { standard, tonal, filled }
 /// 全软件**唯一的图标色彩层**。
 ///
 /// 职责：「语义 → 色 → duotone/渐变 色对」。
-/// - 所有色值来自 [AppThemeTokens] / [ColorScheme]，且经 harmonize 到 seed，
-///   换主题色 / 切明暗时自动重算，组件里不留任何固定 hex；
+/// - 所有色值来自 [AppThemeTokens] / [ColorScheme]，随亮暗自动重算，
+///   组件里不留任何固定 hex；语义色**不再 harmonize 到 seed**（那会让
+///   收入红/绿、信息蓝跟着主题偏，失去对比色职能）；
 /// - 每个色对都用 [ColorMath.ensureContrast] 校验到 4.5:1。小图标有色像素
 ///   占比低、抗锯齿吃掉边缘，实践上比 WCAG 非文本 3:1 更严；
 /// - 语义色不随浓度漂移：回收站永远是支出红、外观永远是琥珀，
@@ -41,7 +42,7 @@ class AppIconTone {
   bool get isVivid => intensity == AppIconIntensity.vivid;
   bool get isDark => brightness == Brightness.dark;
 
-  // ── 语义色（全部已 harmonize 到当前 seed）────────────────────
+  // ── 语义色（与主题种子解耦，保持本色）────────────────────────
   Color get brand => cs.primary;
   Color get tertiary => cs.tertiary;
   Color get info => tokens.info;

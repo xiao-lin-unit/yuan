@@ -12,7 +12,7 @@ import 'package:yuan/styles/theme_tokens.dart';
 /// 「再想想 / 确认删除」双按钮 + 不可撤销注释。
 ///
 /// [intent] 决定徽章与危险按钮的取色；默认是 danger（语义「支出」红，
-/// 已 harmonize 到当前主题种子）。改成 warning / neutral 时同一套布局
+/// 与主题种子解耦、保持本色）。改成 warning / neutral 时同一套布局
 /// 会自动换成对应语义色，不需要另写组件。
 ///
 /// 【本轮补齐的异步确认链路，工作逻辑写清楚】

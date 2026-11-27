@@ -73,8 +73,10 @@ abstract final class AppSheetSize {
   /// 单选行「代表色」色点直径（主题色选择等）
   static const double optionSwatchSize = 20;
 
-  static const double categoryTileSize = 76;
-  static const double categoryIconSize = 30;
+  // 76dp 方块比 4 列下的列宽(~73dp)还宽，加上 6 字标签必然折成三行。
+  // 收到 56dp / 图标 24dp，标签再配 maxLines + ellipsis 兜底。
+  static const double categoryTileSize = 56;
+  static const double categoryIconSize = 24;
   static const int categoryColumns = 4;
 
   static const double mediaCoverSize = 76;
@@ -172,7 +174,7 @@ class SheetPalette {
         ],
       );
 
-  /// 危险操作渐变：从已 harmonize 的语义「支出」红派生。
+  /// 危险操作渐变：从与主题解耦、保持本色的语义「支出」红派生。
   LinearGradient get dangerGradient => LinearGradient(
         begin: Alignment.centerLeft,
         end: Alignment.centerRight,
@@ -218,13 +220,14 @@ class SheetPalette {
         alpha: AppSheetOpacity.glassOutline,
       );
 
-  /// 选中行 / 选中 chip 的浅紫底：surface 与 primaryContainer 之间插值。
+  /// 选中行 / 选中 chip 的淡蓝底：surface 与**固定 info 蓝**之间插值。
+  /// 不再是随主题变的「浅紫底」——选中是状态标记，不是品牌配色。
   Color get selectedTint => Color.lerp(
             cs.surface,
-            cs.primaryContainer,
+            tokens.info,
             AppSheetOpacity.selectedRowTint,
           ) ??
-      cs.primaryContainer;
+      cs.surfaceContainerHigh;
 
   Color get unselectedTint => cs.surfaceContainerHighest;
   Color get inactiveBar =>
@@ -239,14 +242,16 @@ class SheetPalette {
   Color get mutedText => cs.onSurfaceVariant;
   Color get bodyText => cs.onSurface;
 
-  /// 分类网格的语义色：由主色等距旋转色相派生，
-  /// 12 个格子天然协调，且换主题 / 切明暗时整体平移，不写死 12 个 hex。
+  /// 分类网格的语义色：**以固定 info 蓝为基准的小幅邻近色**。
+  /// 旧版从 cs.primary 等距旋转 34°、饱和度 0.62，粉色主题下会炸成
+  /// 蓝/靛/紫/粉一屏彩虹，且随主题整体平移。现在色源解耦、色相步长
+  /// 收到 10°、饱和度 0.32，四个格子是蓝→青的近邻，只做轻微区分。
   Color categoryTone(int index) {
-    final h = HSLColor.fromColor(cs.primary);
+    final h = HSLColor.fromColor(tokens.info);
     return h
-        .withHue((h.hue + index * 34.0) % 360)
-        .withSaturation(0.62)
-        .withLightness(isDark ? 0.68 : 0.46)
+        .withHue((h.hue + index * 10.0) % 360)
+        .withSaturation(0.32)
+        .withLightness(isDark ? 0.66 : 0.44)
         .toColor();
   }
 
@@ -307,7 +312,7 @@ class SheetText {
       AppTypography.categoryLabel.copyWith(color: cs.onSurface);
   TextStyle get categoryLabelSelected =>
       AppTypography.categoryLabel.copyWith(
-        color: cs.primary,
+        color: tokens.info,
         fontWeight: FontWeight.w600,
       );
   TextStyle get chipLabel =>

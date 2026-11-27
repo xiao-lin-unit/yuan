@@ -1,7 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../../../styles/app_decorations.dart';
-import '../../../styles/color_math.dart';
 import '../../../styles/app_typography.dart';
 import '../../../styles/theme_tokens.dart';
 import '../header/section_header.dart';
@@ -86,7 +85,8 @@ class AppStatItem {
 ///   · **纯展示**（默认，不传 [selectedIndex] / [onSelected]）：三格只是数字，
 ///     完全静态，行为与旧版一致；
 ///   · **可点 tab**（成对传入 [selectedIndex] + [onSelected]）：每格变成
-///     可点击，选中格用 primaryContainer 底 + 2dp 主色底部指示线。
+///     可点击，选中格用**固定蓝淡底 + 2dp 固定蓝底部指示线**（当前所在
+///     分类是导航信息，不跟主题色偏）。
 ///
 /// 【动态逻辑说明】tab 模式是通用结构件里唯一一处动态行为，分步写清：
 ///   ① 页面持有「当前选中第几格」的状态，把下标和回调一起传进来；
@@ -94,7 +94,7 @@ class AppStatItem {
 ///   ③ 点某格 → `onSelected(i)` → 页面 setState → 组件重建 → 高亮同步；
 ///   ④ 边界：两个参数必须成对（assert 保证）；下标越界时按「无选中」渲染，
 ///      不会崩；未传回调时格子不可点、也不画高亮。
-/// 高亮色与文字色全部取自 ColorScheme，换主题色 / 切明暗自动跟随。
+/// 高亮色取自解耦的 `tokens.info`，换主题色不变；文字取 ColorScheme 中性色。
 class AppStatBar extends StatelessWidget {
   const AppStatBar({
     super.key,
@@ -162,11 +162,16 @@ class _StatCell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final t = context.tokens;
     // InkWell 的水波纹画在最近的一层 Material 上；若直接用带不透明底色的
     // Container，splash 会被那层颜色盖住。所以这里显式给每格铺一层 Material，
     // 未选中格透明，露出整条卡片的底色。
+    // 选中是导航状态，走解耦的固定蓝淡底，不跟主题色偏。
     return Material(
-      color: selected ? cs.primaryContainer : Colors.transparent,
+      color: selected
+          ? (Color.lerp(cs.surface, t.info, AppColorEmphasis.accentTint) ??
+              cs.surfaceContainerHigh)
+          : Colors.transparent,
       child: InkWell(
         onTap: onTap,
         child: SizedBox(
@@ -181,14 +186,15 @@ class _StatCell extends StatelessWidget {
                   Text(
                     item.label,
                     style: context.appText.caption.copyWith(
-                      color: selected ? cs.onPrimaryContainer : null,
+                      color: selected ? t.info : null,
                     ),
                   ),
                   const SizedBox(height: AppSpacing.xxs),
                   Text(
                     item.value,
                     style: context.appText.menuTitle.copyWith(
-                      color: selected ? cs.onPrimaryContainer : null,
+                      color: selected ? t.info : null,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ],
@@ -200,7 +206,7 @@ class _StatCell extends StatelessWidget {
                   bottom: 0,
                   child: Container(
                     height: _kStatIndicatorHeight,
-                    color: cs.primary,
+                    color: t.info,
                   ),
                 ),
             ],
@@ -230,6 +236,7 @@ class AppHintBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final t = context.tokens;
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.md,
@@ -239,7 +246,9 @@ class AppHintBanner extends StatelessWidget {
       ),
       child: Container(
         decoration: BoxDecoration(
-          color: cs.primaryContainer,
+          // 提示是「信息」职能，用固定蓝淡底；不再铺 primaryContainer。
+          color: Color.lerp(cs.surface, t.info, AppColorEmphasis.accentTint) ??
+              cs.surfaceContainerHigh,
           borderRadius: BorderRadius.circular(_kHintRadius),
         ),
         padding: const EdgeInsets.fromLTRB(
@@ -253,21 +262,20 @@ class AppHintBanner extends StatelessWidget {
           children: <Widget>[
             Padding(
               padding: const EdgeInsets.only(top: AppSpacing.xxs),
-              child: Icon(icon, size: AppIconSize.small, color: cs.onPrimaryContainer),
+              child: Icon(icon, size: AppIconSize.small, color: t.info),
             ),
             const SizedBox(width: AppSpacing.xs),
             Expanded(
               child: Text(
                 message,
-                style: context.appText.caption
-                    .copyWith(color: cs.onPrimaryContainer),
+                style: context.appText.caption.copyWith(color: t.info),
               ),
             ),
             IconButton(
               onPressed: onDismiss,
               icon: const Icon(AppIcons.clear),
               iconSize: AppIconSize.small,
-              color: cs.onPrimaryContainer,
+              color: t.info,
               constraints: const BoxConstraints.tightFor(
                 width: kMinTapTarget,
                 height: kMinTapTarget,
@@ -356,7 +364,8 @@ class AppSegmentTabs<T> extends StatelessWidget {
 // 全部纯静态，无状态、无回调注册。
 // ══════════════════════════════════════════════════════════════════
 
-const double _kHeroValueSize = 40;
+// 与 AppTypography.heroValue 同值：主角要明显大于其余所有文字。
+const double _kHeroValueSize = 44;
 const double _kHeroMinHeight = 140;
 const double _kProgressHeight = 6;
 const double _kLedgerRowHeight = AppLayout.listItemMinHeight;
@@ -375,23 +384,21 @@ class AppInfoItem {
 /// [value] 是业务层用 MoneyFormat 格式化好的字符串；[caption] 是
 /// 设计原则第一条要求的「大白话解释」，每个数字旁边都要说清代表什么。
 /// [progress] 0..1 时显示一条已用比例（信用卡额度条），不传就不画。
-/// [accent] 由调用方从 `context.tokens` 取语义色，本组件不定义颜色。
+/// [accent] 由调用方从 `context.tokens` 取**语义色**，本组件不定义颜色。
 ///
-/// 【配色试点开关】[emphasized] 默认 false，此时是普通中性卡。
-/// 传 true 换成强调表面（柔和版，不再是整块实色主色）：
-///   · 底色 surfaceEmphasis（= cs.primaryContainer，随主题 / 亮暗重算）；
-///   · 文字 onEmphasis（= cs.onPrimaryContainer 经对比度兜底）；
-///   · 大数字 accentOnEmphasis（= cs.primary，校到 3:1）。
+/// 【布局层次：不是从上到下平铺】自上而下分成三个权重不同的区：
+///   ① 提示位 —— [label]（口径 / 单位），最小最淡、居中；[trailing] 放
+///      右上，供分类胶囊等状态标记用；
+///   ② 主角区 —— [value]，全页唯一的大字号、纯中性 onSurface、上下留白
+///      最大；[caption] 是它下面的次要说明，淡且居中；
+///   ③ 分组指标 —— [secondary]，一条细线隔开，组内收紧、组间放松。
+/// 文字职能也分三档（hintStyle / heroValue / captionStyle / infoStyle），
+/// 不再一路 caption + sm 等权排队。
+///
+/// 【配色分工：信息层全中性】[emphasized] 只决定容器取高一档中性
+/// surface 还是普通 card，**两者都不带主色**；大数字一律 onSurface，
+/// 只有显式传 [accent] 才带语义色。主色归 header / 悬浮操作 / 主按钮。
 /// 这是构造期静态 bool，没有运行时注册、没有 Notifier、没有跨帧回调。
-///
-/// 为什么做成开关而不是直接全改：全仓 6 处调用里 3 处传了语义 accent
-/// （warning / expense），那 3 张是「欠款 / 受限」状态卡，不该染主色；
-/// 本轮只在账户首页「全部」那一张开 true 做试点，看完观感再定铺开范围。
-/// 语义 hero 请保持 emphasized=false。
-///
-/// 边界行为：emphasized=true 时 [trailing] 若传 Widget，请调用方自己取
-/// onEmphasis 颜色（本组件不包装 IconTheme，避免又多一层隐式机制）；
-/// [accent] 在强调模式下仍然生效，但会先校到 3:1 再使用，不会糊在底色上。
 class AppSummaryHero extends StatelessWidget {
   const AppSummaryHero({
     super.key,
@@ -415,7 +422,8 @@ class AppSummaryHero extends StatelessWidget {
   final double? progress;
   final Color? accent;
 
-  /// 是否用主色表面。默认 false = 保持原来的中性卡片，逐像素不变。
+  /// 是否用高一档的中性容器底（+ 极淡中性渐变）。默认 false = 普通卡。
+  /// 两个分支都不带主色，只是明度略差一档，用于首屏与详情屏区分。
   final bool emphasized;
 
   @override
@@ -424,26 +432,27 @@ class AppSummaryHero extends StatelessWidget {
     final t = context.tokens;
     final bool strong = emphasized;
 
-    // 强调卡不再是一整块高饱和主色 + 白字（最像「后台模板」的一种），
-    // 改成淡彩容器底 + 深色文字 + 主色大数字，层次靠对比而不是靠色块。
-    final TextStyle labelStyle = strong
-        ? context.appText.caption.copyWith(color: t.onEmphasis)
-        : context.appText.caption;
+    // ★ 配色分工：信息层全中性。容器是高一档 neutral surface，口径 /
+    // 说明 / 次要指标都是 onSurface 系；只有调用方显式传语义 accent
+    // （信用卡额度条 warning）时才带色。主色退到 header / 悬浮操作。
+    final Color background = strong ? t.surfaceEmphasis : t.card;
+    final Color tone = accent ?? cs.onSurface;
+
+    // ★ 三种「文字职能」分别取不同权重，而不是一路 caption：
+    //   提示位(口径/单位) 最小最淡 → 主角(数字) 最大最深 → 说明(白话) 淡。
+    final TextStyle hintStyle = context.appText.caption.copyWith(
+      color: cs.onSurfaceVariant,
+      letterSpacing: 0.4,
+    );
+    final TextStyle captionStyle =
+        context.appText.caption.copyWith(color: cs.onSurfaceVariant);
     final TextStyle infoStyle = context.appText.menuTitle.copyWith(
-      color: strong ? t.onEmphasis : null,
+      color: cs.onSurface,
       fontWeight: FontWeight.w700,
     );
-    final Color background = strong ? t.surfaceEmphasis : t.card;
-    final Color tone = strong
-        ? ColorMath.ensureContrast(
-            accent ?? t.accentOnEmphasis,
-            background,
-            minimum: AppColorEmphasis.accentMinContrast,
-          )
-        : (accent ?? cs.primary);
 
-    // 强调分支用一层极淡的同系渐变，让大卡有体积但不抢数字；
-    // 圆角 / 阴影 / 透明度仍全部来自 styles 层，本文件不写魔法数。
+    // 强调分支只保留一层极淡的**中性**渐变（background 已不带主色），
+    // 给大卡一点体积；圆角 / 阴影仍全部来自 styles 层。
     final BoxDecoration decoration = strong
         ? BoxDecoration(
             gradient: LinearGradient(
@@ -467,20 +476,29 @@ class AppSummaryHero extends StatelessWidget {
 
     return Container(
       decoration: decoration,
-      padding: const EdgeInsets.all(AppSpacing.md),
+      // ★ 留白按权重分配：主角区上下最松，分组指标区收紧。
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.md,
+        AppSpacing.lg,
+        AppSpacing.md,
+        AppSpacing.md,
+      ),
       constraints: const BoxConstraints(minHeight: _kHeroMinHeight),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          Row(
+          // 提示位：口径 / 单位居中，右上角留给分类胶囊等状态标记。
+          Stack(
+            alignment: Alignment.center,
             children: <Widget>[
-              Expanded(child: Text(label, style: labelStyle)),
-              ?trailing,
+              Text(label, textAlign: TextAlign.center, style: hintStyle),
+              if (trailing != null)
+                Align(alignment: Alignment.centerRight, child: trailing!),
             ],
           ),
-          const SizedBox(height: AppSpacing.sm),
-          // 切筛选标签时数字淡入，不再是硬跳一下。
+          const SizedBox(height: AppSpacing.md),
+          // 主角：全页唯一的大字号 + 纯中性文字，周围留白最大。
           AnimatedSwitcher(
             duration: AppMotion.medium,
             transitionBuilder: (Widget child, Animation<double> animation) =>
@@ -488,41 +506,56 @@ class AppSummaryHero extends StatelessWidget {
             child: Text(
               value,
               key: ValueKey<String>(value),
+              textAlign: TextAlign.center,
               style: context.appText.heroValue.copyWith(
                 fontSize: _kHeroValueSize,
                 color: tone,
               ),
             ),
           ),
-          const SizedBox(height: AppSpacing.xs),
-          Text(caption, style: labelStyle),
+          const SizedBox(height: AppSpacing.sm),
+          // 白话说明：次要、淡、居中，不跟主角争。
+          Text(caption, textAlign: TextAlign.center, style: captionStyle),
           if (progress != null) ...<Widget>[
-            const SizedBox(height: AppSpacing.sm),
+            const SizedBox(height: AppSpacing.md),
             ClipRRect(
               borderRadius: BorderRadius.circular(AppRadius.small),
               child: LinearProgressIndicator(
                 value: progress!.clamp(0.0, 1.0).toDouble(),
                 minHeight: _kProgressHeight,
-                backgroundColor: strong
-                    ? t.onEmphasis.withValues(alpha: AppOpacity.selected)
-                    : cs.surfaceContainerHighest,
+                backgroundColor: cs.surfaceContainerHighest,
                 color: tone,
               ),
             ),
           ],
           if (secondary.isNotEmpty) ...<Widget>[
+            // 分组：一条细线把「主角区」与「次要指标组」隔开，
+            // 组间 lg、组内 md，形成疏—密的层级节奏。
             const SizedBox(height: AppSpacing.lg),
+            Divider(height: 1, thickness: AppBorder.thin, color: t.divider),
+            const SizedBox(height: AppSpacing.md),
             Row(
               children: <Widget>[
                 for (var i = 0; i < secondary.length; i++) ...<Widget>[
-                  if (i > 0) const SizedBox(width: AppSpacing.xl),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: <Widget>[
-                      Text(secondary[i].label, style: labelStyle),
-                      Text(secondary[i].value, style: infoStyle),
-                    ],
+                  if (i > 0) const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: <Widget>[
+                        Text(
+                          secondary[i].label,
+                          textAlign: TextAlign.center,
+                          style: hintStyle,
+                        ),
+                        const SizedBox(height: AppSpacing.xxs),
+                        Text(
+                          secondary[i].value,
+                          textAlign: TextAlign.center,
+                          style: infoStyle,
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ],
@@ -538,39 +571,109 @@ class AppSummaryHero extends StatelessWidget {
 /// 用 Wrap 而不是 GridView：格子高度随内容自适应，也不会和外层
 /// SingleChildScrollView 抢滚动手势。
 class AppInfoGrid extends StatelessWidget {
-  const AppInfoGrid({super.key, required this.items});
+  const AppInfoGrid({super.key, required this.items, this.groupLabel});
 
   final List<AppInfoItem> items;
 
+  /// 可选分组名。传了就在网格上方补一行组标题，让「四个等权小卡」
+  /// 变成「有名字的一组指标」——层次感来自归属关系，不是再画四个框。
+  final String? groupLabel;
+
   @override
   Widget build(BuildContext context) {
-    final double cellWidth =
-        (MediaQuery.sizeOf(context).width - AppSpacing.md * 2 - AppSpacing.xs) / 2;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 0),
-      child: Wrap(
-        spacing: AppSpacing.xs,
-        runSpacing: AppSpacing.xs,
-        children: <Widget>[
-          for (final AppInfoItem item in items)
-            SizedBox(
-              width: cellWidth.clamp(120.0, 320.0).toDouble(),
-              child: Container(
-                decoration: AppDecorations.item(context),
-                padding: const EdgeInsets.all(AppSpacing.sm),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: <Widget>[
-                    Text(item.label, style: context.appText.caption),
-                    const SizedBox(height: AppSpacing.xxs),
-                    Text(item.value, style: context.appText.menuTitle),
-                  ],
-                ),
+    final cs = Theme.of(context).colorScheme;
+    final t = context.tokens;
+    final TextStyle labelStyle =
+        context.appText.caption.copyWith(color: cs.onSurfaceVariant);
+    final TextStyle valueStyle = context.appText.menuTitle.copyWith(
+      color: cs.onSurface,
+      fontWeight: FontWeight.w700,
+    );
+
+    Widget cell(AppInfoItem item) => Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.sm,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Text(item.label, style: labelStyle),
+              const SizedBox(height: AppSpacing.xxs),
+              Text(
+                item.value,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: valueStyle,
+              ),
+            ],
+          ),
+        );
+
+    final int rows = (items.length / 2).ceil();
+    if (rows == 0) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        if (groupLabel != null)
+          Padding(
+            padding: const EdgeInsets.only(
+              left: AppSpacing.xxs,
+              bottom: AppSpacing.xs,
+            ),
+            child: Text(
+              groupLabel!,
+              style: context.appText.caption.copyWith(
+                color: cs.onSurfaceVariant,
+                letterSpacing: 0.4,
               ),
             ),
-        ],
-      ),
+          ),
+        // 整组共用一张中性卡，内部只靠细线分格：
+        // 不再给每个字段都套一个同款容器 + 同款内距 + 同款底色。
+        Container(
+          decoration: AppDecorations.item(context),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              for (int r = 0; r < rows; r++) ...<Widget>[
+                if (r > 0)
+                  Divider(
+                    height: 1,
+                    thickness: AppBorder.thin,
+                    color: t.divider,
+                  ),
+                IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: <Widget>[
+                      Expanded(child: cell(items[r * 2])),
+                      // 奇数项时右半留空，保持两列节奏不被打破。
+                      Expanded(
+                        child: r * 2 + 1 < items.length
+                            ? Row(
+                                children: <Widget>[
+                                  VerticalDivider(
+                                    width: 1,
+                                    thickness: AppBorder.thin,
+                                    color: t.divider,
+                                  ),
+                                  Expanded(child: cell(items[r * 2 + 1])),
+                                ],
+                              )
+                            : const SizedBox.shrink(),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

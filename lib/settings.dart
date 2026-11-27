@@ -96,7 +96,8 @@ class ThemeSetting {
     iconTheme: IconThemeData(color: cs.onSurfaceVariant, size: AppIconSize.large),
   );
 
-  static NavigationBarThemeData navigationBarTheme(ColorScheme cs) =>
+  static NavigationBarThemeData navigationBarTheme(
+          ColorScheme cs, AppThemeTokens t) =>
       NavigationBarThemeData(
         // 底导与内容同底，只靠 indicator 提示选中，去掉「工具栏分界」。
         backgroundColor: cs.surface,
@@ -105,7 +106,14 @@ class ThemeSetting {
         elevation: 0,
         height: AppLayout.navigationBarHeight,
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-        indicatorColor: cs.primaryContainer,
+        // 选中标记走**与主题解耦的固定蓝**：主题换成粉/绿时，导航仍是可
+        // 识别的同一套功能色，不会整屏跟着偏。
+        indicatorColor: Color.lerp(
+              cs.surface,
+              t.info,
+              AppColorEmphasis.accentTint,
+            ) ??
+            cs.surfaceContainerHigh,
         // 药丸 indicator 是 M3 最显眼的出厂感，换成收敛的圆角小块。
         indicatorShape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.item),
@@ -114,7 +122,7 @@ class ThemeSetting {
           final selected = states.contains(WidgetState.selected);
           return IconThemeData(
             size: AppIconSize.large,
-            color: selected ? cs.onSecondaryContainer : cs.onSurfaceVariant,
+            color: selected ? t.info : cs.onSurfaceVariant,
           );
         }),
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
@@ -135,11 +143,16 @@ class ThemeSetting {
       NavigationRailThemeData(
         backgroundColor: cs.surfaceContainer,
         elevation: 0,
-        indicatorColor: cs.secondaryContainer,
+        indicatorColor: Color.lerp(
+              cs.surface,
+              t.info,
+              AppColorEmphasis.accentTint,
+            ) ??
+            cs.surfaceContainerHigh,
         indicatorShape: const StadiumBorder(),
         selectedIconTheme: IconThemeData(
           size: AppIconSize.large,
-          color: cs.onSecondaryContainer,
+          color: t.info,
         ),
         unselectedIconTheme: IconThemeData(
           size: AppIconSize.large,
@@ -341,8 +354,9 @@ class ThemeSetting {
   // 三条统一规则（与全局设计系统对齐）：
   //  1. 圆角只取 AppRadius（small / item / card / sheet / dialog），不写魔法数；
   //  2. 间距只取 AppSpacing（8pt 网格）与 kMinTapTarget（48dp 热区）；
-  //  3. 选中态统一用 cs.secondaryContainer / cs.onSecondaryContainer 或
-  //     cs.primary / cs.onPrimary，状态层透明度统一取 AppOpacity。
+  //  3. 导航 / 快筛 / 分类这类**状态标记**统一走解耦的 tokens.info
+  //     （固定蓝淡底），品牌与操作位才用 cs.primary；状态层透明度取
+  //     AppOpacity。信息容器一律中性，不给主题色。
   //
   // 这些控件此前走 Flutter M3 默认值，虽然跟随 colorScheme，但圆角档位、
   // 内边距、选中态容器色与项目里其它组件（卡片 / 列表 / 按钮）并不一致。
@@ -385,10 +399,16 @@ class ThemeSetting {
         return null;
       });
 
-  /// Chip：选中态 = secondaryContainer，描边 = divider，圆角 = small。
+  /// Chip：选中态 = 固定蓝淡底（与主题解耦），圆角 = small。
+  /// 快筛是「状态标记」不是品牌位，不该跟着主题色偏。
   static ChipThemeData chipTheme(ColorScheme cs, AppThemeTokens t) {
     final base = t.card;
-    final selected = cs.secondaryContainer;
+    final selected = Color.lerp(
+          cs.surface,
+          t.info,
+          AppColorEmphasis.accentTint,
+        ) ??
+        cs.surfaceContainerHigh;
     final disabled =
         cs.onSurface.withValues(alpha: AppOpacity.disabledContainer);
     return ChipThemeData(
@@ -400,7 +420,7 @@ class ThemeSetting {
         disabled: disabled,
       ),
       deleteIconColor: cs.onSurfaceVariant,
-      checkmarkColor: cs.onSecondaryContainer,
+      checkmarkColor: t.info,
       showCheckmark: true,
       // 快筛 chip 靠底色区分即可，再画一圈框会和列表卡片叠成网格感。
       side: BorderSide.none,
@@ -444,22 +464,23 @@ class ThemeSetting {
     );
   }
 
-  /// TabBar：3dp 主色下划线（带圆角）、分隔线 1dp、标签左右 16dp。
+  /// TabBar：3dp **固定蓝**下划线（带圆角）、分隔线 1dp。
+  /// 当前所在页是导航信息，用与主题解耦的对比色，换主题也不偏色。
   static TabBarThemeData tabBarTheme(ColorScheme cs, AppThemeTokens t) =>
       TabBarThemeData(
         indicator: UnderlineTabIndicator(
           borderSide: BorderSide(
-            color: cs.primary,
+            color: t.info,
             width: AppComponentSize.tabIndicatorHeight,
           ),
           borderRadius:
               BorderRadius.circular(AppComponentSize.tabIndicatorHeight),
         ),
-        indicatorColor: cs.primary,
+        indicatorColor: t.info,
         indicatorSize: TabBarIndicatorSize.label,
         dividerColor: t.divider,
         dividerHeight: AppBorder.thin,
-        labelColor: cs.primary,
+        labelColor: t.info,
         unselectedLabelColor: cs.onSurfaceVariant,
         labelStyle: textTheme.labelLarge?.copyWith(
           fontWeight: FontWeight.w600,

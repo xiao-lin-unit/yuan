@@ -204,16 +204,23 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
+        // ★ 留白按层级分配，不再一路 AppSpacing.sm 等权排队：
+        //   主角区 → 信息组：lg（同一块主信息里放松）
+        //   信息组 → 流水区块：xl（两大区块之间最松）
+        //   流水区块内部：md（组内收紧）
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
           child: _hero(context, catalog, account),
         ),
-        const SizedBox(height: AppSpacing.sm),
+        const SizedBox(height: AppSpacing.lg),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-          child: AppInfoGrid(items: _infoItems(catalog, account)),
+          child: AppInfoGrid(
+            items: _infoItems(catalog, account),
+            groupLabel: '账户信息',
+          ),
         ),
-        const SizedBox(height: AppSpacing.sm),
+        const SizedBox(height: AppSpacing.xl),
         AppFunctionSection(
           title: _kLedgerTitle,
           child: Padding(
@@ -226,9 +233,9 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
                 // 两套标签与两套算式各自成段，不共用同一个 net 解释。
                 // 三格统计始终全量，不随分页 / 方向标签变化。
                 AppStatBar(items: _statItems(account, summary)),
-                const SizedBox(height: AppSpacing.sm),
+                const SizedBox(height: AppSpacing.md),
                 _entryFilterChips(catalog),
-                const SizedBox(height: AppSpacing.sm),
+                const SizedBox(height: AppSpacing.md),
                 ..._entryList(catalog, account),
               ],
             ),
@@ -274,6 +281,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
       final double limit = account.creditLimit ?? 0;
       return AppSummaryHero(
         label: '已用额度 / 总额度',
+        trailing: _kindBadge(context, account),
         value: '${MoneyFormat.yuan0(account.balance)} / '
             '${MoneyFormat.orDash(account.creditLimit)}',
         caption: '可用 ${MoneyFormat.orDash(account.availableCredit)} · '
@@ -295,6 +303,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     }
     return AppSummaryHero(
       label: '当前余额',
+      trailing: _kindBadge(context, account),
       value: MoneyFormat.yuan(account.balance),
       caption: account.kind == AccountKind.restricted
           ? '该账户资金有特定用途，记账时将按绑定用途过滤可选账户。'
@@ -311,6 +320,32 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
               : '不限',
         ),
       ],
+    );
+  }
+
+  /// 分类标记：用**与主题解耦的固定蓝**淡底，承担「这是哪一类账户」的
+  /// 状态职能，不占用主色。放在 hero 提示位右上角，与居中的口径提示
+  /// 形成「主角 + 状态标记」的层级，而不是让分类也去排队。
+  Widget _kindBadge(BuildContext context, AccountRecord account) {
+    final cs = Theme.of(context).colorScheme;
+    final t = context.tokens;
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.xxs,
+      ),
+      decoration: BoxDecoration(
+        color: Color.lerp(cs.surface, t.info, AppColorEmphasis.accentTint) ??
+            cs.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(AppRadius.small),
+      ),
+      child: Text(
+        account.kind.label,
+        style: context.appText.caption.copyWith(
+          color: t.info,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
     );
   }
 

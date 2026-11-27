@@ -206,7 +206,8 @@ class _OptionRow<T> extends StatelessWidget {
                       ? AppIcons.radioChecked
                       : AppIcons.radioUnchecked,
                   size: AppSheetSize.optionRadioSize,
-                  color: selected ? p.cs.primary : p.mutedText,
+                  // 选中是状态标记，走解耦的固定蓝而非主题主色。
+                  color: selected ? p.tokens.info : p.mutedText,
                 ),
               ],
             ),
@@ -257,7 +258,7 @@ class _OptionLeading<T> extends StatelessWidget {
     return Icon(
       option.icon!,
       size: AppIconSize.medium,
-      color: selected ? p.cs.primary : p.mutedText,
+      color: selected ? p.tokens.info : p.mutedText,
     );
   }
 }
@@ -341,27 +342,27 @@ class _CategoryTile<T> extends StatelessWidget {
             width: AppSheetSize.categoryTileSize,
             height: AppSheetSize.categoryTileSize,
             decoration: BoxDecoration(
-              color: selected ? p.cs.primary : p.categoryTileTone(index),
+              // 选中态也走解耦的固定蓝，不再用主色实底。
+              color: selected ? p.tokens.info : p.categoryTileTone(index),
               borderRadius: BorderRadius.circular(AppSheetRadius.tile),
-              border: Border.all(
-                color: selected
-                    ? Colors.transparent
-                    : tone.withValues(alpha: AppOpacity.outline),
-                width: AppBorder.thin,
-              ),
-              boxShadow: selected ? p.primaryGlow : null,
+              // 每个格子再画一圈框会把弹层叠成网格感，去掉；主色光晕也
+              // 一并去掉，选中靠实底蓝就够了。
             ),
             alignment: Alignment.center,
             child: Icon(
               category.icon,
               size: AppSheetSize.categoryIconSize,
-              color: selected ? p.onPrimaryGradient : tone,
+              color: selected ? p.tokens.onInfo : tone,
             ),
           ),
           const SizedBox(height: _kTileLabelGap),
           Text(
             category.label,
             textAlign: TextAlign.center,
+            // 六字标签在窄列里曾经被拆成「流动资金账 / 户」；限制两行并
+            // 省略，配合 12px 字号后正常情况就是一行。
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
             style: selected
                 ? text.categoryLabelSelected
                 : text.categoryLabel,

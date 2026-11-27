@@ -213,9 +213,10 @@ abstract final class AppTypography {
     height: 1.40,
   );
   static const TextStyle categoryLabel = TextStyle(
-    fontSize: 13,
+    // 4 列窄格下 13px 会把六字标签拆成两行；12px + 外层 maxLines 兜底。
+    fontSize: 12,
     fontWeight: FontWeight.w500,
-    height: 1.40,
+    height: 1.30,
   );
   static const TextStyle chipLabel = TextStyle(
     fontSize: 14,

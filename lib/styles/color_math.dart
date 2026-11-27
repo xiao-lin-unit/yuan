@@ -61,6 +61,11 @@ class ColorMath {
 
   /// M3 风格的颜色和谐化：把 design 色相朝 seed 色相旋转，最多 [maxDegrees]。
   /// HCT 需要额外依赖，这里用 HSL 做工程近似，效果一致且零依赖。
+  ///
+  /// ⚠️ **语义色不要再用它**。`AppThemeTokens.fromScheme` 曾拿它把收入绿 /
+  /// 支出红 / 信息蓝拉向主题种子，导致粉色主题下找不到一个真正的对比色
+  /// （「全部向主题色偏向」）。现在语义色只做明暗 tone 适配；本函数保留
+  /// 给确需与主题协调的装饰色使用。
   static Color harmonize(Color design, Color seed, {double maxDegrees = 15}) {
     final d = HSLColor.fromColor(design);
     final s = HSLColor.fromColor(seed);
