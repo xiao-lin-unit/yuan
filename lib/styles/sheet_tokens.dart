@@ -268,12 +268,18 @@ class SheetPalette {
 /// 排版便捷入口：Sheet 组件统一用 `SheetText.of(context)`，
 /// 不直接写 `TextStyle(fontSize: ...)`，颜色由当前 ColorScheme 注入。
 class SheetText {
-  SheetText(this.cs);
+  SheetText(this.cs, this.tokens);
 
   final ColorScheme cs;
 
-  static SheetText of(BuildContext context) =>
-      SheetText(Theme.of(context).colorScheme);
+  /// 与 [SheetPalette] 一样持有设计令牌：本轮把选中态文字从主色改成
+  /// 解耦的固定蓝 `tokens.info`，光有 [cs] 取不到语义色。
+  final AppThemeTokens tokens;
+
+  static SheetText of(BuildContext context) => SheetText(
+        Theme.of(context).colorScheme,
+        context.tokens,
+      );
 
   TextStyle get title =>
       AppTypography.sheetTitle.copyWith(color: cs.onSurface);
@@ -285,8 +291,9 @@ class SheetText {
       AppTypography.sectionLabel.copyWith(color: cs.onSurfaceVariant);
   TextStyle get metricLabel =>
       AppTypography.metricLabel.copyWith(color: cs.onSurfaceVariant);
+  // 概览数值属于信息层，按本轮配色分工回中性，不再跟主题色偏。
   TextStyle get metricValue =>
-      AppTypography.metricValue.copyWith(color: cs.primary);
+      AppTypography.metricValue.copyWith(color: cs.onSurface);
   TextStyle get metricUnit =>
       AppTypography.metricUnit.copyWith(color: cs.onSurfaceVariant);
   TextStyle get buttonLabel =>
@@ -297,7 +304,7 @@ class SheetText {
       AppTypography.optionLabel.copyWith(color: cs.onSurface);
   TextStyle get optionLabelSelected =>
       AppTypography.optionLabel.copyWith(
-        color: cs.primary,
+        color: tokens.info,
         fontWeight: FontWeight.w600,
       );
   TextStyle get confirmTitle =>
@@ -318,7 +325,7 @@ class SheetText {
   TextStyle get chipLabel =>
       AppTypography.chipLabel.copyWith(color: cs.onSurface);
   TextStyle get chipLabelSelected =>
-      AppTypography.chipLabel.copyWith(color: cs.primary);
+      AppTypography.chipLabel.copyWith(color: tokens.info);
   TextStyle get trendLabel =>
       AppTypography.trendLabel.copyWith(color: cs.onSurfaceVariant);
   /// 表单左标签：独立紧凑字阶，不再借用 16px 的 [optionLabel]。
@@ -355,7 +362,7 @@ class SheetText {
       );
   TextStyle get optionLabelCompactSelected =>
       AppTypography.optionLabel.copyWith(
-        color: cs.primary,
+        color: tokens.info,
         fontWeight: FontWeight.w600,
         height: 1.2,
       );
