@@ -98,14 +98,18 @@ class ThemeSetting {
 
   static NavigationBarThemeData navigationBarTheme(ColorScheme cs) =>
       NavigationBarThemeData(
-        backgroundColor: cs.surfaceContainer,
-        surfaceTintColor: cs.surfaceTint,
+        // 底导与内容同底，只靠 indicator 提示选中，去掉「工具栏分界」。
+        backgroundColor: cs.surface,
+        surfaceTintColor: Colors.transparent,
         // M3 底导靠 tonal elevation 分层，硬阴影 elevation:2 会在暗色下发灰
         elevation: 0,
         height: AppLayout.navigationBarHeight,
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-        indicatorColor: cs.secondaryContainer,
-        indicatorShape: const StadiumBorder(),
+        indicatorColor: cs.primaryContainer,
+        // 药丸 indicator 是 M3 最显眼的出厂感，换成收敛的圆角小块。
+        indicatorShape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.item),
+        ),
         iconTheme: WidgetStateProperty.resolveWith((states) {
           final selected = states.contains(WidgetState.selected);
           return IconThemeData(
@@ -248,8 +252,8 @@ class ThemeSetting {
   static CardThemeData cardTheme(ColorScheme cs, AppThemeTokens t) =>
       CardThemeData(
         color: t.card,
-        surfaceTintColor: cs.surfaceTint,
-        elevation: 1,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(t.radiusCard),
         ),
@@ -382,7 +386,7 @@ class ThemeSetting {
 
   /// Chip：选中态 = secondaryContainer，描边 = divider，圆角 = small。
   static ChipThemeData chipTheme(ColorScheme cs, AppThemeTokens t) {
-    final base = cs.surfaceContainerLow;
+    final base = t.card;
     final selected = cs.secondaryContainer;
     final disabled =
         cs.onSurface.withValues(alpha: AppOpacity.disabledContainer);
@@ -397,15 +401,22 @@ class ThemeSetting {
       deleteIconColor: cs.onSurfaceVariant,
       checkmarkColor: cs.onSecondaryContainer,
       showCheckmark: true,
-      side: BorderSide(
-        color: t.divider.withValues(alpha: AppOpacity.outline),
-        width: AppBorder.thin,
-      ),
+      // 快筛 chip 靠底色区分即可，再画一圈框会和列表卡片叠成网格感。
+      side: BorderSide.none,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppRadius.small),
       ),
+      // ⚠️ vertical 只能是 4（AppSpacing.xxs），别再往上加。
+      // material_ui 的 _RenderChip._computeSizes 用
+      //   contentSize = max(32 − padding.vertical + labelPadding.vertical,
+      //                     label.height + labelPadding.vertical)
+      // 倒推内容区高度，再断言 contentSize >= avatar / deleteIcon 的高度。
+      // 本主题把 avatarBoxConstraints 固定成 24dp、deleteIcon 18dp：
+      // 上下各 8 → contentSize = 16 → 断言「16 >= 24」失败，chip 拿不到
+      // size，父级 RenderPadding 接着抛「RenderBox was not laid out」。
+      // 想让 chip 更舒展只能调水平内距或缩小 avatar 约束，不能加竖直 padding。
       padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.xs,
+        horizontal: AppSpacing.sm,
         vertical: AppSpacing.xxs,
       ),
       labelPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxs),

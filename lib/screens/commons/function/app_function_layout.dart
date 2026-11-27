@@ -356,8 +356,8 @@ class AppSegmentTabs<T> extends StatelessWidget {
 // 全部纯静态，无状态、无回调注册。
 // ══════════════════════════════════════════════════════════════════
 
-const double _kHeroValueSize = 36;
-const double _kHeroMinHeight = 132;
+const double _kHeroValueSize = 44;
+const double _kHeroMinHeight = 152;
 const double _kProgressHeight = 6;
 const double _kLedgerRowHeight = AppLayout.listItemMinHeight;
 
@@ -377,11 +377,11 @@ class AppInfoItem {
 /// [progress] 0..1 时显示一条已用比例（信用卡额度条），不传就不画。
 /// [accent] 由调用方从 `context.tokens` 取语义色，本组件不定义颜色。
 ///
-/// 【配色试点开关】[emphasized] 默认 false，此时与改造前逐像素一致。
-/// 传 true 才把这张卡换成主色表面：
-///   · 底色 surfaceEmphasis（= cs.primary，随主题色 / 亮暗自动重算）；
-///   · 文字 onEmphasis（= cs.onPrimary 经对比度兜底，**不是硬写白**）；
-///   · 大数字 accentOnEmphasis（由 tertiary 派生并校到 3:1）。
+/// 【配色试点开关】[emphasized] 默认 false，此时是普通中性卡。
+/// 传 true 换成强调表面（柔和版，不再是整块实色主色）：
+///   · 底色 surfaceEmphasis（= cs.primaryContainer，随主题 / 亮暗重算）；
+///   · 文字 onEmphasis（= cs.onPrimaryContainer 经对比度兜底）；
+///   · 大数字 accentOnEmphasis（= cs.primary，校到 3:1）。
 /// 这是构造期静态 bool，没有运行时注册、没有 Notifier、没有跨帧回调。
 ///
 /// 为什么做成开关而不是直接全改：全仓 6 处调用里 3 处传了语义 accent
@@ -424,14 +424,15 @@ class AppSummaryHero extends StatelessWidget {
     final t = context.tokens;
     final bool strong = emphasized;
 
-    // 默认分支完全沿用原 TextStyle；只有 strong 才换令牌，
-    // 保证其余 5 处调用逐像素不变。
+    // 强调卡不再是一整块高饱和主色 + 白字（最像「后台模板」的一种），
+    // 改成淡彩容器底 + 深色文字 + 主色大数字，层次靠对比而不是靠色块。
     final TextStyle labelStyle = strong
         ? context.appText.caption.copyWith(color: t.onEmphasis)
         : context.appText.caption;
-    final TextStyle infoStyle = strong
-        ? context.appText.menuTitle.copyWith(color: t.onEmphasis)
-        : context.appText.menuTitle;
+    final TextStyle infoStyle = context.appText.menuTitle.copyWith(
+      color: strong ? t.onEmphasis : null,
+      fontWeight: FontWeight.w700,
+    );
     final Color background = strong ? t.surfaceEmphasis : t.card;
     final Color tone = strong
         ? ColorMath.ensureContrast(
@@ -441,16 +442,22 @@ class AppSummaryHero extends StatelessWidget {
           )
         : (accent ?? cs.primary);
 
-    // 强调分支只用全局令牌拼装（圆角 / 阴影 / 透明度都来自 styles 层），
-    // 本文件不定义任何新数值。不复用 AppDecorations.card 是因为它带一条
-    // 中性发丝描边，叠在主色底上会显脏。
+    // 强调分支用一层极淡的同系渐变，让大卡有体积但不抢数字；
+    // 圆角 / 阴影 / 透明度仍全部来自 styles 层，本文件不写魔法数。
     final BoxDecoration decoration = strong
         ? BoxDecoration(
-            color: background,
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: <Color>[
+                background,
+                Color.lerp(background, cs.surface, 0.34) ?? background,
+              ],
+            ),
             borderRadius: BorderRadius.circular(AppRadius.card),
             boxShadow: <BoxShadow>[
               BoxShadow(
-                color: background.withValues(alpha: AppElevation.cardAlpha),
+                color: cs.shadow.withValues(alpha: AppElevation.cardAlpha),
                 offset: AppElevation.cardOffset,
                 blurRadius: AppElevation.cardBlur,
               ),
@@ -460,7 +467,7 @@ class AppSummaryHero extends StatelessWidget {
 
     return Container(
       decoration: decoration,
-      padding: const EdgeInsets.all(AppSpacing.md),
+      padding: const EdgeInsets.all(AppSpacing.lg),
       constraints: const BoxConstraints(minHeight: _kHeroMinHeight),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -472,15 +479,22 @@ class AppSummaryHero extends StatelessWidget {
               ?trailing,
             ],
           ),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            value,
-            style: context.appText.pageTitle.copyWith(
-              fontSize: _kHeroValueSize,
-              color: tone,
+          const SizedBox(height: AppSpacing.sm),
+          // 切筛选标签时数字淡入，不再是硬跳一下。
+          AnimatedSwitcher(
+            duration: AppMotion.medium,
+            transitionBuilder: (Widget child, Animation<double> animation) =>
+                FadeTransition(opacity: animation, child: child),
+            child: Text(
+              value,
+              key: ValueKey<String>(value),
+              style: context.appText.heroValue.copyWith(
+                fontSize: _kHeroValueSize,
+                color: tone,
+              ),
             ),
           ),
-          const SizedBox(height: AppSpacing.xxs),
+          const SizedBox(height: AppSpacing.xs),
           Text(caption, style: labelStyle),
           if (progress != null) ...<Widget>[
             const SizedBox(height: AppSpacing.sm),
@@ -497,11 +511,11 @@ class AppSummaryHero extends StatelessWidget {
             ),
           ],
           if (secondary.isNotEmpty) ...<Widget>[
-            const SizedBox(height: AppSpacing.sm),
+            const SizedBox(height: AppSpacing.lg),
             Row(
               children: <Widget>[
                 for (var i = 0; i < secondary.length; i++) ...<Widget>[
-                  if (i > 0) const SizedBox(width: AppSpacing.lg),
+                  if (i > 0) const SizedBox(width: AppSpacing.xl),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,

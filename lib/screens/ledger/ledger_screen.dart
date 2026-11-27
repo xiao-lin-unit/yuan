@@ -34,8 +34,7 @@ const String _kSearchEmptyDescription = '换个关键词，或者点「全部」
 const String _kFilterEmptyTitle = '这一组还没有记录';
 const String _kFilterEmptyDescription = '点右上角 ＋ 新增，或切回「全部」查看其它类型组。';
 const String _kFootNote =
-    '这里只统计自己登记的资产与负债；账户余额在「账户」页单独看。'
-    '挂卡分期的剩余本金已含在信用卡欠款里，不重复相加。';
+    '这里只算自己登记的资产与负债，账户余额在「账户」页单独看。';
 
 /// 资产 / 负债两段 tab，与账户页的类型快筛是两套不同控件（各管一件事）。
 enum _AzTab { asset, liability }
@@ -224,7 +223,9 @@ class _LedgerScreenState extends State<LedgerScreen> {
     );
 
     return AppHomePage(
-      // 右上角只放动作，没有标题、没有返回按钮（与账户页一致）。
+      // 首屏层级与账户页一致：标题 → 大数字摘要 → 明细。
+      title: '资债',
+      subtitle: '房子、投资、借款，都记在这一处',
       actions: <Widget>[
         IconButton(
           icon: const Icon(AppIcons.add),

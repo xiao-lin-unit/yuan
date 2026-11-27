@@ -1,4 +1,5 @@
 import 'package:material_ui/material_ui.dart';
+import 'package:yuan/styles/app_typography.dart';
 
 import '../../../styles/theme_tokens.dart';
 
@@ -14,7 +15,7 @@ const double _kActionGap = AppSpacing.xxs;
 /// 而 Home 页本身就在底导上，**导航栏已经说明这是哪个页面**，顶上再放
 /// 一行「账户 / 返回」是重复信息，还把首屏最值钱的一块让给了标题栏。
 /// 所以 Home 页用本组件：
-///   · 不渲染 AppBar、不渲染标题、不渲染返回按钮；
+///   · 不渲染 AppBar、不渲染返回按钮；标题改为**可选的页面级大标题**；
 ///   · 顶部只保留一个**纯动作行**（原型的「＋」），右侧对齐；
 ///   · 首屏第一块内容直接是大幅摘要卡（[hero]），视觉重心落在数字上。
 ///
@@ -48,6 +49,8 @@ class AppHomePage extends StatelessWidget {
   const AppHomePage({
     super.key,
     required this.child,
+    this.title,
+    this.subtitle,
     this.hero,
     this.actions,
     this.bottom,
@@ -55,6 +58,14 @@ class AppHomePage extends StatelessWidget {
     this.scrollable = true,
     this.padding,
   });
+
+  /// 首屏大标题。默认不渲染（导航栏已说明在哪个 tab），传了才在
+  /// [hero] 之上补一行页面级标题，建立「标题 → 大数字 → 明细」的
+  /// 三级层级；不传时布局与改造前逐像素一致。
+  final String? title;
+
+  /// 标题下的一句白话说明，可空。
+  final String? subtitle;
 
   /// 页面主体（分区、列表、说明）。
   final Widget child;
@@ -97,6 +108,27 @@ class AppHomePage extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
+        // 页面级标题：不传就不渲染，其余页面逐像素不变。
+        if (title != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.md,
+              AppSpacing.xs,
+              AppSpacing.md,
+              AppSpacing.md,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Text(title!, style: context.appText.pageTitle),
+                if (subtitle != null) ...<Widget>[
+                  const SizedBox(height: AppSpacing.xxs),
+                  Text(subtitle!, style: context.appText.caption),
+                ],
+              ],
+            ),
+          ),
         ?hero,
         child,
       ],

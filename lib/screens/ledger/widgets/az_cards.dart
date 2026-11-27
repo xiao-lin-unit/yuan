@@ -84,10 +84,14 @@ class AzGroupSection extends StatelessWidget {
               height: _kGroupHeaderHeight,
               child: Row(
                 children: <Widget>[
-                  Icon(
-                    collapsed ? AppIcons.chevronRight : AppIcons.expandMore,
-                    size: AppIconSize.medium,
-                    color: cs.onSurfaceVariant,
+                  AnimatedRotation(
+                    turns: collapsed ? 0 : 0.5,
+                    duration: AppMotion.short,
+                    child: Icon(
+                      AppIcons.expandMore,
+                      size: AppIconSize.medium,
+                      color: cs.onSurfaceVariant,
+                    ),
                   ),
                   const SizedBox(width: AppSpacing.xs),
                   Expanded(
@@ -107,8 +111,11 @@ class AzGroupSection extends StatelessWidget {
                         style: context.appText.caption),
                   ),
                   const SizedBox(width: AppSpacing.sm),
-                  Text(MoneyFormat.yuan0(group.total),
-                      style: context.appText.menuTitle),
+                  Text(
+                    MoneyFormat.yuan0(group.total),
+                    style: context.appText.menuTitle
+                        .copyWith(fontWeight: FontWeight.w700),
+                  ),
                 ],
               ),
             ),
@@ -165,8 +172,7 @@ class AzTypeBlockView extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: <Widget>[
-                Text('${block.spec.code}（${block.spec.label}）',
-                    style: context.appText.caption),
+                Text(block.spec.label, style: context.appText.caption),
                 Text('${block.rows.length} 条 · ${MoneyFormat.yuan0(block.total)}',
                     style: context.appText.caption),
               ],
@@ -251,7 +257,7 @@ class AzEntryCard extends StatelessWidget {
                       const SizedBox(height: AppSpacing.xxs),
                       Text(
                         <String>[
-                          '${spec.code}（${spec.label}）',
+                          spec.label,
                           if (row.text('note').isNotEmpty) row.text('note'),
                         ].join(' · '),
                         style: context.appText.caption,
@@ -268,7 +274,7 @@ class AzEntryCard extends StatelessWidget {
                   children: <Widget>[
                     Text(
                       MoneyFormat.yuan0(amount),
-                      style: context.appText.menuTitle.copyWith(
+                      style: context.appText.amount.copyWith(
                         color: liability ? tokens.expense : null,
                       ),
                     ),

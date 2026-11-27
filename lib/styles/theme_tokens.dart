@@ -13,12 +13,13 @@ abstract final class AppSpacing {
   static const double xl = 32;
 }
 
-/// 圆角尺度：同一层级只用同一档，避免 12/16/20 混用没有规律
+/// 圆角尺度：同一层级只用同一档。整体比 M3 默认放宽一档，
+/// 卡片与列表项更接近 squircle，少一点「规整方框」的观感。
 abstract final class AppRadius {
-  static const double small = 8;
-  static const double item = 12;
-  static const double card = 16;
-  static const double sheet = 20;
+  static const double small = 10;
+  static const double item = 14;
+  static const double card = 20;
+  static const double sheet = 24;
   static const double dialog = 28;
 }
 
@@ -37,10 +38,10 @@ abstract final class AppOpacity {
   static const double selected = 0.10;
   static const double disabled = 0.38;
   static const double disabledContainer = 0.12;
-  /// 划分性描边的不透明度。旧版 0.5 叠中灰实色，界限过硬；
-  /// 现在叠的是 [AppStroke.colorFor] 的近背景中性色，0.34 已足够淡。
-  static const double outline = 0.34;
-  static const double outlineDark = 0.30;
+  /// 划分性描边的不透明度。一屏十几个列表项若都带可见描边，
+  /// 就会变成「圆角表格」；再压一半，只留贴近才察觉的一道暗示。
+  static const double outline = 0.16;
+  static const double outlineDark = 0.14;
   static const double hint = 0.7;
   static const double scrim = 0.4;
 }
@@ -93,14 +94,15 @@ abstract final class AppComponentSize {
   static const double calendarMarkerSize = 6;
 }
 
-/// 阴影：亮色用极轻的真实阴影，暗色以 tonal elevation（容器色差）为主
+/// 阴影：亮色用更散更淡的真实阴影，暗色以 tonal elevation（容器色差）为主。
+/// 列表项去掉描边后，「浮起感」主要靠这层阴影，不能像原来那样又近又实。
 abstract final class AppElevation {
-  static const double cardBlur = 8;
-  static const double sheetBlur = 16;
-  static const double cardAlpha = 0.08;
-  static const double sheetAlpha = 0.12;
-  static const Offset cardOffset = Offset(0, 2);
-  static const Offset sheetOffset = Offset(0, -2);
+  static const double cardBlur = 18;
+  static const double sheetBlur = 24;
+  static const double cardAlpha = 0.05;
+  static const double sheetAlpha = 0.10;
+  static const Offset cardOffset = Offset(0, 4);
+  static const Offset sheetOffset = Offset(0, -4);
 }
 
 /// 图标尺寸阶梯：同一层级只用同一档
@@ -151,15 +153,16 @@ enum AppWindowSize {
   expanded,
 }
 
-/// 页面级布局节奏：统一所有页面的留白与最小高度，
-/// 避免 ProfileScreen 里 18 / 12 / 4 / 4 / 24 这类无规律数字。
+/// 页面级布局节奏：统一所有页面的留白与最小高度。
+/// 16dp 上下留白 + 16dp 分区间距在中文界面里偏挤，整体放宽一档，
+/// 让「标题 → 摘要卡 → 列表」之间真正有呼吸；底导同步收矮一点。
 abstract final class AppLayout {
-  static const double pageTop = 16;
-  static const double pageBottom = 32;
-  static const double sectionGap = 16;
-  static const double sectionHeaderTop = 16;
-  static const double sectionHeaderBottom = 8;
-  static const double navigationBarHeight = 72;
+  static const double pageTop = 24;
+  static const double pageBottom = 40;
+  static const double sectionGap = 24;
+  static const double sectionHeaderTop = 20;
+  static const double sectionHeaderBottom = 12;
+  static const double navigationBarHeight = 64;
   static const double fieldMinHeight = 56;
   static const double listItemMinHeight = 56;
   static const double formRowMinHeight = 64;
@@ -235,9 +238,9 @@ class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
   final Color shadow;
 
   /// 强调表面三件套：只给「一张主色 hero」用，其余卡片仍是中性卡。
-  /// surfaceEmphasis 由 cs.primary 派生；onEmphasis 由 fromSeed 的
-  /// onPrimary 给出（**不是硬写白**）；accentOnEmphasis 由 tertiary
-  /// 派生并校对比度。三者都进 copyWith / lerp，主题切换动画不跳色。
+  /// surfaceEmphasis 取 primaryContainer 淡彩底；onEmphasis 取
+  /// onPrimaryContainer（**不是硬写白**）；accentOnEmphasis 取 primary
+  /// 并校对比度。三者都进 copyWith / lerp，主题切换动画不跳色。
   final Color surfaceEmphasis;
   final Color onEmphasis;
   final Color accentOnEmphasis;
@@ -286,17 +289,15 @@ class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
     final info = semantic(const Color(0xFF1565C0));
 
     // ── 强调表面三件套（本轮配色试点唯一一处新增取色）──────────────
-    // 为什么用 cs.primary / cs.onPrimary 而不是硬写「主色 + 白字」：
-    // 主题色用户可换、可切亮暗，fromSeed 会把它重算到对应 tone；
-    // onPrimary 正是「这个底色上该用什么字」的 WCAG 结果。换成浅主题
-    // 或暗色模式都不会出现白字糊在浅底上。ensureContrast 只是兜底。
-    final Color emphasis = cs.primary;
-    final Color onEmphasis = ColorMath.ensureContrast(cs.onPrimary, emphasis);
-    // 强调色取 M3 tertiary（天生与 primary 形成色相对比），先 harmonize
-    // 到 seed，再校到 3:1：不够时 ensureContrast 朝 onColorFor 插值，
-    // 保留色相的同时提亮 / 压暗，不会硬贴一个刺眼的互补色。
+    // 强调表面不再用 cs.primary 实色：整屏一块高饱和主色 + 白字是最像
+    // 「后台模板」的观感。改用 primaryContainer 淡彩底 + 深色字，
+    // 大数字仍取主色并校到 3:1。三件套都进 copyWith / lerp，
+    // 换主题 / 切明暗不会跳色。
+    final Color emphasis = cs.primaryContainer;
+    final Color onEmphasis =
+        ColorMath.ensureContrast(cs.onPrimaryContainer, emphasis);
     final Color accentOnEmphasis = ColorMath.ensureContrast(
-      ColorMath.harmonize(cs.tertiary, seed),
+      cs.primary,
       emphasis,
       minimum: AppColorEmphasis.accentMinContrast,
     );

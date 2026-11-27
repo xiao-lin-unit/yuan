@@ -84,7 +84,7 @@ class AccountCard extends StatelessWidget {
             decoration: AppDecorations.item(context),
             constraints: const BoxConstraints(minHeight: _kCardMinHeight),
             padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.sm,
+              horizontal: AppSpacing.md,
               vertical: AppSpacing.sm,
             ),
             child: Row(
@@ -155,7 +155,7 @@ class AccountCard extends StatelessWidget {
                       credit
                           ? '可用额度 ${MoneyFormat.orDash(account.availableCredit)}'
                           : MoneyFormat.yuan0(account.balance),
-                      style: context.appText.menuTitle.copyWith(
+                      style: context.appText.amount.copyWith(
                         color: credit ? tokens.warning : null,
                       ),
                     ),

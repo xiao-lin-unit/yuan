@@ -80,6 +80,30 @@ class ColorMath {
     return hsl.withLightness(target).toColor();
   }
 
+  /// 把 `ColorScheme.fromSeed` 生成的 M3 色板从「高饱和工装色」压成柔和色。
+  ///
+  /// fromSeed 的 primaryContainer / secondaryContainer / tertiaryContainer
+  /// 饱和度偏高，铺到 indicator、chip 选中底、hero 卡上就是一眼认得出的
+  /// 「Flutter 默认皮肤」。这里只压饱和度、不动明度，所以 onXxx 前景的
+  /// 对比度几乎不变；亮暗两套走同一函数，换任意种子色都成立。
+  static ColorScheme soften(ColorScheme scheme) {
+    Color capSat(Color c, double cap) {
+      final hsl = HSLColor.fromColor(c);
+      if (hsl.saturation < 0.04) return c;
+      return hsl.withSaturation(math.min(hsl.saturation, cap)).toColor();
+    }
+
+    return scheme.copyWith(
+      primary: capSat(scheme.primary, 0.70),
+      primaryContainer: capSat(scheme.primaryContainer, 0.34),
+      secondary: capSat(scheme.secondary, 0.52),
+      secondaryContainer: capSat(scheme.secondaryContainer, 0.30),
+      tertiary: capSat(scheme.tertiary, 0.62),
+      tertiaryContainer: capSat(scheme.tertiaryContainer, 0.30),
+      surfaceTint: capSat(scheme.surfaceTint, 0.40),
+    );
+  }
+
   /// 高对比度档位（0 标准 / 1 中 / 2 高）。
   /// 不重算整个色板，只把文字与描边往 onSurface 拉近。
   static ColorScheme boostContrast(ColorScheme scheme, double level) {

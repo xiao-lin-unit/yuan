@@ -38,20 +38,17 @@ const String _kSearchEmptyDescription = '换个关键词，或者点「全部」
 const String _kFilterEmptyTitle = '这一类还没有账户';
 const String _kFilterEmptyDescription = '点右上角 ＋ 新增，或切回「全部」查看其它账户。';
 const String _kFootNote =
-    '「真正属于你的钱」会把所有账户加起来、再减去欠银行的钱。'
-    '以后把房子、借进借出的钱也记进来，这个数字会更完整。';
-const String _kDragTip = '拖动账户左侧手柄可调整顺序；搜索结果不参与排序。';
+    '净资产 = 所有账户相加 − 欠银行的钱。房子、借进借出的钱记进来后会更完整。';
+const String _kDragTip = '拖左侧手柄可调整顺序。';
 
 // ── 3.6 看板的 2c 增量（A1 / A2 / A3）────────────────────────────
 // A2（P0）：月末存一次数，之后改价 / 改口径都不改写历史。
 // 清单原话是「改一行文案 + 一个跳转」，但跳转目标 8.1.4 归因还没做；
 // 按 10.9「一个功能只在一个地方出现」，这里只写静态文案，不造第二个
 // 入口、也不画一条还没数据的趋势图。
-const String _kTrendNote =
-    '变化趋势按每个月末存一次数记录：之后改了价、改了口径，都不会改写历史。';
+const String _kTrendNote = '每月末存一次数，历史不会被改价或改口径影响。';
 // A3（3.8 / 13.1 / 13.12）：账本永远是名义金额。
-const String _kNominalNote =
-    '账本里记的都是当时填下的钱数，软件不会自己把它调大或调小。';
+const String _kNominalNote = '账本记的是当时填下的金额，不会自动换算。';
 // A1（3.6 两行）属情境设计：月收入、必须花的钱是 8.2 / 13.2 的推算
 // 参数，结果只在情境设计里出，不在账户 / 资债页摆「—」占位槽位。
 const String _kReminderDisclaimer = '估算，按你填的日利率粗算，以账单为准。';
@@ -242,7 +239,10 @@ class _AccountsScreenState extends State<AccountsScreen> {
     final bool nothingShown = visible.isEmpty && visibleArchived.isEmpty;
 
     return AppHomePage(
-      // 右上角只放动作，没有标题、没有返回按钮。
+      // 首屏层级：标题 → 大数字摘要 → 明细。右上角仍只有动作，
+      // 不渲染 AppBar、不渲染返回按钮。
+      title: '账户',
+      subtitle: '看清现在能花多少钱',
       actions: <Widget>[
         IconButton(
           icon: const Icon(AppIcons.accountAdd),
@@ -677,9 +677,10 @@ class _AccountsScreenState extends State<AccountsScreen> {
 
 /// 分组标题行：展开/折叠箭头、段名、数量徽章、段内合计。
 ///
-/// **纯静态**：箭头图标按 [collapsed] 布尔值二选一，没有隐式动画、
-/// 没有 Notifier；点一下由页面 setState 重建，读这一行就知道会发生什么。
-/// 左右 16dp 与 SectionHeader 一致，颜色只取 ColorScheme / 全局文字角色。
+/// **仍然纯静态**：只是箭头多了一层 AnimatedRotation（由 [collapsed]
+/// 驱动，组件自身不持有状态）；点一下由页面 setState 重建，读这一行
+/// 就知道会发生什么。左右 16dp 与 SectionHeader 一致，颜色只取
+/// ColorScheme / 全局文字角色。
 class _AccountGroupHeader extends StatelessWidget {
   const _AccountGroupHeader({
     required this.label,
@@ -711,10 +712,14 @@ class _AccountGroupHeader extends StatelessWidget {
           height: _kGroupHeaderHeight,
           child: Row(
             children: <Widget>[
-              Icon(
-                collapsed ? AppIcons.chevronRight : AppIcons.expandMore,
-                size: AppIconSize.medium,
-                color: cs.onSurfaceVariant,
+              AnimatedRotation(
+                turns: collapsed ? 0 : 0.5,
+                duration: AppMotion.short,
+                child: Icon(
+                  AppIcons.expandMore,
+                  size: AppIconSize.medium,
+                  color: cs.onSurfaceVariant,
+                ),
               ),
               const SizedBox(width: AppSpacing.xs),
               Expanded(
@@ -733,7 +738,11 @@ class _AccountGroupHeader extends StatelessWidget {
                 child: Text('$count', style: context.appText.caption),
               ),
               const SizedBox(width: AppSpacing.sm),
-              Text(sumText, style: context.appText.menuTitle),
+              Text(
+                sumText,
+                style: context.appText.menuTitle
+                    .copyWith(fontWeight: FontWeight.w700),
+              ),
             ],
           ),
         ),

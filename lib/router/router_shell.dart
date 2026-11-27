@@ -112,11 +112,11 @@ class AppShell extends StatelessWidget {
       AppIconEmphasis.tonal,
     );
 
-    /// 未选中图标：鲜明档每个 tab 取色环上的语义色，克制档退回单色。
-    /// 抽成一个小函数，底导和 rail 不各写一遍。
-    Color tabColor(int i) => iconTone
-        .resolve(iconTone.forTab(i), AppIconEmphasis.standard)
-        .foreground;
+    /// 未选中图标统一走中性前景，不再让 5 个 tab 各占一种颜色。
+    /// 选中态交给 navigationBarTheme / navigationRailTheme 的 indicator
+    /// 与选中图标色，底导一眼看过去只有「一个」高亮。
+    Color tabColor(int i) =>
+        Theme.of(context).colorScheme.onSurfaceVariant;
 
     // ★ 唯一的动态点：view 宽度 → 档位 → 导航形态。
     // 与 AppPageScaffold 用同一个宽度来源，详见类注释第 1 步。

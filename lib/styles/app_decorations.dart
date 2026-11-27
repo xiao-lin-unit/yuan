@@ -38,16 +38,24 @@ abstract final class AppDecorations {
     );
   }
 
-  /// 列表项 / 分区内容：比卡片低半档，只靠底色与描边，不叠阴影
+  /// 列表项 / 分区内容：靠底色与极轻阴影分层，**不画描边**。
+  /// 一屏十几张卡若每张都带一圈框，视觉上就成了「圆角表格」；
+  /// 去掉框之后层级改由留白、字号与阴影承担，整屏立刻松下来。
   static BoxDecoration item(BuildContext context) {
     final t = context.tokens;
+    final dark = Theme.of(context).colorScheme.brightness == Brightness.dark;
     return BoxDecoration(
       color: t.card,
       borderRadius: BorderRadius.circular(AppRadius.item),
-      border: Border.all(
-        color: t.divider.withValues(alpha: AppOpacity.outline),
-        width: AppBorder.thin,
-      ),
+      boxShadow: dark
+          ? null
+          : <BoxShadow>[
+              BoxShadow(
+                color: t.shadow.withValues(alpha: AppElevation.cardAlpha * 0.6),
+                offset: AppElevation.cardOffset,
+                blurRadius: AppElevation.cardBlur,
+              ),
+            ],
     );
   }
 
@@ -81,32 +89,25 @@ abstract final class AppDecorations {
     );
   }
 
-  /// 图标徽章：语义色低透明底 + 语义色图标，统一全软件图标视觉语言
-  /// 图标徽章容器。
+  /// 图标徽章容器：色对由 [AppIconTone] 解析好再传进来。
   ///
-  /// 参数已从「语义色」改为「由 AppIconTone.resolve 解析好的容器色」：
-  /// 旧版固定 12% 淡底 + 同色图标，等于给单色图标蒙了层几乎看不见的雾，
-  /// 比纯单色还平。现在容器实色（tonal 浅 / filled 深），前景取反色，
-  /// 圆角与描边仍来自全局令牌。透明容器（standard 档）不加描边。
+  /// 旧版固定 12% 淡底 + 同色图标，等于给单色图标蒙了层看不见的雾；
+  /// 后来改成实色容器又给每个徽章套了一圈描边，一屏下来全是小方框。
+  /// 现在容器实色（tonal 浅 / filled 深）、前景取反色、**不画描边**，
+  /// 圆角统一走 [AppRadius.item]；只有鲜明档才叠加光晕。
   static BoxDecoration iconBadge(
     BuildContext context,
     Color container, {
     Gradient? gradient,
     bool glow = false,
   }) {
-    final t = context.tokens;
     final transparent = container == Colors.transparent;
     return BoxDecoration(
       // BoxDecoration 不允许 color 与 gradient 同时非 null
       color: gradient == null ? container : null,
       gradient: gradient,
-      borderRadius: BorderRadius.circular(AppRadius.small + 2),
-      border: transparent
-          ? null
-          : Border.all(
-              color: t.divider.withValues(alpha: AppOpacity.outline),
-              width: AppBorder.thin,
-            ),
+      borderRadius: BorderRadius.circular(AppRadius.item),
+      // 徽章本身已是色块，再套一圈描边会碎成一堆小方框；去掉。
       boxShadow: glow && !transparent
           ? <BoxShadow>[
               BoxShadow(

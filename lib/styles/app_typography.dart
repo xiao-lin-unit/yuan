@@ -47,56 +47,76 @@ abstract final class AppTypography {
   );
 
   // ── 语义角色（无颜色）─────────────────────────────────────────
+  // 中文在 14/15px + w400 下偏挤，整体上调一档；更重要的是**拉开层级**：
+  // 金额 / 首屏大数字各有专用角色，不再和账户名共用 menuTitle 一个字号。
   static const TextStyle pageTitle = TextStyle(
-    fontSize: 24,
-    fontWeight: FontWeight.w600,
-    height: 1.33,
+    fontSize: 26,
+    fontWeight: FontWeight.w700,
+    height: 1.30,
+    letterSpacing: -0.3,
   );
   static const TextStyle sectionHeader = TextStyle(
-    fontSize: 15,
-    fontWeight: FontWeight.w600,
+    fontSize: 16,
+    fontWeight: FontWeight.w700,
     height: 1.4,
   );
   static const TextStyle userName = TextStyle(
-    fontSize: 17,
-    fontWeight: FontWeight.w600,
+    fontSize: 18,
+    fontWeight: FontWeight.w700,
     height: 1.4,
   );
   static const TextStyle userSub = TextStyle(
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: FontWeight.w400,
     height: 1.4,
   );
   static const TextStyle menuTitle = TextStyle(
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: FontWeight.w500,
     height: 1.4,
   );
   static const TextStyle menuSubtitle = TextStyle(
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: FontWeight.w400,
     height: 1.4,
   );
   static const TextStyle body = TextStyle(
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: FontWeight.w400,
-    height: 1.43,
+    height: 1.47,
   );
   static const TextStyle caption = TextStyle(
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: FontWeight.w400,
-    height: 1.4,
+    height: 1.45,
   );
   static const TextStyle emptyTitle = TextStyle(
-    fontSize: 17,
+    fontSize: 19,
     fontWeight: FontWeight.w600,
     height: 1.4,
   );
   static const TextStyle emptyDescription = TextStyle(
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: FontWeight.w400,
     height: 1.5,
   );
+
+  /// 金额专用：比名称更大更重，让「钱」成为一行的视觉终点。
+  static const TextStyle amount = TextStyle(
+    fontSize: 19,
+    fontWeight: FontWeight.w700,
+    height: 1.25,
+    letterSpacing: -0.4,
+  );
+
+  /// 首屏大数字：整页唯一的 40+ 字号，负字距避免数字散开。
+  static const TextStyle heroValue = TextStyle(
+    fontSize: 44,
+    fontWeight: FontWeight.w700,
+    height: 1.10,
+    letterSpacing: -1.2,
+  );
+
   static const TextStyle labelSmall = TextStyle(
       fontSize: 11,
       fontWeight: FontWeight.w600,
@@ -209,6 +229,12 @@ class AppText {
       AppTypography.menuSubtitle.copyWith(color: cs.onSurfaceVariant);
   TextStyle get body =>
       AppTypography.body.copyWith(color: cs.onSurface);
+  /// 金额：与名称拉开一级，读列表时眼睛先落在钱上。
+  TextStyle get amount =>
+      AppTypography.amount.copyWith(color: cs.onSurface);
+  /// 首屏大数字，颜色由调用方按强调 / 语义色覆盖。
+  TextStyle get heroValue =>
+      AppTypography.heroValue.copyWith(color: cs.onSurface);
   TextStyle get caption =>
       AppTypography.caption.copyWith(color: cs.onSurfaceVariant);
   TextStyle get emptyTitle =>

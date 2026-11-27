@@ -7,8 +7,8 @@ import 'theme_tokens.dart';
 ///
 /// 只改 [AppIconTone.intensity] 一处即可整体在「克制 / 鲜明」间切换，
 /// 所有组件自动跟随，不需要回到业务页面改任何一个参数。
-/// 当前为 **鲜明档**：12 色相环铺到菜单 / 分区 / 底导，容器改双色渐变 +
-/// 光晕，接近分类网格的观感，但 16–24px 高频功能图标仍保持单色。
+/// 当前为 **克制档**：列表徽章统一主色低饱和同系色，底导只有一个高亮；
+/// 彩色只留给分类网格 / 空状态这类低频锚点，不再铺满一屏。
 enum AppIconIntensity { restrained, vivid }
 
 /// 图标的**强调档位**，对应 Material 3 icon button 的 standard / tonal / filled。
@@ -69,8 +69,20 @@ class AppIconTone {
         .toColor();
   }
 
-  /// 无显式语义时按 IconData 码点稳定派生（四个占位页各得一色）。
-  Color forIcon(IconData icon) => forIndex(icon.codePoint % 12);
+  /// 列表徽章的默认色。
+  ///
+  /// 旧版按 IconData 码点铺 12 色相环：一屏十几张卡，每张图标颜色都
+  /// 不同，靠颜色区分反而变成彩色噪声。现在收敛到主色的低饱和同系色，
+  /// 靠「形状 + 名称」区分，图标退回背景层。分类网格 / 鲜明档仍走
+  /// [forIndex]，那里需要彩色锚点。
+  Color forIcon(IconData icon) {
+    final hsl = HSLColor.fromColor(cs.primary);
+    return hsl
+        .withHue((hsl.hue + (icon.codePoint % 3) * 1.5) % 360)
+        .withSaturation(0.26)
+        .withLightness(isDark ? 0.62 : 0.52)
+        .toColor();
+  }
 
   /// 菜单项按业务 key 取色，[index] 用于鲜明档铺 12 色环。
   ///
@@ -122,14 +134,9 @@ class AppIconTone {
         _ => forIndex(index),
       };
     }
-    return switch (index) {
-      0 => success,
-      1 => warning,
-      2 => info,
-      3 => tertiary,
-      4 => brand,
-      _ => brand,
-    };
+    // 克制档下 5 个 tab 不再各占一种语义色：底导只需要「一个」高亮，
+    // 其余统一中性，彩色交给 indicator 一处承担。
+    return brand;
   }
 
   // ── 色对 ────────────────────────────────────────────────────

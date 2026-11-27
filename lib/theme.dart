@@ -36,7 +36,9 @@ class AppTheme {
       seedColor: seed,
       brightness: brightness,
     );
-    final cs = ColorMath.boostContrast(base, contrast);
+    // fromSeed 的标准 M3 色板偏「工装」：先压饱和度再交给全站派生，
+    // 换任意种子色 / 切明暗都自动跟随，业务层一个字不用改。
+    final cs = ColorMath.soften(ColorMath.boostContrast(base, contrast));
     final tokens = AppThemeTokens.fromScheme(cs, seed);
 
     return ThemeData(
