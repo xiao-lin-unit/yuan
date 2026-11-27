@@ -125,16 +125,17 @@ abstract final class AppTypography {
     letterSpacing: -0.2,
   );
 
-  /// 表单左标签：13px 就够，16px 会把右侧输入文字压得没主次。
+  /// 表单左标签：14px。13px 在真机上和 hint 一起糊成一片灰，
+  /// 16px 又会把右侧输入文字压得没主次，取中间。
   static const TextStyle formLabel = TextStyle(
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: FontWeight.w500,
     height: 1.30,
   );
 
-  /// 表单输入文字：14px，与标签拉开半级但仍清晰。
+  /// 表单输入文字：15px，比标签大半级，输入值才是这一行的主角。
   static const TextStyle formValue = TextStyle(
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: FontWeight.w400,
     height: 1.30,
   );

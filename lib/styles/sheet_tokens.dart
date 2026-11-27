@@ -34,7 +34,9 @@ abstract final class AppSheetSize {
   static const double topPadding = 12;
   static const double bottomPadding = 16;
   static const double sectionGap = 20;
-  static const double itemGap = 12;
+  /// 表单项之间的呼吸：12dp 把四个输入框粘成一整片，16dp 才能看出
+  /// 「一行一个字段」。
+  static const double itemGap = 16;
 
   static const double primaryButtonHeight = 56;
   static const double secondaryButtonHeight = 56;
@@ -55,12 +57,12 @@ abstract final class AppSheetSize {
   static const double avatarCameraBadge = 32;
 
   /// 表单行：左侧 label 固定宽度（全软件表单对齐一致）。
-  /// 标签字号从 16 收到 13 后，72dp 会留出一大段空槽，收到 64。
-  static const double formLabelWidth = 64;
+  /// 标签回到 14px 后，64dp 放四个汉字刚好，留一点呼吸。
+  static const double formLabelWidth = 68;
 
-  /// 单行表单行高。44dp = WCAG 2.2 AAA 的最小可点尺寸，比原来的
-  /// 48dp 少 4dp；配合更小的字号，整行不再「框大内容小」。
-  static const double formRowHeight = 44;
+  /// 单行表单行高。44dp 是 WCAG 2.2 AAA 下限，但真机上配 13/14px
+  /// 字显得太小气；回调到 50dp，仍比最早的 56dp 紧凑。
+  static const double formRowHeight = 50;
 
   /// 单选行：56dp 是 M3 双行 list tile 的高度，本行只有一行 16px 文字，
   /// 用 56 会上下各留约 17dp 空白。改 48dp（= 最小点击区 kMinTapTarget）

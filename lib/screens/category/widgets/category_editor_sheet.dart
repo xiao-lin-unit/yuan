@@ -483,6 +483,9 @@ class _OrderFieldState extends State<_OrderField> {
               onChanged: _onChanged,
               style: SheetText.of(context).fieldValue,
               decoration: const InputDecoration(
+                // 底色由外层 AppDecorations.field 统一给；关掉主题填充，
+                // 否则会在这层亮底里再套一层 t.field 灰底。
+                filled: false,
                 border: InputBorder.none,
                 isCollapsed: true,
                 contentPadding: EdgeInsets.symmetric(vertical: AppSpacing.sm),

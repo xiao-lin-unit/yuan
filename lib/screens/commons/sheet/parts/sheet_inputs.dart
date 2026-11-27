@@ -5,16 +5,17 @@ import 'package:yuan/styles/sheet_tokens.dart';
 import 'package:yuan/styles/theme_tokens.dart';
 
 // ── 组件私有样式（只服务本文件，全部引用全局令牌）──────────────
-/// 单行高度取紧凑表单令牌（44dp，仍满足 WCAG 2.2 AAA 最小可点尺寸），
-/// 不再跟着多行 / 独立输入框的全局 minHeight 走。
-/// 「单行看起来过高」的根因就是两种控件共用一个 minHeight。
+/// 单行高度取表单行令牌（50dp），不跟着多行 / 独立输入框的全局
+/// minHeight 走。「单行看起来过高」的根因就是两种控件共用一个 minHeight。
 const double _kSingleLineFieldHeight = AppSheetSize.formRowHeight;
 const double _kMultiLineFieldMinHeight = AppLayout.fieldMinHeight;
 const double _kMultiLineFieldPaddingV = AppSpacing.xs;
 const double _kFieldPaddingH = AppSpacing.sm;
 const double _kLabelGap = AppSpacing.sm;
-const double _kLabelTopInset = AppSpacing.xxs;
-const double _kSwitchRowMinHeight = AppLayout.listItemMinHeight;
+/// 多行 label 的顶部偏移 = 右侧框垂直内距(8) + 输入文字首行 leading(≈2)，
+/// 保证 label 与输入框首行文字齐平，而不是齐框顶。
+const double _kLabelTopInset = _kMultiLineFieldPaddingV + 2;
+const double _kSwitchRowMinHeight = AppSheetSize.formRowHeight;
 const double _kClearIconSize = AppIconSize.small;
 const double _kCounterGap = AppSpacing.xxs;
 
@@ -33,17 +34,24 @@ double _keyboardScrollPadding(BuildContext context) {
       : AppSheetSize.keyboardScrollPadding;
 }
 
-/// 两种文本行共用的容器外壳。
+/// 两种文本行共用的**行骨架**（不画背景）。
+///
+/// ★ 本轮的关键统一：label **一律站在输入框外面**。
+/// 旧版把「整行灰底」画在这个外壳的 Container 上，于是单行 / 多行文本的
+/// label 落在灰底里；而标签组、下拉、开关走 [SheetFormLabeledRow] /
+/// [SheetSwitchRow]，label 在灰底外。同一张表单里两种 label 位置混着，
+/// 就是「有的 label 在灰色背景内、有的在外面」的根因。
+///
+/// 现在外壳只负责「左 label 列 + 右内容区」的对齐，背景装饰下沉到
+/// [_FieldBox] 且**只包右侧控件**；所有表单项的 label 就都站在框外，
+/// 与下拉 / 标签组 / 开关完全一致。
 ///
 /// 统一了「原来 label 没固定宽、标签组却有独立列宽」的错位：
-/// 现在单行 / 多行 / 标签组 / 自定义项全部用 `AppSheetSize.formLabelWidth`
-/// 对齐，样式只有这一份（容器装饰、圆角、内边距、label 排版）。
+/// 单行 / 多行 / 标签组 / 自定义项全部用 `AppSheetSize.formLabelWidth`。
 ///
-/// [singleLine] 是两者唯一的布局差异开关：
-/// - 单行：label 与 child **各自明确占一行高度**，两侧内部再各自把一行
-///   文字居中。容器、label、input 三者同高，不存在「框比内容高」的错位，
-///   也不依赖 `Container.alignment`（child 与容器等高时它是零位移）。
-/// - 多行：全局 minHeight 下限、较小垂直内边距、Row 顶部对齐、label 顶部微调。
+/// [singleLine] 只决定对齐方式：
+/// - 单行：label 与右侧框各占一行高，文字各自居中；
+/// - 多行：顶部对齐，右侧框按内容自然增高，label 顶部微调对齐首行文字。
 class _FormFieldShell extends StatelessWidget {
   const _FormFieldShell({
     required this.label,
@@ -58,53 +66,70 @@ class _FormFieldShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final sheetText = SheetText.of(context);
-    return Container(
-      constraints: BoxConstraints(
-        minHeight: singleLine
-            ? _kSingleLineFieldHeight
-            : _kMultiLineFieldMinHeight,
-      ),
-      // 不再用 Container.alignment：单行 label 与 child 都会明确占整行高，
-      // 居中只发生在这一行内部，不是靠外层容器去推。
-      decoration: AppDecorations.field(context),
-      padding: EdgeInsets.symmetric(
-        horizontal: _kFieldPaddingH,
-        vertical: singleLine ? 0 : _kMultiLineFieldPaddingV,
-      ),
-      child: Row(
-        crossAxisAlignment: singleLine
-            ? CrossAxisAlignment.center
-            : CrossAxisAlignment.start,
-        children: <Widget>[
-          SizedBox(
-            width: AppSheetSize.formLabelWidth,
-            height: singleLine ? _kSingleLineFieldHeight : null,
-            child: singleLine
-                // Align 给 child loose 约束 → Text 保持一行高，被精确居中。
-                ? Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      label,
-                      style: sheetText.fieldLabelSingleLine,
-                    ),
-                  )
-                : Padding(
-                    padding: const EdgeInsets.only(top: _kLabelTopInset),
-                    child: Text(label, style: sheetText.fieldLabel),
+    return Row(
+      crossAxisAlignment: singleLine
+          ? CrossAxisAlignment.center
+          : CrossAxisAlignment.start,
+      children: <Widget>[
+        SizedBox(
+          width: AppSheetSize.formLabelWidth,
+          height: singleLine ? _kSingleLineFieldHeight : null,
+          child: singleLine
+              // Align 给 child loose 约束 → Text 保持一行高，被精确居中。
+              ? Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    label,
+                    style: sheetText.fieldLabelSingleLine,
                   ),
-          ),
-          const SizedBox(width: _kLabelGap),
-          Expanded(
-            // 单行 child 明确占整行高：内层 Row 因此高度恒定，
-            // crossAxisAlignment.center 才有稳定空间把 TextField 居中。
-            child: singleLine
-                ? SizedBox(height: _kSingleLineFieldHeight, child: child)
-                : child,
-          ),
-        ],
-      ),
+                )
+              : Padding(
+                  padding: const EdgeInsets.only(top: _kLabelTopInset),
+                  child: Text(label, style: sheetText.fieldLabel),
+                ),
+        ),
+        const SizedBox(width: _kLabelGap),
+        Expanded(
+          child: _FieldBox(singleLine: singleLine, child: child),
+        ),
+      ],
     );
   }
+}
+
+/// 只包右侧控件的输入框外壳：**label 不进来**。
+///
+/// 装饰走全局 `AppDecorations.field`（亮底 + 可见细框），所以文本输入、
+/// 下拉、搜索框、自定义字段的边界感完全一致；label 一律留在框外。
+class _FieldBox extends StatelessWidget {
+  const _FieldBox({required this.singleLine, required this.child});
+
+  final bool singleLine;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        constraints: BoxConstraints(
+          minHeight: singleLine
+              ? _kSingleLineFieldHeight
+              : _kMultiLineFieldMinHeight,
+        ),
+        decoration: AppDecorations.field(context),
+        padding: EdgeInsets.symmetric(
+          horizontal: _kFieldPaddingH,
+          vertical: singleLine ? 0 : _kMultiLineFieldPaddingV,
+        ),
+        // 用 minHeight 而不是固定 height：validator 的 error 文案把
+        // TextField 撑高时，整个框跟着长，不裁切。
+        child: singleLine
+            ? ConstrainedBox(
+                constraints: const BoxConstraints(
+                  minHeight: _kSingleLineFieldHeight,
+                ),
+                child: child,
+              )
+            : child,
+      );
 }
 
 /// 单行文本输入行。
@@ -123,8 +148,8 @@ class _FormFieldShell extends StatelessWidget {
 ///
 /// 之前三种居中全部失效，因为它们动的都是外层：
 /// `ConstrainedBox(minHeight: 48)`、`Container.alignment`、
-/// `textAlignVertical.center` —— 而 56dp 是 TextField **自己**的高度，
-/// 外层再怎么摆一个已经贴顶的 56dp 框都没用。
+/// `textAlignVertical.center` —— 而那个 minHeight 是 TextField **自己**
+/// 的高度，外层再怎么摆一个已经贴顶的框都没用。
 ///
 /// 修复就是单行 decoration 里显式写 `constraints: const BoxConstraints()`
 /// 覆盖主题值。这一行是本轮最关键的一处。
@@ -409,7 +434,9 @@ class SheetFormAvatarPlaceholder extends StatelessWidget {
 
 /// 「左标签 + 右内容」的通用行，供标签组 / 自定义项复用。
 ///
-/// 标签列宽来自全局令牌 `AppSheetSize.formLabelWidth`，全软件表单对齐一致。
+/// 与 [_FormFieldShell] 共用同一条约定：**label 永远在框外**，右侧控件
+/// 自己带 `AppDecorations.field` 或 chip 底色。标签列宽来自全局令牌
+/// `AppSheetSize.formLabelWidth`，全软件表单对齐一致。
 class SheetFormLabeledRow extends StatelessWidget {
   const SheetFormLabeledRow({
     super.key,
@@ -444,8 +471,10 @@ class SheetFormLabeledRow extends StatelessWidget {
   }
 }
 
-/// 开关行（「设为公开」）。Switch 走 ThemeData 的 M3 默认样式，
-/// 会自动跟随当前 ColorScheme，不需要局部写颜色。
+/// 开关行（「设为公开」）。label 与其它表单项一样站在框外，右侧是
+/// Switch（无输入框容器，属于控件形态差异，不是 label 位置差异）。
+/// 行高统一取 `AppSheetSize.formRowHeight`，避免和文本行错开一格。
+/// Switch 走 ThemeData 的 M3 默认样式，会自动跟随当前 ColorScheme。
 class SheetSwitchRow extends StatelessWidget {
   const SheetSwitchRow({
     super.key,

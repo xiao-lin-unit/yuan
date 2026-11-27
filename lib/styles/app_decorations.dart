@@ -76,14 +76,24 @@ abstract final class AppDecorations {
     );
   }
 
-  /// 表单输入框容器（M3 filled text field 的容器色）
+  /// 表单输入框容器：**亮底 + 可见细框**。
+  ///
+  /// 这里和列表卡是两套逻辑，别混：列表的描边是视觉噪声，所以
+  /// `item()` 不画框；输入框的描边是「这里能填」的功能信号，必须看得见。
+  /// 旧版用 `t.field` 灰填充 + `divider × 0.16` 的边框，框几乎融进底色，
+  /// 整屏灰度过高、聚焦时也看不出哪个字段是活的。现在底色回到
+  /// `cs.surface`（明暗自适应），边框取划分线实色、不再二次衰减 alpha。
+  ///
+  /// 所有输入框类容器（文本行 / 下拉 / 搜索框 / 自定义字段）共用这一份，
+  /// 因此 label 挪到框外之后，左右两列的边界感仍然完全一致。
   static BoxDecoration field(BuildContext context) {
     final t = context.tokens;
+    final cs = Theme.of(context).colorScheme;
     return BoxDecoration(
-      color: t.field,
+      color: cs.surface,
       borderRadius: BorderRadius.circular(AppRadius.item),
       border: Border.all(
-        color: t.divider.withValues(alpha: AppOpacity.outline),
+        color: t.divider,
         width: AppBorder.thin,
       ),
     );

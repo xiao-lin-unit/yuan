@@ -166,7 +166,7 @@ abstract final class AppLayout {
   static const double sectionHeaderTop = 20;
   static const double sectionHeaderBottom = 12;
   static const double navigationBarHeight = 64;
-  static const double fieldMinHeight = 48;
+  static const double fieldMinHeight = 50;
   static const double listItemMinHeight = 56;
   static const double formRowMinHeight = 48;
 
