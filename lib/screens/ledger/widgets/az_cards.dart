@@ -13,7 +13,7 @@ import '../../../styles/theme_tokens.dart';
 import '../../../utils/money_format.dart';
 
 // ── 组件私有尺寸（只服务本文件，全部引用全局令牌）───────────────
-const double _kIconSize = 44;
+const double _kIconSize = 36;
 const double _kIconGlyphSize = AppIconSize.medium;
 const double _kCardMinHeight = 76;
 const double _kBadgeRadius = AppRadius.small;

@@ -223,9 +223,9 @@ class _LedgerScreenState extends State<LedgerScreen> {
     );
 
     return AppHomePage(
-      // 首屏层级与账户页一致：标题 → 大数字摘要 → 明细。
+      // 与账户页同一套：标题进动作行，首屏层级是
+      // 「标题 → 大数字摘要 → 明细」。
       title: '资债',
-      subtitle: '房子、投资、借款，都记在这一处',
       actions: <Widget>[
         IconButton(
           icon: const Icon(AppIcons.add),
@@ -233,9 +233,10 @@ class _LedgerScreenState extends State<LedgerScreen> {
           onPressed: () => unawaited(actions.add()),
         ),
       ],
+      // 标题已经在固定动作行里，滚动区顶部不必再留 pageTop(24)。
       padding: const EdgeInsets.fromLTRB(
         0,
-        AppLayout.pageTop,
+        AppSpacing.xs,
         0,
         AppLayout.pageBottom,
       ),

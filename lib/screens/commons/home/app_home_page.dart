@@ -15,15 +15,16 @@ const double _kActionGap = AppSpacing.xxs;
 /// 而 Home 页本身就在底导上，**导航栏已经说明这是哪个页面**，顶上再放
 /// 一行「账户 / 返回」是重复信息，还把首屏最值钱的一块让给了标题栏。
 /// 所以 Home 页用本组件：
-///   · 不渲染 AppBar、不渲染返回按钮；标题改为**可选的页面级大标题**；
-///   · 顶部只保留一个**纯动作行**（原型的「＋」），右侧对齐；
+///   · 不渲染 AppBar、不渲染返回按钮；标题是**可选的**，且与右上角
+///     动作合并在同一行，不单独占一段留白；
+///   · 顶部只保留这一个 48dp 动作行；
 ///   · 首屏第一块内容直接是大幅摘要卡（[hero]），视觉重心落在数字上。
 ///
 /// ── 结构嵌套（与功能页共用同一套限宽 / 断点）─────────────────────
 /// ```
 /// AppShell（全局唯一 Scaffold + 断点导航 + 键盘根开关）
-///  └ AppHomePage（页级：无标题、动作行 / 滚动内容 / 可选固定底部）
-///     ├ _HomeActionRow        ← 静态，只有右侧动作，无标题无返回
+///  └ AppHomePage（页级：动作行 / 滚动内容 / 可选固定底部）
+///     ├ _HomeActionRow        ← 静态，左侧可选标题 + 右侧动作，无返回
 ///     ├ Expanded → 限宽列 → SingleChildScrollView
 ///     │    ├ hero             ← 顶部摘要（随内容滚动）
 ///     │    └ child            ← AppFunctionSection / AppStatBar / 业务列表
@@ -50,7 +51,6 @@ class AppHomePage extends StatelessWidget {
     super.key,
     required this.child,
     this.title,
-    this.subtitle,
     this.hero,
     this.actions,
     this.bottom,
@@ -59,13 +59,11 @@ class AppHomePage extends StatelessWidget {
     this.padding,
   });
 
-  /// 首屏大标题。默认不渲染（导航栏已说明在哪个 tab），传了才在
-  /// [hero] 之上补一行页面级标题，建立「标题 → 大数字 → 明细」的
-  /// 三级层级；不传时布局与改造前逐像素一致。
+  /// 首屏标题。**不单独占一段**：与右上角 [actions] 合并在同一个 48dp
+  /// 动作行里，省掉「标题段 + 动作行」两层重复的上下留白。
+  /// 不传时动作行仍只有右侧按钮，布局与改造前逐像素一致。
+  /// 白话说明交给 [hero] 的 caption，不再叠第二行小字。
   final String? title;
-
-  /// 标题下的一句白话说明，可空。
-  final String? subtitle;
 
   /// 页面主体（分区、列表、说明）。
   final Widget child;
@@ -108,27 +106,6 @@ class AppHomePage extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
-        // 页面级标题：不传就不渲染，其余页面逐像素不变。
-        if (title != null)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.md,
-              AppSpacing.xs,
-              AppSpacing.md,
-              AppSpacing.md,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                Text(title!, style: context.appText.pageTitle),
-                if (subtitle != null) ...<Widget>[
-                  const SizedBox(height: AppSpacing.xxs),
-                  Text(subtitle!, style: context.appText.caption),
-                ],
-              ],
-            ),
-          ),
         ?hero,
         child,
       ],
@@ -156,8 +133,12 @@ class AppHomePage extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
-                  if (actions != null && actions!.isNotEmpty)
-                    _HomeActionRow(actions: actions!),
+                  if ((actions != null && actions!.isNotEmpty) ||
+                      title != null)
+                    _HomeActionRow(
+                      actions: actions ?? const <Widget>[],
+                      title: title,
+                    ),
                   Expanded(child: content),
                   if (bottom != null)
                     Align(
@@ -185,27 +166,39 @@ class AppHomePage extends StatelessWidget {
   }
 }
 
-/// 纯动作行：右侧对齐，左侧**刻意留空**（不写标题、不写返回）。
-/// 高度取最小热区 48dp，按钮本身由调用方用 IconButton / 全局令牌给出。
+/// 首屏动作行：左侧放可选标题，右侧放动作，共用同一行 48dp。
+///
+/// 把标题收进来后，首屏不再有「标题段 + 动作行」两段叠出来的上下留白；
+/// 标题单行 22px，即使系统字号被 AppRoot 放大到 1.3 倍也仍在 48dp 内。
+/// 左右内距与页面内容列对齐（16dp），不再缩在 12dp 里。
 class _HomeActionRow extends StatelessWidget {
-  const _HomeActionRow({required this.actions});
+  const _HomeActionRow({required this.actions, this.title});
 
   final List<Widget> actions;
+  final String? title;
 
   @override
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.sm,
+          horizontal: AppSpacing.md,
           vertical: AppSpacing.xxs,
         ),
         child: SizedBox(
           height: _kActionRowHeight,
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.end,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: <Widget>[
+              if (title != null)
+                Expanded(
+                  child: Text(
+                    title!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: context.appText.homeTitle,
+                  ),
+                ),
               for (var i = 0; i < actions.length; i++) ...<Widget>[
-                if (i > 0) const SizedBox(width: _kActionGap),
+                if (i > 0 || title != null) const SizedBox(width: _kActionGap),
                 actions[i],
               ],
             ],

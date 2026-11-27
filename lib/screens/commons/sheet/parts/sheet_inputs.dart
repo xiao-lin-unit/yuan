@@ -5,13 +5,14 @@ import 'package:yuan/styles/sheet_tokens.dart';
 import 'package:yuan/styles/theme_tokens.dart';
 
 // ── 组件私有样式（只服务本文件，全部引用全局令牌）──────────────
-/// 单行高度 = 全局最小点击区 48dp，不再跟着多行 / 独立输入框的 56dp。
-/// 这是「单行看起来过高」的根因：两种控件共用一个 minHeight。
-const double _kSingleLineFieldHeight = kMinTapTarget;
+/// 单行高度取紧凑表单令牌（44dp，仍满足 WCAG 2.2 AAA 最小可点尺寸），
+/// 不再跟着多行 / 独立输入框的全局 minHeight 走。
+/// 「单行看起来过高」的根因就是两种控件共用一个 minHeight。
+const double _kSingleLineFieldHeight = AppSheetSize.formRowHeight;
 const double _kMultiLineFieldMinHeight = AppLayout.fieldMinHeight;
-const double _kMultiLineFieldPaddingV = AppSpacing.sm;
-const double _kFieldPaddingH = AppSpacing.md;
-const double _kLabelGap = AppSpacing.md;
+const double _kMultiLineFieldPaddingV = AppSpacing.xs;
+const double _kFieldPaddingH = AppSpacing.sm;
+const double _kLabelGap = AppSpacing.sm;
 const double _kLabelTopInset = AppSpacing.xxs;
 const double _kSwitchRowMinHeight = AppLayout.listItemMinHeight;
 const double _kClearIconSize = AppIconSize.small;
@@ -34,15 +35,15 @@ double _keyboardScrollPadding(BuildContext context) {
 
 /// 两种文本行共用的容器外壳。
 ///
-/// 统一了「原来 label 没固定宽、标签组却有 72dp 列」的错位：
+/// 统一了「原来 label 没固定宽、标签组却有独立列宽」的错位：
 /// 现在单行 / 多行 / 标签组 / 自定义项全部用 `AppSheetSize.formLabelWidth`
 /// 对齐，样式只有这一份（容器装饰、圆角、内边距、label 排版）。
 ///
 /// [singleLine] 是两者唯一的布局差异开关：
-/// - 单行：label 与 child **各自明确占 48dp**，两侧内部再各自把一行文字
-///   居中。容器、label、input 三者同高，不存在「框比内容高」的错位，
+/// - 单行：label 与 child **各自明确占一行高度**，两侧内部再各自把一行
+///   文字居中。容器、label、input 三者同高，不存在「框比内容高」的错位，
 ///   也不依赖 `Container.alignment`（child 与容器等高时它是零位移）。
-/// - 多行：56dp 下限、12dp 垂直内边距、Row 顶部对齐、label 顶部微调。
+/// - 多行：全局 minHeight 下限、较小垂直内边距、Row 顶部对齐、label 顶部微调。
 class _FormFieldShell extends StatelessWidget {
   const _FormFieldShell({
     required this.label,
@@ -63,8 +64,8 @@ class _FormFieldShell extends StatelessWidget {
             ? _kSingleLineFieldHeight
             : _kMultiLineFieldMinHeight,
       ),
-      // 不再用 Container.alignment：单行 label 与 child 都会明确占 48dp，
-      // 居中的是「48dp 里的 19dp 文字」，不是「48dp 容器里的 48dp child」。
+      // 不再用 Container.alignment：单行 label 与 child 都会明确占整行高，
+      // 居中只发生在这一行内部，不是靠外层容器去推。
       decoration: AppDecorations.field(context),
       padding: EdgeInsets.symmetric(
         horizontal: _kFieldPaddingH,
@@ -94,7 +95,7 @@ class _FormFieldShell extends StatelessWidget {
           ),
           const SizedBox(width: _kLabelGap),
           Expanded(
-            // 单行 child 明确 48dp：内层 Row 因此恒为 48，
+            // 单行 child 明确占整行高：内层 Row 因此高度恒定，
             // crossAxisAlignment.center 才有稳定空间把 TextField 居中。
             child: singleLine
                 ? SizedBox(height: _kSingleLineFieldHeight, child: child)
@@ -111,15 +112,14 @@ class _FormFieldShell extends StatelessWidget {
 /// ## 为什么之前一直贴顶（★ 真正的根因）
 ///
 /// 全局 `ThemeSetting.inputDecorationTheme` 设了
-/// `constraints: BoxConstraints(minHeight: AppLayout.fieldMinHeight /* 56 */)`。
+/// `constraints: BoxConstraints(minHeight: AppLayout.fieldMinHeight)`。
 /// `InputDecoration.applyDefaults()` 会把主题里**所有 null 字段**填进每个
 /// decoration，其中就包括 `constraints`；`InputDecorator.build` 末尾看到
 /// `decoration.constraints != null` 就再包一层 `ConstrainedBox`。
 ///
-/// 结果：单行 TextFormField 被强制 **56dp 高**，而 `isCollapsed` 的
-/// `containerHeight` 仍只有一个行高 ≈19dp → 「56dp 框 + 顶部一行字 +
-/// 37dp 空白」。多行 `minLines: 2` 的内容 + padding 正好约 56dp，
-/// 把框填满了，所以**只有单行贴顶、多行正常**。
+/// 结果：单行 TextFormField 被强制撑到全局 minHeight，而 `isCollapsed` 的
+/// `containerHeight` 仍只有一个行高 → 「高框 + 顶部一行字 + 一大截空白」。
+/// 多行内容本来就会把框填满，所以**只有单行贴顶**。
 ///
 /// 之前三种居中全部失效，因为它们动的都是外层：
 /// `ConstrainedBox(minHeight: 48)`、`Container.alignment`、
@@ -133,10 +133,10 @@ class _FormFieldShell extends StatelessWidget {
 ///
 /// 1. `InputDecoration(isCollapsed: true, contentPadding: zero)` →
 ///    TextFormField 的高度**就是一个行高**；
-/// 2. 外壳把 label 与 child 各自放进**明确 48dp** 的盒子，两侧内部用
-///    `Align` / `Row.crossAxisAlignment.center` 把 19dp 文字居中；
-/// 3. builder 的 Row 里放一个**恒定 48dp 占位**（清除按钮不显示时也在），
-///    空输入时不会退化成 19dp 行又把文字贴回顶部。
+/// 2. 外壳把 label 与 child 各自放进**明确一行高**的盒子，两侧内部用
+///    `Align` / `Row.crossAxisAlignment.center` 把文字居中；
+/// 3. builder 的 Row 里放一个**恒定行高占位**（清除按钮不显示时也在），
+///    空输入时不会退化成一个行高又把文字贴回顶部。
 ///
 /// 手写 `isCollapsed` 而非 `InputDecoration.collapsed` 构造：后者禁止
 /// `errorText`，validator 的错误提示会失效（3.47 源码已核对）。
@@ -198,14 +198,13 @@ class SheetSingleLineFormField extends StatelessWidget {
           decoration: InputDecoration(
             isCollapsed: true,
             contentPadding: EdgeInsets.zero,
-            // ★ 真正的根因：全局 InputDecorationTheme 设了
-            //   constraints: BoxConstraints(minHeight: 56)，
+            // ★ 真正的根因：全局 InputDecorationTheme 设了 minHeight，
             // applyDefaults() 会把它注入到每一个没显式写 constraints 的
             // decoration；InputDecorator.build 末尾再包一层 ConstrainedBox。
-            // 于是单行 TextFormField 被强制 56dp 高，而 isCollapsed 的
-            // containerHeight 仍只有一个行高 ≈19dp → 文字永远贴在框顶。
-            // 多行内容 2~3 行 + padding 正好约 56dp，所以只有单行出问题。
-            // 显式给空约束覆盖掉主题的 56dp，TextField 才会只有一行高。
+            // 于是单行 TextFormField 被强制撑高，而 isCollapsed 的
+            // containerHeight 仍只有一个行高 → 文字永远贴在框顶。
+            // 多行内容 2~3 行 + padding 本就会填满，所以只有单行出问题。
+            // 显式给空约束覆盖掉主题的 minHeight，TextField 才会只有一行高。
             constraints: const BoxConstraints(),
             border: InputBorder.none,
             enabledBorder: InputBorder.none,
@@ -231,8 +230,8 @@ class SheetSingleLineFormField extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: <Widget>[
               Expanded(child: field!),
-              // 恒定 48dp 占位：空输入时 Row 也是 48dp，
-              // crossAxisAlignment.center 才有空间把 19dp TextField 居中。
+              // 恒定行高占位：空输入时 Row 也保持整行高，
+              // crossAxisAlignment.center 才有空间把 TextField 居中。
               SizedBox(
                 width: _kSingleLineFieldHeight,
                 height: _kSingleLineFieldHeight,
@@ -251,8 +250,8 @@ class SheetSingleLineFormField extends StatelessWidget {
 /// 多行文本输入行。
 ///
 /// label 顶部对齐首行文字，输入框按 minLines / maxLines 自然增高，
-/// 字数统计在下方；这几项都会撑高容器，所以保留 56dp 下限 + 12dp
-/// 垂直内边距，与单行的紧凑节奏明确区分。
+/// 字数统计在下方；这几项都会撑高容器，所以保留全局 minHeight 下限 +
+/// 较小的垂直内边距，与单行的紧凑节奏明确区分。
 class SheetMultiLineFormField extends StatelessWidget {
   const SheetMultiLineFormField({
     super.key,
@@ -356,7 +355,7 @@ class SheetMultiLineFormField extends StatelessWidget {
   }
 }
 
-/// 清除按钮：两种文本行共用，48dp 无障碍热区 + 语义图标 + tooltip。
+/// 清除按钮：两种文本行共用，与表单行同高的无障碍热区 + 语义图标 + tooltip。
 class _ClearButton extends StatelessWidget {
   const _ClearButton({required this.controller, required this.color});
 
@@ -371,9 +370,9 @@ class _ClearButton extends StatelessWidget {
       icon: const Icon(AppIcons.clear, size: _kClearIconSize),
       color: color,
       padding: EdgeInsets.zero,
-      constraints: const BoxConstraints.tightFor(
-        width: kMinTapTarget,
-        height: kMinTapTarget,
+      constraints: BoxConstraints.tightFor(
+        width: _kSingleLineFieldHeight,
+        height: _kSingleLineFieldHeight,
       ),
     );
   }
@@ -436,7 +435,7 @@ class SheetFormLabeledRow extends StatelessWidget {
           width: AppSheetSize.formLabelWidth,
           child: Padding(
             padding: EdgeInsets.only(top: alignTop ? AppSpacing.xs : 0),
-            child: Text(label!, style: SheetText.of(context).optionLabel),
+            child: Text(label!, style: SheetText.of(context).formLabel),
           ),
         ),
         content,
@@ -468,7 +467,7 @@ class SheetSwitchRow extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: SheetText.of(context).optionLabel,
+              style: SheetText.of(context).formLabel,
             ),
           ),
           Switch(value: value, onChanged: onChanged),

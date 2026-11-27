@@ -10,7 +10,7 @@ import '../icon/app_icon_badge.dart';
 // ── 组件私有样式（只服务本文件）────────────────────────────────
 const double _kEmojiSize = 22;
 const double _kChevronSize = 20;
-const double _kIconBoxWidth = 40;
+const double _kIconBoxWidth = 36;
 const double _kSubtitleGap = 2;
 
 /// 列表项数据模型：新增功能只需在分区组件的数据数组里加一条。

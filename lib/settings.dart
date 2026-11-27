@@ -223,7 +223,7 @@ class ThemeSetting {
       hoverColor: cs.primary.withValues(alpha: AppOpacity.hover),
       contentPadding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.md,
-        vertical: AppSpacing.sm,
+        vertical: AppSpacing.xs,
       ),
       constraints: const BoxConstraints(minHeight: AppLayout.fieldMinHeight),
       isDense: false,
@@ -237,9 +237,10 @@ class ThemeSetting {
       errorBorder: line(cs.error, AppStroke.emphasisWidth),
       focusedErrorBorder: line(cs.error, AppBorder.focused),
       disabledBorder: line(cs.onSurface.withValues(alpha: AppOpacity.disabledContainer), AppBorder.thin),
-      hintStyle: textTheme.bodyLarge?.copyWith(color: cs.onSurfaceVariant),
-      labelStyle: textTheme.bodyLarge?.copyWith(color: cs.onSurfaceVariant),
-      floatingLabelStyle: textTheme.bodyMedium?.copyWith(color: cs.primary),
+      // 表单里的 label / 输入文字统一收一档：16px 在 48dp 行里显得又大又顶。
+      hintStyle: textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+      labelStyle: textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+      floatingLabelStyle: textTheme.bodySmall?.copyWith(color: cs.primary),
       helperStyle: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
       counterStyle: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
       errorStyle: textTheme.bodySmall?.copyWith(color: cs.error),
@@ -415,6 +416,7 @@ class ThemeSetting {
       // 上下各 8 → contentSize = 16 → 断言「16 >= 24」失败，chip 拿不到
       // size，父级 RenderPadding 接着抛「RenderBox was not laid out」。
       // 想让 chip 更舒展只能调水平内距或缩小 avatar 约束，不能加竖直 padding。
+      // 第二轮收紧表单 / 图标时复核过：这里仍保持 4，chip 断言继续通过。
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.sm,
         vertical: AppSpacing.xxs,

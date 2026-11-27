@@ -9,7 +9,7 @@ import '../../commons/icon/app_icon_badge.dart';
 import '../../commons/icons/app_icons.dart';
 
 // ── 组件私有样式（只服务本文件，全部引用全局令牌）───────────────
-const double _kIconSize = 44;
+const double _kIconSize = 36;
 const double _kIconGlyphSize = AppIconSize.medium;
 const double _kCardMinHeight = 76;
 const double _kBadgeRadius = AppRadius.small;

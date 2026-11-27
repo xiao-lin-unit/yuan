@@ -239,10 +239,9 @@ class _AccountsScreenState extends State<AccountsScreen> {
     final bool nothingShown = visible.isEmpty && visibleArchived.isEmpty;
 
     return AppHomePage(
-      // 首屏层级：标题 → 大数字摘要 → 明细。右上角仍只有动作，
-      // 不渲染 AppBar、不渲染返回按钮。
+      // 标题与右上角 ＋ 合并在同一个 48dp 动作行里，首屏不再有
+      // 独立的标题段；层级仍是「标题 → 大数字 → 明细」。
       title: '账户',
-      subtitle: '看清现在能花多少钱',
       actions: <Widget>[
         IconButton(
           icon: const Icon(AppIcons.accountAdd),
@@ -252,9 +251,10 @@ class _AccountsScreenState extends State<AccountsScreen> {
       ],
       // 分区结构件各自管左右 16dp 留白，页壳只管上下留白，
       // 避免「页壳 16 + 分区 16 = 32」的双重缩进（与分类管理页一致）。
+      // 标题已经在固定动作行里，滚动区顶部不必再留 pageTop(24)。
       padding: const EdgeInsets.fromLTRB(
         0,
-        AppLayout.pageTop,
+        AppSpacing.xs,
         0,
         AppLayout.pageBottom,
       ),

@@ -5,7 +5,7 @@ import '../../../styles/app_icon_tone.dart';
 import '../../../styles/theme_tokens.dart';
 
 // ── 组件私有样式（只服务本文件）────────────────────────────────
-const double _kBadgeSize = 40;
+const double _kBadgeSize = 36;
 
 /// 全软件统一的图标徽章。
 ///

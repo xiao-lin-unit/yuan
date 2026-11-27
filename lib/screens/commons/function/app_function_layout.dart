@@ -356,8 +356,8 @@ class AppSegmentTabs<T> extends StatelessWidget {
 // 全部纯静态，无状态、无回调注册。
 // ══════════════════════════════════════════════════════════════════
 
-const double _kHeroValueSize = 44;
-const double _kHeroMinHeight = 152;
+const double _kHeroValueSize = 40;
+const double _kHeroMinHeight = 140;
 const double _kProgressHeight = 6;
 const double _kLedgerRowHeight = AppLayout.listItemMinHeight;
 
@@ -467,7 +467,7 @@ class AppSummaryHero extends StatelessWidget {
 
     return Container(
       decoration: decoration,
-      padding: const EdgeInsets.all(AppSpacing.lg),
+      padding: const EdgeInsets.all(AppSpacing.md),
       constraints: const BoxConstraints(minHeight: _kHeroMinHeight),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

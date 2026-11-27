@@ -105,13 +105,16 @@ abstract final class AppElevation {
   static const Offset sheetOffset = Offset(0, -4);
 }
 
-/// 图标尺寸阶梯：同一层级只用同一档
+/// 图标尺寸阶梯：同一层级只用同一档。
+/// 整体收小一档：列表里的图标是「引导」不是「主角」，20~22dp 会把
+/// 一行 16px 文字压下去。large 保留 24 给底导 / FAB / AppBar 这类
+/// 需要独立可点的位置；empty 也收一档，空状态锚点不再喧宾夺主。
 abstract final class AppIconSize {
-  static const double small = 16;
-  static const double medium = 20;
+  static const double small = 14;
+  static const double medium = 18;
   static const double large = 24;
-  static const double badge = 22;
-  static const double empty = 32;
+  static const double badge = 18;
+  static const double empty = 28;
 }
 
 /// 描边宽度：常规 0.6dp 发丝线，强调 1.5dp。
@@ -163,9 +166,9 @@ abstract final class AppLayout {
   static const double sectionHeaderTop = 20;
   static const double sectionHeaderBottom = 12;
   static const double navigationBarHeight = 64;
-  static const double fieldMinHeight = 56;
+  static const double fieldMinHeight = 48;
   static const double listItemMinHeight = 56;
-  static const double formRowMinHeight = 64;
+  static const double formRowMinHeight = 48;
 
   /// 窄屏 / 中屏内容列上限。手机（<600）时 640 不生效，等于不限宽。
   static const double maxContentWidth = 640;

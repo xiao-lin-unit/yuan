@@ -47,14 +47,20 @@ abstract final class AppSheetSize {
   static const double trendBarWidth = 18;
   static const double trendBaselineWidth = 1;
 
-  static const double iconBadgeSize = 72;
-  static const double iconBadgeIconSize = 32;
+  // 空状态 / 错误态 / 弹层图标锚点：72dp 太像插画，56dp 足够当锚点。
+  static const double iconBadgeSize = 56;
+  static const double iconBadgeIconSize = 28;
 
   static const double avatarSize = 96;
   static const double avatarCameraBadge = 32;
 
-  /// 表单行：左侧 label 固定宽度（全软件表单对齐一致）
-  static const double formLabelWidth = 72;
+  /// 表单行：左侧 label 固定宽度（全软件表单对齐一致）。
+  /// 标签字号从 16 收到 13 后，72dp 会留出一大段空槽，收到 64。
+  static const double formLabelWidth = 64;
+
+  /// 单行表单行高。44dp = WCAG 2.2 AAA 的最小可点尺寸，比原来的
+  /// 48dp 少 4dp；配合更小的字号，整行不再「框大内容小」。
+  static const double formRowHeight = 44;
 
   /// 单选行：56dp 是 M3 双行 list tile 的高度，本行只有一行 16px 文字，
   /// 用 56 会上下各留约 17dp 空白。改 48dp（= 最小点击区 kMinTapTarget）
@@ -308,25 +314,28 @@ class SheetText {
       AppTypography.chipLabel.copyWith(color: cs.primary);
   TextStyle get trendLabel =>
       AppTypography.trendLabel.copyWith(color: cs.onSurfaceVariant);
+  /// 表单左标签：独立紧凑字阶，不再借用 16px 的 [optionLabel]。
+  /// optionLabel 仍归单选行 / 按钮 / 媒体标题用，两边互不牵连。
+  TextStyle get formLabel =>
+      AppTypography.formLabel.copyWith(color: cs.onSurfaceVariant);
   TextStyle get fieldLabel =>
-      AppTypography.optionLabel.copyWith(color: cs.onSurface);
+      AppTypography.formLabel.copyWith(color: cs.onSurface);
   TextStyle get fieldValue =>
-      AppTypography.optionLabel.copyWith(color: cs.onSurfaceVariant);
+      AppTypography.formValue.copyWith(color: cs.onSurface);
 
-  /// 单行输入专用：把 1.40 行高压到 1.0。
+  /// 单行输入专用：把行高压到 1.0。
   ///
-  /// [AppTypography.optionLabel] 的 height 1.40 是为多行 / 换行准备的，
-  /// 单行 TextField 带着这段额外 leading 时，文字在自身行框里偏上，
+  /// 单行 TextField 带着 1.30 的额外 leading 时，文字在自身行框里偏上，
   /// 外层再怎么居中看起来都像「顶到上边框」。单行与多行从 style 上
   /// 就分开，不再共用同一个 TextStyle。
   TextStyle get fieldLabelSingleLine =>
-      AppTypography.optionLabel.copyWith(
+      AppTypography.formLabel.copyWith(
         color: cs.onSurface,
         height: 1.0,
       );
   TextStyle get fieldValueSingleLine =>
-      AppTypography.optionLabel.copyWith(
-        color: cs.onSurfaceVariant,
+      AppTypography.formValue.copyWith(
+        color: cs.onSurface,
         height: 1.0,
       );
 

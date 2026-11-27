@@ -117,6 +117,28 @@ abstract final class AppTypography {
     letterSpacing: -1.2,
   );
 
+  /// Home 页标题：放进 48dp 动作行，不能像 pageTitle(26) 那样单独占一段。
+  static const TextStyle homeTitle = TextStyle(
+    fontSize: 22,
+    fontWeight: FontWeight.w700,
+    height: 1.25,
+    letterSpacing: -0.2,
+  );
+
+  /// 表单左标签：13px 就够，16px 会把右侧输入文字压得没主次。
+  static const TextStyle formLabel = TextStyle(
+    fontSize: 13,
+    fontWeight: FontWeight.w500,
+    height: 1.30,
+  );
+
+  /// 表单输入文字：14px，与标签拉开半级但仍清晰。
+  static const TextStyle formValue = TextStyle(
+    fontSize: 14,
+    fontWeight: FontWeight.w400,
+    height: 1.30,
+  );
+
   static const TextStyle labelSmall = TextStyle(
       fontSize: 11,
       fontWeight: FontWeight.w600,
@@ -235,6 +257,9 @@ class AppText {
   /// 首屏大数字，颜色由调用方按强调 / 语义色覆盖。
   TextStyle get heroValue =>
       AppTypography.heroValue.copyWith(color: cs.onSurface);
+  /// Home 页标题：与动作行同高，单行不换行。
+  TextStyle get homeTitle =>
+      AppTypography.homeTitle.copyWith(color: cs.onSurface);
   TextStyle get caption =>
       AppTypography.caption.copyWith(color: cs.onSurfaceVariant);
   TextStyle get emptyTitle =>
