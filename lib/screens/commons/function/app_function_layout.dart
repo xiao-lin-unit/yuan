@@ -20,6 +20,17 @@ import 'app_info_tip.dart';
 // 系统文字缩放再大也只会把格子撑高，不会再 overflow。外层
 // IntrinsicHeight 仍把同一条里的所有格统一到最高那一格，保持等高。
 const double _kStatCellMinHeight = 60;
+
+// ── label + 小 ⓘ 的横向约束（第十一轮）──────────────────────────
+// `Row(mainAxisSize: MainAxisSize.min)` 会给非 flex 子节点 **unbounded
+// 横向约束**：Text 就算写了 `overflow: TextOverflow.ellipsis` 也不会生效，
+// 因为「没有宽度上限就不需要省略」，Text 按整段文字的自然宽度布局。
+// 再加上 ⓘ 的 IconButton 固定 28dp 热区，在 97.6dp 的窄统计格里合计
+// 约 111.6dp，被父约束 clamp 到 97.6 → 右侧溢出 14px（真机黄黑条纹）。
+//
+// 下面几处 label 行统一用 `Flexible` 包 Text：Row 先把固定宽度分给
+// ⓘ，再把剩余宽度的**有界**约束交给 Text，省略号才真正起作用。
+// 这比缩小 ⓘ 热区更对——28dp 是最小可点目标，不该为排版让路。
 const double _kSegmentMinHeight = AppComponentSize.segmentedButtonHeight;
 const double _kStatIndicatorHeight = 2;
 
@@ -207,12 +218,14 @@ class _StatCell extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: <Widget>[
-                      Text(
-                        item.label,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: context.appText.caption.copyWith(
-                          color: selected ? t.info : null,
+                      Flexible(
+                        child: Text(
+                          item.label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: context.appText.caption.copyWith(
+                            color: selected ? t.info : null,
+                          ),
                         ),
                       ),
                       if (item.tip != null)
@@ -394,7 +407,20 @@ class AppSegmentTabs<T> extends StatelessWidget {
 const double _kHeroValueSize = 44;
 const double _kHeroMinHeight = 140;
 const double _kProgressHeight = 6;
-const double _kLedgerRowHeight = AppLayout.listItemMinHeight;
+
+// 流水行的**最小高度**，不是固定高度。
+//
+// 原来写的是 SizedBox(height: 56) 的 tight 约束，而里面的 Column 装了
+// 两行 Text（body 15/1.47≈22dp + caption 13/1.45≈19dp），且 title /
+// subtitle 都**没有 maxLines**——长流水标题在窄屏换行后 Column 变 3~4 行，
+// 直接把 56dp 撑出纵向 RenderFlex overflow（「纵向超限问题」）。
+// 系统文字缩放到 1.3 倍时两行合计约 53dp，也已逼近 56。
+//
+// 两处一起收：① 两行 Text 补 maxLines:1 + ellipsis，长标题省略而非换行；
+// ② 固定高度改 ConstrainedBox(minHeight:)，即便以后有人给行里加内容，
+// 也只会把行撑高、不会再被压出溢出。常态两行 41dp < 56dp，行高仍是 56，
+// 列表密度与对齐完全不变。
+const double _kLedgerRowMinHeight = AppLayout.listItemMinHeight;
 
 /// 信息网格的一格（纯数据）。
 @immutable
@@ -541,10 +567,14 @@ class AppSummaryHero extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: <Widget>[
-                  Text(
-                    label,
-                    textAlign: TextAlign.center,
-                    style: hintStyle,
+                  Flexible(
+                    child: Text(
+                      label,
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: hintStyle,
+                    ),
                   ),
                   if (caption.isNotEmpty)
                     AppInfoTip(
@@ -620,12 +650,14 @@ class AppSummaryHero extends StatelessWidget {
                           mainAxisSize: MainAxisSize.min,
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: <Widget>[
-                            Text(
-                              secondary[i].label,
-                              textAlign: TextAlign.center,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: hintStyle,
+                            Flexible(
+                              child: Text(
+                                secondary[i].label,
+                                textAlign: TextAlign.center,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: hintStyle,
+                              ),
                             ),
                             if (secondary[i].tip != null)
                               AppInfoTip(
@@ -689,11 +721,13 @@ class AppInfoGrid extends StatelessWidget {
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: <Widget>[
-                  Text(
-                    item.label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: labelStyle,
+                  Flexible(
+                    child: Text(
+                      item.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: labelStyle,
+                    ),
                   ),
                   if (item.tip != null)
                     AppInfoTip(
@@ -835,8 +869,8 @@ class AppLedgerList extends StatelessWidget {
             child: Text(group.dateLabel, style: context.appText.caption),
           ),
           for (final AppLedgerRowData row in group.rows)
-            SizedBox(
-              height: _kLedgerRowHeight,
+            ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: _kLedgerRowMinHeight),
               child: Row(
                 children: <Widget>[
                   Icon(row.icon,
@@ -847,9 +881,22 @@ class AppLedgerList extends StatelessWidget {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
                       children: <Widget>[
-                        Text(row.title, style: context.appText.body),
-                        Text(row.subtitle, style: context.appText.caption),
+                        // 长标题 / 长备注省略而不是换行：换行会把固定 56dp
+                        // 的行撑出纵向溢出，且让整条列表行高参差不齐。
+                        Text(
+                          row.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: context.appText.body,
+                        ),
+                        Text(
+                          row.subtitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: context.appText.caption,
+                        ),
                       ],
                     ),
                   ),

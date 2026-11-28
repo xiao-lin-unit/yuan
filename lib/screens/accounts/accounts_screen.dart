@@ -842,9 +842,13 @@ class _BoardNotes extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
-        Text(
-          label,
-          style: context.appText.caption.copyWith(color: cs.onSurfaceVariant),
+        Flexible(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: context.appText.caption.copyWith(color: cs.onSurfaceVariant),
+          ),
         ),
         AppInfoTip(title: label, message: message, size: AppIconSize.small),
       ],
