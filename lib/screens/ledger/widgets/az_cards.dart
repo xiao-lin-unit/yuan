@@ -169,12 +169,30 @@ class AzTypeBlockView extends StatelessWidget {
               top: AppSpacing.xxs,
               bottom: AppSpacing.xxs,
             ),
+            // 两个裸 Text 在 Row 里都拿 **unbounded** 横向约束：金额一长
+            // （如 ¥1,234,567）+ 分组名一长，两者自然宽相加就超父宽，
+            // 右侧 RenderFlex 溢出。改各占一半的 Expanded，把有界宽度
+            // 交给 Text，ellipsis 才生效；右格 textAlign.end 保持「分组名
+            // 靠左 / N 条 · 金额靠右」的原观感，spaceBetween 随之退场。
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: <Widget>[
-                Text(block.spec.label, style: context.appText.caption),
-                Text('${block.rows.length} 条 · ${MoneyFormat.yuan0(block.total)}',
-                    style: context.appText.caption),
+                Expanded(
+                  child: Text(
+                    block.spec.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: context.appText.caption,
+                  ),
+                ),
+                Expanded(
+                  child: Text(
+                    '${block.rows.length} 条 · ${MoneyFormat.yuan0(block.total)}',
+                    textAlign: TextAlign.end,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: context.appText.caption,
+                  ),
+                ),
               ],
             ),
           ),

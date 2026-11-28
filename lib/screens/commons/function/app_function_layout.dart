@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:material_ui/material_ui.dart';
 
 import '../../../styles/app_decorations.dart';
@@ -20,6 +22,23 @@ import 'app_info_tip.dart';
 // 系统文字缩放再大也只会把格子撑高，不会再 overflow。外层
 // IntrinsicHeight 仍把同一条里的所有格统一到最高那一格，保持等高。
 const double _kStatCellMinHeight = 60;
+
+// ── 信息网格：左右两格的统一槽位（第十三轮）──────────────────────
+// 之前 cell 的 label 行是「裸 Row」：带小 ⓘ 的格子会被 IconButton 的
+// 28dp 热区撑高，不带 ⓘ 的只有 caption 文字的 ~19dp。虽然外层
+// IntrinsicHeight 把整行拉到等高，但每格 Column 都从顶部排，于是带 ⓘ
+// 那格的 value 被往下推了约 9dp —— 真机上就是「右侧 label 和值之间
+// 留白明显偏大、左右两列不对齐」。
+//
+// 现在把 cell 拆成三个固定槽：label 槽（统一 minHeight 28，与 ⓘ 热区
+// 一致，文字在槽内垂直居中，带不带 ⓘ 基线都一样）→ 4dp 行距 →
+// value 槽（统一两行展示区）。两格结构完全对称，不再随内容变节奏。
+//
+// value 槽用 minHeight 而不是 tight height：系统文字缩放到 1.3 倍时
+// 两行文字会自己把槽撑高，不会被压出溢出（第八 / 十二轮同一个坑）。
+// menuTitle 是 16/1.4 ≈ 22.4dp 一行，两行约 44.8 → 取 45 作下限。
+const double _kInfoLabelRowMinHeight = 28;
+const double _kInfoValueMinHeight = 45;
 
 // ── label + 小 ⓘ 的横向约束（第十一轮）──────────────────────────
 // `Row(mainAxisSize: MainAxisSize.min)` 会给非 flex 子节点 **unbounded
@@ -304,13 +323,25 @@ class AppHintBanner extends StatelessWidget {
             message: message,
             size: AppIconSize.small,
           ),
-          Text(
-            label,
-            style: context.appText.caption.copyWith(
-              color: cs.onSurfaceVariant,
+          // 第十一轮收 5 处 label 行时，这里被判为「父够宽 + 短标签」
+          // 刻意跳过；但 Row 里非 flex 子节点拿的是 **unbounded** 横向
+          // 约束，Text 写不写 ellipsis 都不会生效。真机字号放大 / 调用方
+          // 传长 label / 360dp 窄屏时，28dp ⓘ + 整段 label + 48dp 关闭
+          // 按钮合计会超父宽，右侧溢出（「横向超限问题」）。
+          //
+          // Flexible 作为**唯一** flex 子节点会占满剩余宽度，视觉上正好
+          // 等价于原来的 Spacer（label 靠左、关闭按钮靠右），同时把有界
+          // 宽度交给 Text，省略号才真正起作用。故此处删掉 Spacer。
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: context.appText.caption.copyWith(
+                color: cs.onSurfaceVariant,
+              ),
             ),
           ),
-          const Spacer(),
           IconButton(
             onPressed: onDismiss,
             icon: const Icon(AppIcons.clear),
@@ -718,31 +749,54 @@ class AppInfoGrid extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: <Widget>[
-                  Flexible(
-                    child: Text(
-                      item.label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: labelStyle,
+              // 槽 1：label。带不带 ⓘ 都占同样的高度，两列基线才对齐。
+              ConstrainedBox(
+                constraints: const BoxConstraints(
+                  minHeight: _kInfoLabelRowMinHeight,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    Flexible(
+                      child: Text(
+                        item.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: labelStyle,
+                      ),
                     ),
-                  ),
-                  if (item.tip != null)
-                    AppInfoTip(
-                      title: item.label,
-                      message: item.tip!,
-                      size: AppIconSize.small,
-                    ),
-                ],
+                    if (item.tip != null)
+                      AppInfoTip(
+                        title: item.label,
+                        message: item.tip!,
+                        size: AppIconSize.small,
+                      ),
+                  ],
+                ),
               ),
               const SizedBox(height: AppSpacing.xxs),
-              Text(
-                item.value,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: valueStyle,
+              // 槽 2：固定两行展示区。内容再多也只占两行（尾部 …），
+              // 不会把格子撑高；点开用与 ⓘ 完全相同的弹框看完整值。
+              ConstrainedBox(
+                constraints: const BoxConstraints(
+                  minHeight: _kInfoValueMinHeight,
+                ),
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => unawaited(
+                    showInfoTipDialog(
+                      context,
+                      title: item.label,
+                      message: item.value,
+                    ),
+                  ),
+                  child: Text(
+                    item.value,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: valueStyle,
+                  ),
+                ),
               ),
             ],
           ),
