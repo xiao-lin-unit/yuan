@@ -14,13 +14,13 @@ import 'widgets/az_cards.dart';
 
 // ── 页面私有文案（样式一律走全局层）─────────────────────────────
 const String _kTypeHint = '按类型组排列，选一次类型后只填这一类专属字段。';
-const String _kFormNote = '金额按元填写，可带两位小数；不填的金额按 0 记。';
+const String _kFormNote = '金额按元填写，可带两位小数；日期填 YYYY-MM-DD；不填的金额按 0 记。';
 const String _kDeleteDesc = '删除后进入回收站，主表与次表记录都会保留，只是不再显示。';
 
 /// 一次新增 / 编辑提交上来的字段值。
 /// 【所属模块】screens/ledger · 新增表单
 /// 【实现功能】承载动态表单填出的主表字段与次表字段，交给 AzWriteController 写库。
-/// 【使用限制】不可变；键必须来自 AzSchema.editableColumns；金额一律 String。
+/// 【使用限制】不可变；键必须来自 AzSchema.editableColumns；金额一律 String；日期列已转成毫秒整数。
 /// 【入参与结果】构造收 mainValues / subValues；消费方只读字段。
 /// 【异常与调用方处理】不抛异常；空 Map 表示没有可编辑字段，调用方按「只建主表」处理。
 class AzEntryDraft {
@@ -28,6 +28,36 @@ class AzEntryDraft {
 
   final Map<String, Object?> mainValues;
   final Map<String, Object?> subValues;
+}
+
+/// 一次还款动作的用户输入（只装动作，金额拆分与罚费由软件算）。
+/// 【所属模块】screens/ledger · 还款弹层
+/// 【实现功能】承载实还金额与「是否提前还款 / 是否还本期 / 是否有违约金 / 结清规则」等动作开关。
+/// 【使用限制】不可变；金额单位元；settleRule 用草案的英文 code；软件不判断用户是否一次性还清。
+/// 【入参与结果】构造收各动作字段；消费方只读字段并交给 AzRepaymentService。
+/// 【异常与调用方处理】不抛异常；非法组合由负债服务在事务内校验并上抛。
+class AzRepaySheetResult {
+  const AzRepaySheetResult({
+    required this.amount,
+    required this.prepay,
+    required this.payCurrentTerm,
+    required this.hasPenalty,
+    required this.settleAll,
+    required this.partialMode,
+    this.settleRule,
+    this.ruleRatio,
+    this.serviceFee,
+  });
+
+  final double amount;
+  final bool prepay;
+  final bool payCurrentTerm;
+  final bool hasPenalty;
+  final bool settleAll;
+  final String partialMode;
+  final String? settleRule;
+  final double? ruleRatio;
+  final double? serviceFee;
 }
 
 /// 枚举列的默认值（与 az_controller 的写入兜底一致）。
@@ -39,6 +69,46 @@ const Map<String, String> _kEnumDefault = <String, String>{
   'term_unit': 'month',
   'direction': 'out',
 };
+
+/// 枚举值 → 中文显示（存库仍用英文 code，业务层按 code 校验）。
+const Map<String, String> _kEnumLabels = <String, String>{
+  'equal_principal': '等额本金',
+  'equal_installment': '等额本息',
+  'interest_first': '先息后本',
+  'lump_sum': '到期一次性还本付息',
+  'revolving': '随借随还',
+  'month': '按月',
+  'quarter': '按季',
+  'year': '按年',
+  'day': '按天',
+  'week': '按周（每周六）',
+  'normal': '正常',
+  'overdue': '逾期',
+  'settled': '已结清',
+  'waive_unbilled': '免收未出账手续费',
+  'charge_all_remaining': '收齐剩余各期手续费',
+  'charge_one_more': '只加收一期手续费',
+  'ratio_of_remaining': '按剩余本金比例收',
+  'extra_service_fee': '另收一笔服务费',
+};
+
+/// 日期列：界面按 YYYY-MM-DD 录入，写库转毫秒整数（DDL 是 INTEGER）。
+const Set<String> _kDateCols = <String>{
+  'start_date',
+  'end_date',
+  'due_at',
+  'repaid_at',
+  'drawn_at',
+};
+
+/// 分期提前结清规则（与 AzSchema.tableColumns 的 options 完全一致）。
+const List<String> _kSettleRules = <String>[
+  'waive_unbilled',
+  'charge_all_remaining',
+  'charge_one_more',
+  'ratio_of_remaining',
+  'extra_service_fee',
+];
 
 /// ⑤ 新增第一步：按类型组选类型。与账户页 `showAccountKindPicker` 同构。
 /// 【所属模块】screens/ledger · 新增表单
@@ -78,7 +148,7 @@ Future<AzTypeSpec?> showAzTypeSheet(BuildContext context, {required String side}
 /// 表单项由 AzSchema.editableColumns 生成，样式全部交给 FormSheetContent 与全局令牌。
 /// 【所属模块】screens/ledger · 新增表单
 /// 【实现功能】为选中类型渲染主表与次表的全部可录入列，提交后把 SheetFormValues 转成 AzEntryDraft；编辑时带出已有值。
-/// 【使用限制】判别列、系统列、软件计算列不出现；金额按 String 提交、空金额写 '0'；表单不写库。
+/// 【使用限制】判别列、系统列、软件计算列不出现；金额按 String 提交、空金额写 '0'；日期按 YYYY-MM-DD 录入、写库转毫秒；表单不写库。
 /// 【入参与结果】收 context / spec / 可选 initialData 与 editId；返回 Future<AzEntryDraft?>，取消返回 null。
 /// 【异常与调用方处理】不抛异常；写库异常由 AzWriteController 上抛，表单不吞；调用方必须判 null 与 mounted。
 Future<AzEntryDraft?> showAzEntrySheet(
@@ -133,6 +203,128 @@ Future<AzEntryDraft?> showAzEntrySheet(
   );
 }
 
+/// 还款动作弹层：常规还本期 / 主动提前还款 / 分期提前结清共用一张表。
+/// 【所属模块】screens/ledger · 还款弹层
+/// 【实现功能】带出当期应还额作默认金额，收集实还金额与全部动作开关，取消返回 null。
+/// 【使用限制】只收集动作输入，不做金额拆分、不判断该不该收违约金；结清规则五值由业务层校验。
+/// 【入参与结果】收 context / 名称 / 是否分期 / 建议金额；返回 Future<AzRepaySheetResult?>，调用方必须判 null 与 mounted。
+/// 【异常与调用方处理】不抛异常；写库异常由 AzRepaymentService 上抛，弹层不吞。
+Future<AzRepaySheetResult?> showAzRepaySheet(
+  BuildContext context, {
+  required String name,
+  required bool isInstallment,
+  required double suggestedAmount,
+}) async {
+  final FormSheetController controller = FormSheetController();
+  final SheetFormValues? values = await AppSheetShell.show<SheetFormValues>(
+    context,
+    header: SheetHeader(
+      title: '还一笔',
+      subtitle: name,
+      centered: true,
+      leading: const SheetCancelAction(),
+      trailing: SheetTextAction(
+        label: '确认还款',
+        emphasized: true,
+        onTap: controller.submit,
+      ),
+    ),
+    child: FormSheetContent(
+      controller: controller,
+      items: <SheetFormItem>[
+        SheetFormSingleLineTextItem(
+          key: 'amount',
+          label: '本次实还金额 *',
+          initialValue: suggestedAmount.toStringAsFixed(2),
+          hint: '0.00',
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          showClearButton: true,
+          validator: (String v) {
+            final double? d = double.tryParse(v.trim());
+            if (d == null || d <= 0) return '请填大于 0 的金额';
+            return null;
+          },
+        ),
+        SheetFormNoteItem(
+          key: '_repay_hint',
+          text: '当期应还约 ${suggestedAmount.toStringAsFixed(2)} 元；'
+              '多还的部分按提前还款冲本金。',
+          centered: false,
+        ),
+        const SheetFormToggleItem(
+          key: 'prepay',
+          label: '这是主动提前还款 / 提前结清',
+          initialValue: false,
+          dividerAbove: true,
+        ),
+        if (!isInstallment) ...<SheetFormItem>[
+          const SheetFormToggleItem(
+            key: 'payCurrent',
+            label: '先还完本期本金 + 利息 + 费用',
+            initialValue: true,
+            dividerAbove: true,
+          ),
+          const SheetFormToggleItem(
+            key: 'hasPenalty',
+            label: '本次有提前还款违约金',
+            initialValue: false,
+            dividerAbove: true,
+          ),
+        ],
+        if (isInstallment) ...<SheetFormItem>[
+          const SheetFormToggleItem(
+            key: 'settleAll',
+            label: '全额提前结清',
+            initialValue: false,
+            dividerAbove: true,
+          ),
+          SheetFormCustomItem(
+            key: 'settleRule',
+            label: '提前结清规则',
+            builder: (BuildContext ctx, ValueChanged<Object?> onChanged) =>
+                _ChoiceField(
+              options: _kSettleRules,
+              initial: _kSettleRules.first,
+              labels: _kEnumLabels,
+              onChanged: onChanged,
+            ),
+          ),
+          const SheetFormSingleLineTextItem(
+            key: 'ruleRatio',
+            label: '比例（5% 填 0.05）',
+            initialValue: '',
+            hint: '选「按剩余本金比例收」时填',
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          ),
+          const SheetFormSingleLineTextItem(
+            key: 'serviceFee',
+            label: '另收服务费金额',
+            initialValue: '',
+            hint: '选「另收一笔服务费」时填',
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          ),
+        ],
+      ],
+    ),
+  );
+  if (values == null) return null;
+  final double amount = double.tryParse(values.text('amount').trim()) ?? 0;
+  if (amount <= 0) return null;
+  return AzRepaySheetResult(
+    amount: amount,
+    prepay: values.flag('prepay'),
+    payCurrentTerm: values.flag('payCurrent'),
+    hasPenalty: values.flag('hasPenalty'),
+    settleAll: values.flag('settleAll'),
+    partialMode: 'B',
+    settleRule: values.text('settleRule').trim().isEmpty
+        ? null
+        : values.text('settleRule').trim(),
+    ruleRatio: double.tryParse(values.text('ruleRatio').trim()),
+    serviceFee: double.tryParse(values.text('serviceFee').trim()),
+  );
+}
+
 AzRecord? _findMain(AzData data, String side, int id) {
   final List<AzRecord> all = side == 'asset' ? data.assets : data.liabilities;
   for (final AzRecord r in all) {
@@ -141,11 +333,19 @@ AzRecord? _findMain(AzData data, String side, int id) {
   return null;
 }
 
-/// 列 → 声明式表单项。枚举走自定义下拉，其余走单行文本（金额/整数改数字键盘）。
+/// 列 → 声明式表单项。枚举走中文下拉、日期走 YYYY-MM-DD、其余走单行文本（金额/整数改数字键盘）。
+/// 【所属模块】screens/ledger · 新增表单
+/// 【实现功能】按列元数据生成表单项；枚举显示中文但存英文 code；日期列编辑时把毫秒回显成日期串。
+/// 【使用限制】软件计算列已由 AzSchema.editableColumns 排除；表单不写库。
+/// 【入参与结果】收列清单与可选已有记录；返回 List<SheetFormItem>。
+/// 【异常与调用方处理】不抛异常；未知录入种类按文本处理。
 List<SheetFormItem> _itemsFor(List<AzColumn> cols, AzRecord? record) {
   final List<SheetFormItem> out = <SheetFormItem>[];
   for (final AzColumn c in cols) {
-    final String initial = record == null ? '' : record.text(c.name);
+    final String raw = record == null ? '' : record.text(c.name);
+    final String initial = _kDateCols.contains(c.name)
+        ? _formatDate(raw)
+        : raw;
     if (c.kind == AzInputKind.choice) {
       final String def = _kEnumDefault[c.name] ??
           (c.options.isEmpty ? '' : c.options.first);
@@ -155,7 +355,10 @@ List<SheetFormItem> _itemsFor(List<AzColumn> cols, AzRecord? record) {
         builder: (BuildContext ctx, ValueChanged<Object?> onChanged) =>
             _ChoiceField(
           options: c.options,
-          initial: initial.isNotEmpty && c.options.contains(initial) ? initial : def,
+          initial: initial.isNotEmpty && c.options.contains(initial)
+              ? initial
+              : def,
+          labels: _kEnumLabels,
           onChanged: onChanged,
         ),
       ));
@@ -164,25 +367,63 @@ List<SheetFormItem> _itemsFor(List<AzColumn> cols, AzRecord? record) {
         key: c.name,
         label: c.required ? '${c.label} *' : c.label,
         initialValue: initial,
-        hint: c.kind == AzInputKind.money ? '0.00' : null,
+        hint: _hintFor(c),
         showClearButton: true,
-        keyboardType: c.kind == AzInputKind.text
+        keyboardType: _kDateCols.contains(c.name) || c.kind == AzInputKind.text
             ? null
             : const TextInputType.numberWithOptions(decimal: true),
-        validator: c.name == 'name'
-            ? (String v) => v.trim().isEmpty ? '名称必填' : null
-            : null,
+        validator: _validatorFor(c),
       ));
     }
   }
   return out;
 }
 
-/// 表单值 → 写库 Map。整数列空写 0，金额列空写 '0'，枚举列空回退默认值。
+String? _hintFor(AzColumn c) {
+  if (_kDateCols.contains(c.name)) return 'YYYY-MM-DD';
+  if (c.kind == AzInputKind.money) return '0.00';
+  if (c.kind == AzInputKind.integer) return '整数';
+  return null;
+}
+
+String? Function(String)? _validatorFor(AzColumn c) {
+  if (c.name == 'name') {
+    return (String v) => v.trim().isEmpty ? '名称必填' : null;
+  }
+  if (_kDateCols.contains(c.name)) {
+    return (String v) {
+      final String s = v.trim();
+      if (s.isEmpty) return null;
+      if (_parseDate(s) == null) return '日期请填 YYYY-MM-DD';
+      return null;
+    };
+  }
+  if (c.kind == AzInputKind.money) {
+    return (String v) {
+      final String s = v.trim();
+      if (s.isEmpty) return null;
+      final double? d = double.tryParse(s);
+      if (d == null || d < 0) return '金额请填不小于 0 的数字';
+      return null;
+    };
+  }
+  return null;
+}
+
+/// 表单值 → 写库 Map。整数列空写 0，金额列空写 '0'，枚举列空回退默认值，日期列转毫秒。
+/// 【所属模块】screens/ledger · 新增表单
+/// 【实现功能】把 SheetFormValues 按列种类转换成可直接写 DDL 的值。
+/// 【使用限制】金额一律 String；日期一律 int 毫秒；不在这里做业务校验。
+/// 【入参与结果】收列清单与表单值；返回写库 Map。
+/// 【异常与调用方处理】不抛异常；非法日期按 0 处理，由业务层拒绝保存。
 Map<String, Object?> _collect(List<AzColumn> cols, SheetFormValues values) {
   final Map<String, Object?> out = <String, Object?>{};
   for (final AzColumn c in cols) {
     final String raw = values.text(c.name).trim();
+    if (_kDateCols.contains(c.name)) {
+      out[c.name] = _parseDate(raw) ?? 0;
+      continue;
+    }
     switch (c.kind) {
       case AzInputKind.integer:
         out[c.name] = int.tryParse(raw) ?? 0;
@@ -197,6 +438,32 @@ Map<String, Object?> _collect(List<AzColumn> cols, SheetFormValues values) {
     }
   }
   return out;
+}
+
+/// YYYY-MM-DD → 当日 0 点的毫秒时间戳；也兼容已经是毫秒的旧值。
+int? _parseDate(String raw) {
+  if (raw.isEmpty) return null;
+  final int? ms = int.tryParse(raw);
+  if (ms != null && ms > 100000000000) return ms;
+  final List<String> parts = raw.split('-');
+  if (parts.length != 3) return null;
+  final int? y = int.tryParse(parts[0]);
+  final int? m = int.tryParse(parts[1]);
+  final int? d = int.tryParse(parts[2]);
+  if (y == null || m == null || d == null) return null;
+  if (m < 1 || m > 12 || d < 1 || d > 31) return null;
+  return DateTime(y, m, d).millisecondsSinceEpoch;
+}
+
+/// 毫秒时间戳 → YYYY-MM-DD 回显；空值返回空串。
+String _formatDate(String raw) {
+  if (raw.isEmpty) return '';
+  final int? ms = int.tryParse(raw);
+  if (ms == null || ms <= 0) return '';
+  final DateTime d = DateTime.fromMillisecondsSinceEpoch(ms);
+  final String mm = d.month.toString().padLeft(2, '0');
+  final String dd = d.day.toString().padLeft(2, '0');
+  return '${d.year}-$mm-$dd';
 }
 
 /// ③ 删除确认，与账户页 `showAccountDeleteSheet` 同一套 ConfirmSheetContent。
@@ -215,7 +482,7 @@ Future<void> showAzDeleteSheet(
       header: const SheetHeader(
         title: '删除记录',
         centered: true,
-        leading: const SheetCancelAction(),
+        leading: SheetCancelAction(),
       ),
       child: ConfirmSheetContent(
         title: '删除「$name」？',
@@ -232,18 +499,25 @@ Future<void> showAzDeleteSheet(
   );
 }
 
-/// 枚举下拉（SheetFormCustomItem 的逃生口）。
+/// 枚举下拉（SheetFormCustomItem 的逃生口）：显示中文，写回英文 code。
 /// 初值在首帧之后写回表单，避免 build 阶段触发父组件 setState。
+/// 【所属模块】screens/ledger · 新增表单
+/// 【实现功能】渲染枚举下拉，选中项以中文显示、以原始 code 回传。
+/// 【使用限制】options 为空时渲染空占位；labels 缺省时直接显示 code。
+/// 【入参与结果】构造收 options / initial / labels / onChanged；无返回值。
+/// 【异常与调用方处理】不抛异常；回调异常由调用方处理。
 class _ChoiceField extends StatefulWidget {
   const _ChoiceField({
     required this.options,
     required this.initial,
     required this.onChanged,
+    this.labels = const <String, String>{},
   });
 
   final List<String> options;
   final String initial;
   final ValueChanged<Object?> onChanged;
+  final Map<String, String> labels;
 
   @override
   State<_ChoiceField> createState() => _ChoiceFieldState();
@@ -270,7 +544,10 @@ class _ChoiceFieldState extends State<_ChoiceField> {
         isExpanded: true,
         items: <DropdownMenuItem<String>>[
           for (final String o in widget.options)
-            DropdownMenuItem<String>(value: o, child: Text(o)),
+            DropdownMenuItem<String>(
+              value: o,
+              child: Text(widget.labels[o] ?? o),
+            ),
         ],
         onChanged: (String? v) {
           if (v == null) return;

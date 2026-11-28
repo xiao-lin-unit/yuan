@@ -637,6 +637,15 @@ class AzSchema {
       'asset_id', 'liability_id', 'sub_asset_id', 'sub_liability_id',
       'asset_class', 'liability_type', 'total_gain', 'total_loss',
       'remaining_after', 'record_source', 'manual_adjusted',
+      // 以下列由软件计算或维护：表单露出会造成「用户填了却不生效」的假象。
+      // 实收金额 = 合同本金 − 服务费；结束日 = 起始 + 总期 × 单位；
+      // 剩余本金 / 已还期数 / 状态 / 抵押状态 / 罚费都由业务层写回。
+      // end_date 保留：一次性还清 / 随借随还没有总期数，必须由用户填；
+      // 按期类填了也会被 normalizeLoan 按「起始 + 总期 × 单位」覆盖。
+      'actual_received_amount', 'remaining_principal',
+      'paid_terms', 'status', 'state', 'mortgage_state',
+      'penalty_amount', 'interest_part', 'principal_part',
+      'principal_due', 'repaid_at', 'repaid_amount',
     };
     return columnsFor(table)
         .where((AzColumn c) => !skip.contains(c.name))

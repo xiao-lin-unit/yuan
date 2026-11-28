@@ -9,6 +9,7 @@ import '../../service/core/entity_registry.dart';
 import '../../service/core/lifecycle_service.dart';
 import '../../service/core/uniqueness_service.dart';
 import '../../service/core/unit_of_work.dart';
+import 'az_liability_service.dart';
 
 /// 资债共享账本：持有 AzData 快照，页面 watch 它自动重建。
 /// 【所属模块】service/ledger · 资债共享账本
@@ -81,7 +82,7 @@ class AzWriteController {
     required this.uow,
     required this.lifecycle,
     required this.uniqueness,
-  });
+  }) : liability = AzLiabilityService(dao);
 
   final Database db;
   final AzDao dao;
@@ -89,6 +90,9 @@ class AzWriteController {
   final UnitOfWork uow;
   final LifecycleService lifecycle;
   final UniquenessService uniqueness;
+
+  /// 负债侧功能接口（IF-Z13~Z23），只由本 Controller 与跨模块编排服务调用。
+  final AzLiabilityService liability;
 
   /// 【所属模块】service/ledger · 资债写入口
   /// 【实现功能】补系统列：主表补 book_id / 排序 / 归档，主表与次表都补留痕三件套；判别列与外键由调用方填入。
@@ -126,16 +130,50 @@ class AzWriteController {
     await uow.run(
       (DatabaseExecutor txn) async {
         await uniqueness.assertUnique(txn, kind, name: name);
+        // 负债侧先做业务层校验与计算列补齐：实收金额、end_date、枚举、
+        // 抵押必选、期数单位都在这里收口，写库前完成（IF-Z13 / IF-Z14）。
+        Map<String, Object?> effMain = mainValues;
+        Map<String, Object?> effSub = subValues;
+        final bool isDebt = spec.side == 'liability';
+        final bool isInstallment =
+            isDebt && spec.subTable == 'az_liability_installment';
+        if (isDebt) {
+          final Map<String, Object?> normalized = isInstallment
+              ? liability.normalizeInstallment(mainValues, subValues)
+              : liability.normalizeLoan(mainValues, subValues);
+          effMain = normalized['main']! as Map<String, Object?>;
+          effSub = normalized['sub']! as Map<String, Object?>;
+        }
         final Map<String, Object?> main = _stamp(<String, Object?>{
-          ...mainValues,
+          ...effMain,
           spec.discriminatorColumn: spec.code,
         }, isMain: true);
         newId = await dao.insert(txn, table, main);
         final String fk = spec.side == 'asset' ? 'asset_id' : 'liability_id';
-        await dao.insert(txn, spec.subTable, _stamp(<String, Object?>{
-          ...subValues,
-          fk: newId,
-        }, isMain: false));
+        final int subId = await dao.insert(
+          txn,
+          spec.subTable,
+          _stamp(<String, Object?>{...effSub, fk: newId}, isMain: false),
+        );
+        if (isDebt) {
+          // 运行时模型硬-1：只在「新建」这一时机生成第一条待还，禁止排满全部期数。
+          await liability.createFirstPendingIn(
+            txn,
+            liabilityId: newId,
+            subId: subId,
+            isInstallment: isInstallment,
+            sub: effSub,
+            main: effMain,
+          );
+          if (!isInstallment) {
+            final int assetId = int.tryParse(
+                    (effSub['link_asset_id'] ?? '').toString()) ??
+                0;
+            if (assetId > 0) {
+              await liability.syncMortgageStateIn(txn, assetId: assetId);
+            }
+          }
+        }
       },
       afterCommit: () => catalog.load(),
     );
@@ -219,5 +257,55 @@ class AzWriteController {
       'remaining_after': remainingAfter,
       'updated_at': now,
     });
+  }
+
+  /// IF-Z16 命名入口：把完整还款动作转给负债服务，供跨模块编排服务在同一事务里调用。
+  /// 【所属模块】service/ledger · 资债写入口
+  /// 【实现功能】转发到 AzLiabilityService.markPlanPaidIn，写回当期与次表、累加总亏损、生成下一条待还。
+  /// 【使用限制】必须在 uow.run 事务内；页面不得直调；不得在此写账户流水或刷新快照。
+  /// 【入参与结果】收 txn / liabilityId / planId / 实还金额 / 还款时间 / 还款账户 / 是否分期；返回 AzRepayOutcome，调用方必须 await。
+  /// 【异常与调用方处理】参数与状态异常原样上抛由外层事务回滚；调用方自行 try/catch 提示「还款未生效」。
+  Future<AzRepayOutcome> markPlanPaidIn(
+    DatabaseExecutor txn, {
+    required int liabilityId,
+    required int planId,
+    required double repaidAmount,
+    required DateTime repaidAt,
+    int? repayAccountId,
+    double? fee,
+    bool isInstallment = false,
+  }) =>
+      liability.markPlanPaidIn(
+        txn,
+        liabilityId: liabilityId,
+        planId: planId,
+        repaidAmount: repaidAmount,
+        repaidAt: repaidAt,
+        repayAccountId: repayAccountId,
+        fee: fee,
+        isInstallment: isInstallment,
+      );
+
+  /// IF-Z20：用户打开详情 / 执行还款前现算现标逾期（软件不打开不处理数据）。
+  /// 【所属模块】service/ledger · 资债写入口
+  /// 【实现功能】在唯一事务里扫描过 due_at 未还的期，标逾期、算罚息与复利、写回主表状态与总亏损，提交后刷新快照。
+  /// 【使用限制】只在用户打开 / 操作时调用，不做定时跨天累计；不得在事务 body 内刷新快照。
+  /// 【入参与结果】收 liabilityId / 是否分期；返回本次标逾期条数，调用方必须 await。
+  /// 【异常与调用方处理】DAO 异常上抛并整体回滚；调用方自行 try/catch 保持旧状态。
+  Future<int> scanOverdue(int liabilityId,
+      {bool isInstallment = false}) async {
+    int changed = 0;
+    await uow.run(
+      (DatabaseExecutor txn) async {
+        changed = await liability.overdueScanIn(
+          txn,
+          liabilityId: liabilityId,
+          now: DateTime.now(),
+          isInstallment: isInstallment,
+        );
+      },
+      afterCommit: () => catalog.load(),
+    );
+    return changed;
   }
 }

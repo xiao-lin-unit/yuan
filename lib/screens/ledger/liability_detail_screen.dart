@@ -14,6 +14,7 @@ import '../../screens/commons/function/app_function_grid.dart';
 import '../../screens/commons/function/app_function_layout.dart';
 import '../../screens/commons/icons/app_icons.dart';
 import '../../service/ledger/az_controller.dart';
+import '../../service/ledger/az_repayment_service.dart';
 import '../../styles/app_typography.dart';
 import '../../styles/theme_tokens.dart';
 import '../../utils/money_format.dart';
@@ -70,13 +71,40 @@ class LiabilityDetailScreen extends StatelessWidget {
         : AzMath.valueOf(data, row, spec);
     final String status = row.text('status');
     final AppThemeTokens tokens = context.tokens;
+    final bool isInstallment =
+        spec != null && spec.subTable == 'az_liability_installment';
+    // 当期应还只从负债侧的待还记录取（要-13）：账户侧只有累计量，查不出本期增量。
+    final AzRecord? plan = _currentPlan(data, row.id, isInstallment);
+    final double dueTotal = plan == null
+        ? 0
+        : plan.money('principal_part') +
+            plan.money('interest_part') +
+            plan.money('fee') +
+            plan.money('penalty_amount');
 
-    // 与资产详情页同一套：功能入口上移到首屏横排格。
+    // 与资产详情页同一套：功能入口上移到首屏横排格，一行 5 个。
     final List<AppFloatingAction> actions = <AppFloatingAction>[
+      AppFloatingAction(
+        label: '还本期',
+        icon: AppIcons.repay,
+        emphasized: true,
+        onPressed: () => unawaited(_repay(context, row, plan, dueTotal,
+            isInstallment: isInstallment, prepay: false)),
+      ),
+      AppFloatingAction(
+        label: '提前还款',
+        icon: AppIcons.add,
+        onPressed: () => unawaited(_repay(context, row, plan, dueTotal,
+            isInstallment: isInstallment, prepay: true)),
+      ),
+      AppFloatingAction(
+        label: '检查逾期',
+        icon: AppIcons.schedule,
+        onPressed: () => unawaited(_scanOverdue(context, row.id, isInstallment)),
+      ),
       AppFloatingAction(
         label: '编辑',
         icon: AppIcons.edit,
-        emphasized: true,
         onPressed: () => unawaited(_edit(context, data, row, spec)),
       ),
       AppFloatingAction(
@@ -131,6 +159,35 @@ class LiabilityDetailScreen extends StatelessWidget {
             child: AppFunctionGrid(actions: actions),
           ),
           const SizedBox(height: AppSpacing.lg),
+          // 当期应还：只展示已生成的一条 pending / overdue，不预测未来期数。
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+            child: AppInfoGrid(
+              groupLabel: '当期应还',
+              items: <AppInfoItem>[
+                AppInfoItem(
+                  label: '合计应还',
+                  value: MoneyFormat.yuan(dueTotal),
+                  tip: '本金 + 利息 + 费用 + 罚费；软件按次表参数算好这一条。',
+                ),
+                AppInfoItem(
+                  label: '期号',
+                  value: plan == null || plan.text('term_no').isEmpty
+                      ? '—'
+                      : '第 ${plan.text('term_no')} 期',
+                ),
+                AppInfoItem(
+                  label: '应还日',
+                  value: plan == null ? '—' : _dateLabel(plan.intOf('due_at')),
+                ),
+                AppInfoItem(
+                  label: '状态',
+                  value: plan == null ? '无待还记录' : _stateLabel(plan.text('state')),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
             child: AppInfoGrid(
@@ -170,6 +227,147 @@ class LiabilityDetailScreen extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  /// 从负债侧取唯一一条待还记录（未来永远只有一条 pending / overdue）。
+  /// 【所属模块】screens/ledger · 详情
+  /// 【实现功能】在还款附表里按 liability_id 筛未还记录，按期号取最早一条。
+  /// 【使用限制】纯内存只读派生；不读账户表、不预测未来期数。
+  /// 【入参与结果】收 data / liabilityId / 是否分期；返回 AzRecord?。
+  /// 【异常与调用方处理】不抛异常；无记录返回 null，调用方渲染「无待还记录」。
+  AzRecord? _currentPlan(AzData data, int liabilityId, bool isInstallment) {
+    final String table = isInstallment
+        ? 'az_liability_installment_repay'
+        : 'az_liability_loan_repay';
+    final List<AzRecord> rows = data
+        .rowsOf(table)
+        .where((AzRecord r) =>
+            r.intOf('liability_id') == liabilityId &&
+            (r.text('state') == 'pending' || r.text('state') == 'overdue'))
+        .toList();
+    if (rows.isEmpty) return null;
+    rows.sort((AzRecord a, AzRecord b) =>
+        a.intOf('term_no').compareTo(b.intOf('term_no')));
+    return rows.first;
+  }
+
+  /// 【所属模块】screens/ledger · 详情
+  /// 【实现功能】把毫秒时间戳显示成 YYYY-MM-DD。
+  /// 【使用限制】只读；0 或负数按「—」。
+  /// 【入参与结果】收毫秒；返回 String。
+  /// 【异常与调用方处理】不抛异常。
+  String _dateLabel(int ms) {
+    if (ms <= 0) return '—';
+    final DateTime d = DateTime.fromMillisecondsSinceEpoch(ms);
+    final String m = d.month.toString().padLeft(2, '0');
+    final String day = d.day.toString().padLeft(2, '0');
+    return '${d.year}-$m-$day';
+  }
+
+  /// 【所属模块】screens/ledger · 详情
+  /// 【实现功能】把附表 state 的英文值显示成中文。
+  /// 【使用限制】只读；未知值原样显示。
+  /// 【入参与结果】收 state；返回 String。
+  /// 【异常与调用方处理】不抛异常。
+  String _stateLabel(String state) => switch (state) {
+        'pending' => '待还',
+        'overdue' => '逾期',
+        'paid' => '已还',
+        'cancelled' => '已取消',
+        _ => state.isEmpty ? '—' : state,
+      };
+
+  /// 还款：先现算逾期，再弹动作表，最后走全库唯一的跨模块编排入口。
+  /// 【所属模块】screens/ledger · 详情
+  /// 【实现功能】常规还本期调 repayLoanInstallment；主动提前还款 / 分期结清调 prepay；写库失败只提示、不跳页。
+  /// 【使用限制】页面不拆金额、不判断该不该收违约金、不直接调账户出账；写库异常不吞。
+  /// 【入参与结果】收 context / 主表行 / 当期计划 / 建议金额 / 是否分期 / 是否提前；返回 Future<void>。
+  /// 【异常与调用方处理】服务抛异常时 SnackBar 提示「还款未生效」，保持页面与旧快照；调用方必须判 mounted。
+  Future<void> _repay(
+    BuildContext context,
+    AzRecord row,
+    AzRecord? plan,
+    double dueTotal, {
+    required bool isInstallment,
+    required bool prepay,
+  }) async {
+    await _scanOverdue(context, row.id, isInstallment, quiet: true);
+    if (!context.mounted) return;
+    final AzRepaySheetResult? result = await showAzRepaySheet(
+      context,
+      name: row.text('name'),
+      isInstallment: isInstallment,
+      suggestedAmount: dueTotal,
+    );
+    if (result == null || !context.mounted) return;
+    if (!result.prepay && plan == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('当前没有待还记录，请先检查是否已结清')),
+      );
+      return;
+    }
+    try {
+      final AzRepaymentService service = context.read<AzRepaymentService>();
+      if (result.prepay) {
+        await service.prepay(AzPrepayRequest(
+          liabilityId: row.id,
+          amount: result.amount,
+          repaidAt: DateTime.now(),
+          isInstallment: isInstallment,
+          settleAll: result.settleAll,
+          settleRule: result.settleRule,
+          ruleRatio: result.ruleRatio,
+          serviceFee: result.serviceFee,
+          partialMode: result.partialMode,
+          payCurrentTerm: result.payCurrentTerm,
+          hasPenalty: result.hasPenalty,
+        ));
+      } else {
+        await service.repayLoanInstallment(
+          liabilityId: row.id,
+          planId: plan!.id,
+          amount: result.amount,
+          repaidAt: DateTime.now(),
+          isInstallment: isInstallment,
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('还款未生效：$e')),
+        );
+      }
+    }
+  }
+
+  /// 用户打开 / 操作时现算现标逾期（软件不打开不处理数据）。
+  /// 【所属模块】screens/ledger · 详情
+  /// 【实现功能】调 AzWriteController.scanOverdue 在唯一事务里标逾期、算罚息与复利、累加总亏损。
+  /// 【使用限制】不做定时跨天累计；quiet=true 时不弹提示。
+  /// 【入参与结果】收 context / liabilityId / 是否分期 / quiet；返回 Future<void>。
+  /// 【异常与调用方处理】DAO 异常只提示、不吞后继续走还款流程之外的其它动作。
+  Future<void> _scanOverdue(
+    BuildContext context,
+    int liabilityId,
+    bool isInstallment, {
+    bool quiet = false,
+  }) async {
+    try {
+      final int changed = await context
+          .read<AzWriteController>()
+          .scanOverdue(liabilityId, isInstallment: isInstallment);
+      if (!quiet && changed > 0 && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('已标记 $changed 条逾期记录')),
+        );
+      }
+    } catch (e) {
+      if (!quiet && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('逾期检查失败：$e')),
+        );
+      }
+    }
   }
 
   /// 编辑：声明式表单带出主表 + 次表已有值，交给 AzWriteController 同事务更新。

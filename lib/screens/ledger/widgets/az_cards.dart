@@ -338,6 +338,40 @@ const Set<String> _kHiddenDetailCols = <String>{
   'asset_id', 'liability_id', 'sub_asset_id', 'sub_liability_id',
 };
 
+/// 详情里按「日期」显示的毫秒列，不再把一串时间戳直接摆给用户。
+const Set<String> _kDateDetailCols = <String>{
+  'start_date', 'end_date', 'due_at', 'repaid_at', 'drawn_at',
+};
+
+/// 详情里枚举 code → 中文（与新增表单同一套显示文案）。
+const Map<String, String> _kDetailLabels = <String, String>{
+  'equal_principal': '等额本金',
+  'equal_installment': '等额本息',
+  'interest_first': '先息后本',
+  'lump_sum': '到期一次性还本付息',
+  'revolving': '随借随还',
+  'month': '按月',
+  'quarter': '按季',
+  'year': '按年',
+  'day': '按天',
+  'week': '按周（每周六）',
+  'normal': '正常',
+  'overdue': '逾期',
+  'settled': '已结清',
+  'pending': '待还',
+  'paid': '已还',
+  'cancelled': '已取消',
+  'auto': '软件生成',
+  'user': '用户主动还款',
+  'waive_unbilled': '免收未出账手续费',
+  'charge_all_remaining': '收齐剩余各期手续费',
+  'charge_one_more': '只加收一期手续费',
+  'ratio_of_remaining': '按剩余本金比例收',
+  'extra_service_fee': '另收一笔服务费',
+  'mortgaged': '已抵押',
+  'unmortgaged': '未抵押',
+};
+
 /// 一行记录 → AppInfoGrid 的条目列表（剔除纯技术列，金额按元格式化）。
 /// 【所属模块】screens/ledger/widgets · 资债卡片
 /// 【实现功能】把一条主表 / 次表 / 附表记录按 AzSchema 列清单转成详情信息格，金额列走 MoneyFormat。
@@ -349,12 +383,41 @@ List<AppInfoItem> azInfoItems(AzRecord record) {
   for (final AzColumn c in AzSchema.columnsFor(record.table)) {
     if (_kHiddenDetailCols.contains(c.name)) continue;
     final Object? raw = record.fields[c.name];
-    final String value = (raw == null || raw.toString().isEmpty)
-        ? '—'
-        : (c.kind == AzInputKind.money ? MoneyFormat.yuan(record.money(c.name)) : raw.toString());
+    final String value;
+    if (raw == null || raw.toString().isEmpty) {
+      value = '—';
+    } else if (c.kind == AzInputKind.money) {
+      value = MoneyFormat.yuan(record.money(c.name));
+    } else if (_kDateDetailCols.contains(c.name)) {
+      value = _detailDate(raw);
+    } else if (c.kind == AzInputKind.choice ||
+        (c.name == 'state' || c.name == 'status' ||
+            c.name == 'record_source' || c.name == 'mortgage_state' ||
+            c.name == 'settle_rule')) {
+      value = _kDetailLabels[raw.toString()] ?? raw.toString();
+    } else {
+      value = raw.toString();
+    }
     out.add(AppInfoItem(label: c.label, value: value));
   }
   return out;
+}
+
+/// 毫秒时间戳 → YYYY-MM-DD；已是文本则原样显示。
+/// 【所属模块】screens/ledger/widgets · 资债卡片
+/// 【实现功能】把详情里的 INTEGER 日期列格式化，避免直接展示时间戳。
+/// 【使用限制】只读；非法值原样返回。
+/// 【入参与结果】收原始值；返回 String。
+/// 【异常与调用方处理】不抛异常。
+String _detailDate(Object? raw) {
+  final int? ms = raw is num
+      ? raw.toInt()
+      : int.tryParse(raw.toString().trim());
+  if (ms == null || ms <= 0) return raw.toString();
+  final DateTime d = DateTime.fromMillisecondsSinceEpoch(ms);
+  final String m = d.month.toString().padLeft(2, '0');
+  final String day = d.day.toString().padLeft(2, '0');
+  return '${d.year}-$m-$day';
 }
 
 /// 与主表行关联的附属表记录，按表分块渲染（SheetSectionLabel + AppInfoGrid）。

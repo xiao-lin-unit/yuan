@@ -137,8 +137,7 @@ class Services {
       uow: uow,
       azWrite: azWrite,
       ledger: accountLedger,
-      accountCatalog: accountController,
-      azLedger: azController,
+      refreshAccounts: () => accountController.load(),
     );
 
     Components.components.putIfAbsent("user", () => userDao);
