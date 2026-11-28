@@ -178,7 +178,7 @@ Future<AzEntryDraft?> showAzEntrySheet(
     context,
     header: SheetHeader(
       title: editId == null ? '新增${spec.label}' : '编辑${spec.label}',
-      subtitle: '${spec.code}（${spec.label}）· 主表 + 次表',
+      subtitle: '${spec.label} · 请填写下面的信息',
       centered: true,
       leading: const SheetCancelAction(),
       trailing: SheetTextAction(
@@ -194,7 +194,7 @@ Future<AzEntryDraft?> showAzEntrySheet(
         if (subCols.isNotEmpty)
           const SheetFormNoteItem(
             key: '_sub_divider',
-            text: '以下内容写进该类型专属的次表。',
+            text: '以下为该类型专属信息。',
             centered: false,
           ),
         ..._itemsFor(subCols, sub),

@@ -336,6 +336,12 @@ const Set<String> _kHiddenDetailCols = <String>{
   'id', 'book_id', 'created_at', 'updated_at', 'revision', 'sort_order',
   'archived', 'deleted_at', 'delete_reason',
   'asset_id', 'liability_id', 'sub_asset_id', 'sub_liability_id',
+  // 判别列已在详情页标题里显示；图标 key / 各种外键 id / 留痕标记属于技术字段，
+  // 详情只读区不必把 DDL 全列平铺给用户（要-13 只展示业务字段）。
+  'asset_class', 'liability_type', 'icon_key', 'manual_adjusted',
+  'link_account_id', 'link_asset_id', 'mount_creditcard_id',
+  'repay_account_id', 'default_account_id', 'debit_account_id',
+  'credit_account_id', 'buy_id', 'sell_id',
 };
 
 /// 详情里按「日期」显示的毫秒列，不再把一串时间戳直接摆给用户。
@@ -395,6 +401,11 @@ List<AppInfoItem> azInfoItems(AzRecord record) {
             c.name == 'record_source' || c.name == 'mortgage_state' ||
             c.name == 'settle_rule')) {
       value = _kDetailLabels[raw.toString()] ?? raw.toString();
+    } else if (c.name.startsWith('has_') || c.name == 'archived') {
+      // 0/1 布尔列直接摆 0/1 看不懂，统一成「是 / 否」。
+      value = (raw.toString() == '1' || raw.toString() == 'true')
+          ? '是'
+          : '否';
     } else {
       value = raw.toString();
     }
@@ -442,12 +453,14 @@ List<Widget> azAttachedSections(
         .where((AzRecord r) => r.intOf(fk) == mainId)
         .toList(growable: false);
     if (rows.isEmpty) continue;
-    out.add(SheetSectionLabel(label: table, count: '${rows.length} 条'));
+    out.add(SheetSectionLabel(
+        label: AzSchema.tableLabel(table), count: '${rows.length} 条'));
+    // 这里是函数体里的语句级 for（out 已建好），不是列表字面量内的
+    // collection-for，不能写 `for (...) ...<Widget>[...]`：那种语法只出现在
+    // `[ ... ]` 里，放语句位置会报 Expected an identifier。直接 out.add 两次。
     for (final AzRecord r in rows) {
-      <Widget>[
-      AppInfoGrid(items: azInfoItems(r)),
-      const SizedBox(height: AppSpacing.xs),
-    ];
+      out.add(AppInfoGrid(items: azInfoItems(r)));
+      out.add(const SizedBox(height: AppSpacing.xs));
     }
   }
   if (out.isEmpty) {
