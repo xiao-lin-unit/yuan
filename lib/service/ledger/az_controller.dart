@@ -144,10 +144,17 @@ class AzWriteController {
           effMain = normalized['main']! as Map<String, Object?>;
           effSub = normalized['sub']! as Map<String, Object?>;
         }
-        final Map<String, Object?> main = _stamp(<String, Object?>{
+        final Map<String, Object?> mainInput = <String, Object?>{
           ...effMain,
           spec.discriminatorColumn: spec.code,
-        }, isMain: true);
+        };
+        // 表单里 link_account_id 是可选技术列，空值会被 _collect 转成 0；
+        // 写 0 等于绑定一个不存在的账户，还款时反而会误导回落逻辑。留 NULL，
+        // 由还款弹层当场选付款账户。
+        if (mainInput['link_account_id'] == 0) {
+          mainInput['link_account_id'] = null;
+        }
+        final Map<String, Object?> main = _stamp(mainInput, isMain: true);
         newId = await dao.insert(txn, table, main);
         final String fk = spec.side == 'asset' ? 'asset_id' : 'liability_id';
         final int subId = await dao.insert(

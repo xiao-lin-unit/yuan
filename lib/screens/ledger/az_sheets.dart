@@ -1,5 +1,7 @@
 import 'package:material_ui/material_ui.dart';
+import 'package:provider/provider.dart';
 
+import '../../database/account/account_record.dart';
 import '../../database/ledger/az_record.dart';
 import '../../database/ledger/az_schema.dart';
 import '../../screens/commons/icons/app_icons.dart';
@@ -10,6 +12,7 @@ import '../../screens/commons/sheet/contents/form_sheet_content.dart';
 import '../../screens/commons/sheet/parts/sheet_primitives.dart';
 import '../../screens/commons/sheet/sheet_form_items.dart';
 import '../../screens/commons/sheet/sheet_models.dart';
+import '../../service/account_controller.dart';
 import 'widgets/az_cards.dart';
 
 // ── 页面私有文案（样式一律走全局层）─────────────────────────────
@@ -44,12 +47,15 @@ class AzRepaySheetResult {
     required this.hasPenalty,
     required this.settleAll,
     required this.partialMode,
+    required this.repayAccountId,
     this.settleRule,
     this.ruleRatio,
     this.serviceFee,
   });
 
   final double amount;
+  /// 付款账户 id；由弹层下拉给出，交给 AzRepaymentService 写账户出账。
+  final int? repayAccountId;
   final bool prepay;
   final bool payCurrentTerm;
   final bool hasPenalty;
@@ -207,14 +213,24 @@ Future<AzEntryDraft?> showAzEntrySheet(
 /// 【所属模块】screens/ledger · 还款弹层
 /// 【实现功能】带出当期应还额作默认金额，收集实还金额与全部动作开关，取消返回 null。
 /// 【使用限制】只收集动作输入，不做金额拆分、不判断该不该收违约金；结清规则五值由业务层校验。
-/// 【入参与结果】收 context / 名称 / 是否分期 / 建议金额；返回 Future<AzRepaySheetResult?>，调用方必须判 null 与 mounted。
-/// 【异常与调用方处理】不抛异常；写库异常由 AzRepaymentService 上抛，弹层不吞。
+/// 【入参与结果】收 context / 名称 / 是否分期 / 建议金额 / 主表已绑定账户 id；返回 Future<AzRepaySheetResult?>，调用方必须判 null 与 mounted。
+/// 【异常与调用方处理】不抛异常；无可用账户时 repayAccountId 为 null，调用方须提示先建账户；写库异常由 AzRepaymentService 上抛。
 Future<AzRepaySheetResult?> showAzRepaySheet(
   BuildContext context, {
   required String name,
   required bool isInstallment,
   required double suggestedAmount,
+  int defaultAccountId = 0,
 }) async {
+  // 新增负债时 link_account_id 是可选技术列，用户几乎不会填；若还款时只回落
+  // 主表，resolveRepayAccountIn 会抛错、整笔还款 100% 失败。这里直接从账户
+  // 账本给出可选账户，信用卡不作为贷款扣款账户（IF-Z23）。
+  final List<AccountRecord> accounts = context
+      .read<AccountController>()
+      .all
+      .where((AccountRecord a) =>
+          a.deletedAt == null && !a.archived && a.kind != AccountKind.credit)
+      .toList(growable: false);
   final FormSheetController controller = FormSheetController();
   final SheetFormValues? values = await AppSheetShell.show<SheetFormValues>(
     context,
@@ -232,6 +248,16 @@ Future<AzRepaySheetResult?> showAzRepaySheet(
     child: FormSheetContent(
       controller: controller,
       items: <SheetFormItem>[
+        SheetFormCustomItem(
+          key: 'repayAccountId',
+          label: '付款账户 *',
+          builder: (BuildContext ctx, ValueChanged<Object?> onChanged) =>
+              _AccountField(
+            accounts: accounts,
+            initial: defaultAccountId,
+            onChanged: onChanged,
+          ),
+        ),
         SheetFormSingleLineTextItem(
           key: 'amount',
           label: '本次实还金额 *',
@@ -310,8 +336,13 @@ Future<AzRepaySheetResult?> showAzRepaySheet(
   if (values == null) return null;
   final double amount = double.tryParse(values.text('amount').trim()) ?? 0;
   if (amount <= 0) return null;
+  final Object? rawAccount = values.raw('repayAccountId');
+  final int? repayAccountId = rawAccount is int
+      ? rawAccount
+      : int.tryParse(rawAccount?.toString().trim() ?? '');
   return AzRepaySheetResult(
     amount: amount,
+    repayAccountId: repayAccountId,
     prepay: values.flag('prepay'),
     payCurrentTerm: values.flag('payCurrent'),
     hasPenalty: values.flag('hasPenalty'),
@@ -497,6 +528,64 @@ Future<void> showAzDeleteSheet(
         },
       ),
   );
+}
+
+/// 付款账户下拉：把「账户 id」变成人能看懂的账户名，避免用户手填技术主键。
+/// 【所属模块】screens/ledger · 还款弹层
+/// 【实现功能】列出未删除、未归档、非信用卡的账户，默认选中主表已绑定账户或第一个；首帧把选中 id 写回表单。
+/// 【使用限制】无可用账户时渲染提示文本且不回传值；不写库。
+/// 【入参与结果】构造收 accounts / initial / onChanged；无返回值。
+/// 【异常与调用方处理】不抛异常；调用方判 repayAccountId 为空后提示先建账户。
+class _AccountField extends StatefulWidget {
+  const _AccountField({
+    required this.accounts,
+    required this.initial,
+    required this.onChanged,
+  });
+
+  final List<AccountRecord> accounts;
+  final int initial;
+  final ValueChanged<Object?> onChanged;
+
+  @override
+  State<_AccountField> createState() => _AccountFieldState();
+}
+
+class _AccountFieldState extends State<_AccountField> {
+  int? _value;
+
+  @override
+  void initState() {
+    super.initState();
+    _value = widget.accounts.any((AccountRecord a) => a.id == widget.initial)
+        ? widget.initial
+        : (widget.accounts.isNotEmpty ? widget.accounts.first.id : null);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) widget.onChanged(_value);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.accounts.isEmpty) {
+      return const Text('还没有可用账户，请先到「账户」页新建一个流动资金账户。');
+    }
+    return DropdownButtonHideUnderline(
+      child: DropdownButton<int>(
+        value: _value,
+        isExpanded: true,
+        items: <DropdownMenuItem<int>>[
+          for (final AccountRecord a in widget.accounts)
+            DropdownMenuItem<int>(value: a.id, child: Text(a.name)),
+        ],
+        onChanged: (int? v) {
+          if (v == null) return;
+          setState(() => _value = v);
+          widget.onChanged(v);
+        },
+      ),
+    );
+  }
 }
 
 /// 枚举下拉（SheetFormCustomItem 的逃生口）：显示中文，写回英文 code。

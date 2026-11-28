@@ -14,6 +14,7 @@ import '../../screens/commons/function/app_function_grid.dart';
 import '../../screens/commons/function/app_function_layout.dart';
 import '../../screens/commons/icons/app_icons.dart';
 import '../../service/ledger/az_controller.dart';
+import '../../service/ledger/az_liability_service.dart';
 import '../../service/ledger/az_repayment_service.dart';
 import '../../styles/app_typography.dart';
 import '../../styles/theme_tokens.dart';
@@ -85,7 +86,9 @@ class LiabilityDetailScreen extends StatelessWidget {
     // 与资产详情页同一套：功能入口上移到首屏横排格，一行 5 个。
     final List<AppFloatingAction> actions = <AppFloatingAction>[
       AppFloatingAction(
-        label: '还本期',
+        // 一次性还清 / 随借随还没有自动计划，主按钮改叫「登记还款」，
+        // 走 user 主动还款路径，不能因 plan == null 把入口堵死。
+        label: plan == null ? '登记还款' : '还本期',
         icon: AppIcons.repay,
         emphasized: true,
         onPressed: () => unawaited(_repay(context, row, plan, dueTotal,
@@ -298,37 +301,52 @@ class LiabilityDetailScreen extends StatelessWidget {
       name: row.text('name'),
       isInstallment: isInstallment,
       suggestedAmount: dueTotal,
+      defaultAccountId: row.intOf('link_account_id'),
     );
     if (result == null || !context.mounted) return;
-    if (!result.prepay && plan == null) {
+    if (result.repayAccountId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('当前没有待还记录，请先检查是否已结清')),
+        const SnackBar(content: Text('请先到「账户」页新建一个流动资金账户，再回来还款')),
       );
       return;
     }
+    // 没有自动计划（一次性 / 随借随还 / 计划被取消）时一律走 user 主动还款，
+    // 否则 markPlanPaidIn 会因找不到 plan 抛错、还款永远办不成。
+    final bool usePrepay = result.prepay || plan == null;
     try {
       final AzRepaymentService service = context.read<AzRepaymentService>();
-      if (result.prepay) {
-        await service.prepay(AzPrepayRequest(
+      AzRepayOutcome outcome;
+      if (usePrepay) {
+        outcome = await service.prepay(AzPrepayRequest(
           liabilityId: row.id,
           amount: result.amount,
           repaidAt: DateTime.now(),
+          repayAccountId: result.repayAccountId,
           isInstallment: isInstallment,
           settleAll: result.settleAll,
           settleRule: result.settleRule,
           ruleRatio: result.ruleRatio,
           serviceFee: result.serviceFee,
           partialMode: result.partialMode,
-          payCurrentTerm: result.payCurrentTerm,
+          // 无自动计划时不能勾选「先还完本期」，否则逻辑会去找不存在的计划。
+          payCurrentTerm: result.payCurrentTerm && plan != null,
           hasPenalty: result.hasPenalty,
         ));
       } else {
-        await service.repayLoanInstallment(
+        outcome = await service.repayLoanInstallment(
           liabilityId: row.id,
           planId: plan!.id,
           amount: result.amount,
           repaidAt: DateTime.now(),
+          repayAccountId: result.repayAccountId,
           isInstallment: isInstallment,
+        );
+      }
+      // 全额结清按规则重算过金额时，明确告诉用户实际扣了多少。
+      if (context.mounted && (outcome.amount - result.amount).abs() > 0.01) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(
+              '已按结清规则以 ${outcome.amount.toStringAsFixed(2)} 元入账（与你填的 ${result.amount.toStringAsFixed(2)} 元不同）')),
         );
       }
     } catch (e) {

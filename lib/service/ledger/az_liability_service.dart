@@ -368,8 +368,13 @@ class AzLiabilityService {
       'updated_at': now,
     });
 
-    final String totalLoss =
-        await recomputeTotalLossIn(txn, liabilityId: liabilityId);
+    // total_loss 是 TEXT 列；分期 / 贷款由调用方显式传，不再猜 liability_type
+    // 的取值（库里写的是中文 code「分期」，永远不等于 'installment'）。
+    final String totalLoss = await recomputeTotalLossIn(
+      txn,
+      liabilityId: liabilityId,
+      isInstallment: isInstallment,
+    );
     await dao.update(txn, _main, liabilityId, <String, Object?>{
       'total_loss': totalLoss,
       'status': settled ? 'settled' : 'normal',
@@ -446,6 +451,8 @@ class AzLiabilityService {
     int paidTerms = _int(sub['paid_terms']);
     double after;
 
+    // 一次性还清 / 随借随还**没有自动计划**：找不到 pending 时不能抛错，
+    // 否则这两类债永远还不了（文档 IF-Z17：它们是唯一由用户新建记录的情形）。
     if (payCurrentTerm) {
       plan = (await txn.query(
         _loanRepay,
@@ -454,27 +461,26 @@ class AzLiabilityService {
         orderBy: 'term_no ASC',
         limit: 1,
       )).firstOrNull;
-      if (plan == null) throw StateError('当期没有可取消的自动计划记录');
-      currentTotal = _num(plan['principal_part']) +
-          _num(plan['interest_part']) +
-          _num(plan['fee']);
-      final double balance = repaidAmount - currentTotal;
-      final double prepayPrincipal = balance > 0 ? balance : 0;
-      penalty = hasPenalty
-          ? (penaltyOverride ?? _floor2(prepayPrincipal * rate))
-          : 0;
-      final double remainingPayPrincipal = prepayPrincipal - penalty;
-      after = before - _num(plan['principal_part']) - remainingPayPrincipal;
+      if (plan != null) {
+        currentTotal = _num(plan['principal_part']) +
+            _num(plan['interest_part']) +
+            _num(plan['fee']);
+      }
+    }
+    final double balance = repaidAmount - currentTotal;
+    final double prepayPrincipal = balance > 0 ? balance : 0;
+    penalty = hasPenalty
+        ? (penaltyOverride ?? _floor2(prepayPrincipal * rate))
+        : 0;
+    final double remainingPayPrincipal = prepayPrincipal - penalty;
+    final double planPrincipal = plan == null ? 0 : _num(plan['principal_part']);
+    after = before - planPrincipal - remainingPayPrincipal;
+    if (plan != null) {
       paidTerms += 1;
       await dao.update(txn, _loanRepay, _int(plan['id']),
           <String, Object?>{'state': 'cancelled', 'updated_at': now});
-    } else {
-      final double prepayPrincipal = repaidAmount;
-      penalty = hasPenalty
-          ? (penaltyOverride ?? _floor2(prepayPrincipal * rate))
-          : 0;
-      after = before - (prepayPrincipal - penalty);
-      // 当期仍是 pending，只重算它的本金与利息，不生成下期、paid_terms 不加。
+    } else if (!payCurrentTerm) {
+      // 不还本期：当期仍是 pending，只按新剩余本金重算它，不生成下期。
       await _recurrentPending(txn, liabilityId, _loanRepay, sub, after);
     }
     if (after < 0) after = 0;
@@ -484,12 +490,10 @@ class AzLiabilityService {
       'liability_id': liabilityId,
       'sub_liability_id': _int(sub['id']),
       'record_source': 'user',
-      'term_no': payCurrentTerm ? _int(plan?['term_no']) : null,
+      'term_no': plan == null ? null : _int(plan['term_no']),
       'due_at': now,
-      'principal_part': _s(payCurrentTerm
-          ? _num(plan?['principal_part'])
-          : (before - after)),
-      'interest_part': _s(payCurrentTerm ? _num(plan?['interest_part']) : 0),
+      'principal_part': _s(before - after),
+      'interest_part': _s(plan == null ? 0 : _num(plan['interest_part'])),
       'fee': '0',
       'penalty_amount': _s(penalty),
       'state': 'paid',
@@ -507,10 +511,30 @@ class AzLiabilityService {
       'updated_at': now,
     });
     await dao.update(txn, _main, liabilityId, <String, Object?>{
-      'total_loss': await recomputeTotalLossIn(txn, liabilityId: liabilityId),
+      'total_loss': await recomputeTotalLossIn(
+          txn, liabilityId: liabilityId, isInstallment: false),
       'status': settled ? 'settled' : 'normal',
       'updated_at': now,
     });
+    // 还完本期后必须生成下一条 pending，否则未来没有任何待还记录，
+    // 「还本期」入口会永久失效（运行模型硬-2）。
+    int? nextId;
+    if (!settled && plan != null) {
+      nextId = await generateNextPendingIn(
+        txn,
+        liabilityId: liabilityId,
+        subId: _int(sub['id']),
+        previous: <String, Object?>{
+          'term_no': plan['term_no'],
+          'due_at': plan['due_at'],
+        },
+        sub: sub,
+        remaining: after,
+        paidTerms: paidTerms,
+        isInstallment: false,
+        settled: false,
+      );
+    }
     if (settled && _int(sub['link_asset_id']) > 0) {
       await syncMortgageStateIn(txn, assetId: _int(sub['link_asset_id']));
     }
@@ -520,7 +544,7 @@ class AzLiabilityService {
       repayAccountId: accountId,
       mountCreditcardId: null,
       settled: settled,
-      nextPendingId: null,
+      nextPendingId: nextId,
     );
   }
 
@@ -571,6 +595,7 @@ class AzLiabilityService {
     double fee = 0;
     double penalty = 0;
     double after = before;
+    double effectiveAmount = repaidAmount;
     int newTerms = totalTerms;
     String note = '';
 
@@ -605,11 +630,16 @@ class AzLiabilityService {
       final double expected =
           before + perTermInterest + perTermFee + fee + penalty;
       if ((_floor2(repaidAmount) - _floor2(expected)).abs() > 0.01) {
-        throw ArgumentError(
-            '实还金额与按规则算出的结清总额不一致：应为 ${_s(expected)} 元，请核对结清页');
+        // 文档 IF-Z18：不一致时提示核对、确认后「以规则算出的金额为准」写回。
+        // 这里不再抛错回滚——用户不可能凭空填中软件算出的总额，硬校验会让
+        // 全额结清永远办不成。债务侧与账户出账统一用 effectiveAmount。
+        effectiveAmount = expected;
+        note = '提前结清规则：$rule；剩余手续费 ${_s(fee)} 元、额外费用 ${_s(penalty)} 元；'
+            '用户填 ${_s(repaidAmount)} 元，按规则以 ${_s(expected)} 元为准';
+      } else {
+        note = '提前结清规则：$rule；剩余手续费 ${_s(fee)} 元、额外费用 ${_s(penalty)} 元';
       }
       after = 0;
-      note = '提前结清规则：$rule；剩余手续费 ${_s(fee)} 元、额外费用 ${_s(penalty)} 元';
     } else {
       if (partialMode == 'A') {
         if (perTermTotal <= 0 ||
@@ -655,7 +685,7 @@ class AzLiabilityService {
           : null,
       'state': 'paid',
       'repaid_at': now,
-      'repaid_amount': _s(repaidAmount),
+      'repaid_amount': _s(effectiveAmount),
       'repay_account_id': accountId,
       'remaining_after': _s(after),
       'manual_adjusted': 0,
@@ -672,13 +702,14 @@ class AzLiabilityService {
           txn, liabilityId, _instRepay, sub, after, isInstallment: true);
     }
     await dao.update(txn, _main, liabilityId, <String, Object?>{
-      'total_loss': await recomputeTotalLossIn(txn, liabilityId: liabilityId),
+      'total_loss': await recomputeTotalLossIn(
+          txn, liabilityId: liabilityId, isInstallment: true),
       'status': settled ? 'settled' : 'normal',
       'updated_at': now,
     });
     return AzRepayOutcome(
       repayId: repayId,
-      amount: repaidAmount,
+      amount: effectiveAmount,
       repayAccountId: accountId,
       mountCreditcardId: _nullableInt(sub['mount_creditcard_id']),
       settled: settled,
@@ -764,9 +795,10 @@ class AzLiabilityService {
       final double penalty = _floor2(principal * rate / 365 * days) +
           _floor2(unpaidInterest * rate / 365 * days);
       // 罚息按「截至当前的总天数」重算覆盖，不逐日累加；
-      // note 只在首次标逾期时追加一次，避免每次打开都堆一行。
-      final String oldNote = (row['note'] ?? '').toString();
-      final String note = penalty > 0 && !oldNote.contains('罚息+复利')
+      // 旧的构成说明先删掉再写新的，避免每次打开都堆一行 / 天数过时。
+      final String oldNote = (row['note'] ?? '').toString().replaceAll(
+          RegExp(r'；?逾期 \d+ 天罚息\+复利 [\d.]+ 元'), '').trim();
+      final String note = penalty > 0
           ? <String>[
               oldNote,
               '逾期 $days 天罚息+复利 ${_s(penalty)} 元',
@@ -783,7 +815,8 @@ class AzLiabilityService {
     if (changed > 0) {
       await dao.update(txn, _main, liabilityId, <String, Object?>{
         'status': 'overdue',
-        'total_loss': await recomputeTotalLossIn(txn, liabilityId: liabilityId),
+        'total_loss': await recomputeTotalLossIn(
+          txn, liabilityId: liabilityId, isInstallment: isInstallment),
         'updated_at': now.millisecondsSinceEpoch,
       });
     }
@@ -794,18 +827,13 @@ class AzLiabilityService {
   /// 【所属模块】service/ledger · 债务统计写回
   /// 【实现功能】贷款 = Σ 已还各期(interest_part + fee + penalty_amount) + 次表 service_fee；分期同式但无 service_fee 项。
   /// 【使用限制】主表只存结果、由软件累加、用户不手填；只做这一笔债维度展示，不进账户侧三个统计视图、与账户流水不相加；必须在事务内。
-  /// 【入参与结果】收 txn / liabilityId；返回新的 total_loss 十进制字符串，必须 await。
+  /// 【入参与结果】收 txn / liabilityId / isInstallment；返回新的 total_loss 十进制字符串，必须 await。
   /// 【异常与调用方处理】DAO 异常上抛并回滚；调用方不得拿返回值写账户余额或支出统计。
   Future<String> recomputeTotalLossIn(
     DatabaseExecutor txn, {
     required int liabilityId,
+    required bool isInstallment,
   }) async {
-    final Map<String, Object?>? main = (await txn.query(
-      _main, where: 'id = ?', whereArgs: <Object?>[liabilityId], limit: 1))
-        .firstOrNull;
-    if (main == null) return '0';
-    final bool isInstallment =
-        (main['liability_type'] ?? '').toString() == 'installment';
     final String repayTable = isInstallment ? _instRepay : _loanRepay;
     final List<Map<String, Object?>> rows = await txn.query(
       repayTable,
@@ -817,6 +845,16 @@ class AzLiabilityService {
       total += _num(r['interest_part']) +
           _num(r['fee']) +
           _num(r['penalty_amount']);
+    }
+    // 逾期罚息已经实际发生，也要计入「一共多付了多少钱」；
+    // 记录还完后会变成 paid，penalty 已在上面累加过，不会双计。
+    final List<Map<String, Object?>> overdue = await txn.query(
+      repayTable,
+      where: 'liability_id = ? AND state = ?',
+      whereArgs: <Object?>[liabilityId, 'overdue'],
+    );
+    for (final Map<String, Object?> r in overdue) {
+      total += _num(r['penalty_amount']);
     }
     if (!isInstallment) {
       final Map<String, Object?>? sub = (await txn.query(
@@ -887,20 +925,28 @@ class AzLiabilityService {
     required int liabilityId,
     int? preferred,
   }) async {
-    if (preferred != null && preferred > 0) return preferred;
-    final Map<String, Object?>? main = (await txn.query(
-      _main, where: 'id = ?', whereArgs: <Object?>[liabilityId], limit: 1))
-        .firstOrNull;
-    final int id = _int(main?['link_account_id']);
-    if (id <= 0) throw StateError('这笔债没有绑定还款账户，请重新关联');
+    int id = preferred ?? 0;
+    if (id <= 0) {
+      final Map<String, Object?>? main = (await txn.query(
+        _main, where: 'id = ?', whereArgs: <Object?>[liabilityId], limit: 1))
+          .firstOrNull;
+      id = _int(main?['link_account_id']);
+    }
+    if (id <= 0) {
+      throw StateError('这笔债没有绑定还款账户，请在还款弹层选择付款账户');
+    }
     final List<Map<String, Object?>> rows = await txn.query(
       'accounts',
-      columns: <String>['id'],
+      columns: <String>['id', 'kind'],
       where: 'id = ? AND deleted_at IS NULL',
       whereArgs: <Object?>[id],
       limit: 1,
     );
     if (rows.isEmpty) throw StateError('还款账户已删除，请重新关联');
+    // 信用卡的「出账」是增加已用额度，拿它做贷款扣款会把余额写反（IF-Z23）。
+    if ((rows.first['kind'] ?? '').toString() == 'credit') {
+      throw ArgumentError('还款账户不能是信用卡，请选流动资金 / 其他资金账户');
+    }
     return id;
   }
 

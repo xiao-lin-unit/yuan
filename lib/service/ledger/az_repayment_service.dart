@@ -61,7 +61,13 @@ class AzRepaymentService {
           fee: fee,
           isInstallment: isInstallment,
         );
-        // ② 账户侧 IF-05：付款存储账户留一条出账，金额是实还总额（含本息费）。
+        // ② 账户侧 IF-05：付款存储账户留一条出账。
+        // ★ account_entries 有跨列 CHECK：entry_type='credit_repay' 必须同时带
+        //   transfer_group_id 与 counterparty_account_id，否则 INSERT 直接被拒、
+        //   整个 uow.run 回滚（还款 100% 失效）。不挂卡时对手方没有账户实体，
+        //   用 0 占位；同一笔的两条流水共用 repayment group。
+        final int? creditCardId = outcome.mountCreditcardId;
+        final String group = 'liability_repay_${outcome.repayId}';
         await ledger.debit(
           txn,
           accountId: outcome.repayAccountId,
@@ -69,12 +75,13 @@ class AzRepaymentService {
           entryType: AccountEntryType.creditRepay,
           occurredAt: repaidAt,
           note: note,
+          counterpartyAccountId: creditCardId ?? 0,
+          transferGroupId: group,
           refType: 'liability_repay',
           refId: outcome.repayId,
         );
-        // ③ 契-1：挂卡分期同事务再写一条等值入账腿，卡上欠款随之下降；
+        // ③ 契-1：挂卡分期同事务再写一条等值入账腿，两条互为对手、同组；
         //    卡欠款与分期剩余本金是同一笔钱，两边各减一次、永不相加。
-        final int? creditCardId = outcome.mountCreditcardId;
         if (creditCardId != null) {
           await ledger.credit(
             txn,
@@ -83,6 +90,8 @@ class AzRepaymentService {
             entryType: AccountEntryType.creditRepay,
             occurredAt: repaidAt,
             note: note,
+            counterpartyAccountId: outcome.repayAccountId,
+            transferGroupId: group,
             refType: 'liability_repay',
             refId: outcome.repayId,
           );
@@ -132,23 +141,30 @@ class AzRepaymentService {
             penaltyOverride: request.penaltyOverride,
           );
         }
+        // 出账金额以债务侧结果为准：分期全额结清时会按 settle_rule 重算总额，
+        // 债务侧与账户侧必须用同一个数，否则两侧对不上账。
+        final int? creditCardId = outcome.mountCreditcardId;
+        final String group = 'liability_repay_${outcome.repayId}';
         await ledger.debit(
           txn,
           accountId: outcome.repayAccountId,
-          amount: request.amount,
+          amount: outcome.amount,
           entryType: AccountEntryType.creditRepay,
           occurredAt: request.repaidAt,
+          counterpartyAccountId: creditCardId ?? 0,
+          transferGroupId: group,
           refType: 'liability_repay',
           refId: outcome.repayId,
         );
-        final int? creditCardId = outcome.mountCreditcardId;
         if (creditCardId != null) {
           await ledger.credit(
             txn,
             accountId: creditCardId,
-            amount: request.amount,
+            amount: outcome.amount,
             entryType: AccountEntryType.creditRepay,
             occurredAt: request.repaidAt,
+            counterpartyAccountId: outcome.repayAccountId,
+            transferGroupId: group,
             refType: 'liability_repay',
             refId: outcome.repayId,
           );
