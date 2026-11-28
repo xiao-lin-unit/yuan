@@ -8,9 +8,18 @@ import '../icons/app_icons.dart';
 import 'app_info_tip.dart';
 
 // ── 组件私有样式（只服务本文件，全部引用全局令牌）──────────────
-// 56 → 60：label 旁多了 28dp 的小 ⓘ 热区，给 Row 留 4dp 余量，
-// 避免 IntrinsicHeight 下文字 + 图标把固定格撑出 overflow。
-const double _kStatCellHeight = 60;
+// 统计格的**最小高度**，不是固定高度。
+//
+// 第五轮把它写成 SizedBox(height: 60) 的 tight 约束，并把「56 → 60」当作
+// 给 label 旁 28dp 小 ⓘ 热区留 4dp 余量的推算值。真机实测：系统字号 /
+// 中文字体度量下，label 行（被 IconButton 热区撑高）+ 4dp 行距 +
+// 16px/1.4 数值行的自然高度约 64dp，被 tight 60 压出 4px 底部
+// RenderFlex overflow（黄黑条纹）。数字是猜的，撑不撑得下由内容决定。
+//
+// 改为 ConstrainedBox(minHeight:) 后：常态按内容自然高，下限 60；
+// 系统文字缩放再大也只会把格子撑高，不会再 overflow。外层
+// IntrinsicHeight 仍把同一条里的所有格统一到最高那一格，保持等高。
+const double _kStatCellMinHeight = 60;
 const double _kSegmentMinHeight = AppComponentSize.segmentedButtonHeight;
 const double _kStatIndicatorHeight = 2;
 
@@ -183,13 +192,15 @@ class _StatCell extends StatelessWidget {
           : Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        child: SizedBox(
-          height: _kStatCellHeight,
+        // 不给 tight 高度：label 旁挂小 ⓘ 后这一列的内容自然高会超过 60，
+        // 固定高度必然压出底部溢出。minHeight 只保证格子不塌，长高交给
+        // 内容，外层 IntrinsicHeight 负责把整条统计条拉齐到同一高度。
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: _kStatCellMinHeight),
           child: Stack(
             alignment: Alignment.center,
             children: <Widget>[
               Column(
-                mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
                 children: <Widget>[
                   Row(
